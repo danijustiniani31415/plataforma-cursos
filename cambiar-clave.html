@@ -66,29 +66,46 @@
   </div>
 
   <script type="module">
-    import { supabase } from './supabaseClient.js';
+import { supabase } from './src/supabaseClient.js';
 
-    async function actualizarClave() {
-      const nuevaClave = document.getElementById("new-password").value;
+// 🆕 Capturar sesión desde el enlace del correo
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    console.log('✅ Sesión de recuperación activa');
+  }
+});
 
-      if (!nuevaClave || nuevaClave.length < 6) {
-        alert("⚠️ La contraseña debe tener al menos 6 caracteres.");
-        return;
-      }
+async function actualizarClave() {
+  const nuevaClave = document.getElementById("new-password").value;
 
-      const { error } = await supabase.auth.updateUser({
-        password: nuevaClave,
-      });
+  if (!nuevaClave || nuevaClave.length < 6) {
+    alert("⚠️ La contraseña debe tener al menos 6 caracteres.");
+    return;
+  }
 
-      if (error) {
-        alert("❌ Error: " + error.message);
-      } else {
-        alert("✅ Contraseña actualizada. Puedes iniciar sesión.");
-        window.location.href = "index.html";
-      }
-    }
+  const { error } = await supabase.auth.updateUser({
+    password: nuevaClave,
+  });
 
-    window.actualizarClave = actualizarClave;
+  if (error) {
+    alert("❌ Error: " + error.message);
+    return;
+  }
+
+  // Marcar que ya cambió la contraseña
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    await supabase
+      .from('profiles')
+      .update({ debe_cambiar_password: false })
+      .eq('id', user.id);
+  }
+
+  alert("✅ Contraseña actualizada correctamente.");
+  window.location.href = "index.html";
+}
+
+window.actualizarClave = actualizarClave;
   </script>
 </body>
 </html>

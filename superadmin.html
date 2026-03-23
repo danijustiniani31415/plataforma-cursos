@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Super Administrador</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .tabs { display: flex; gap: 10px; margin-bottom: 30px; }
+    .tab-btn {
+      padding: 10px 25px; border: none; border-radius: 6px;
+      cursor: pointer; font-weight: bold; background: #e0e0e0; color: #333;
+    }
+    .tab-btn.activo { background: #002855; color: white; }
+    .tab-content { display: none; }
+    .tab-content.activo { display: block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th { background: #002855; color: white; padding: 10px; text-align: left; }
+    td { padding: 10px; border-bottom: 1px solid #eee; }
+    tr:hover { background: #f5f5f5; }
+    .badge-admin { background: #ffc107; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; }
+    .badge-superadmin { background: #dc3545; color: white; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; }
+    .badge-trabajador { background: #28a745; color: white; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+  <header style="display:flex; align-items:center; justify-content:space-between;
+    background:#002855; padding:20px 40px; color:white;">
+    <div style="display:flex; align-items:center; gap:20px;">
+      <img src="logo.png" alt="Logo" style="height:50px; filter:brightness(0) invert(1);" />
+      <div>
+        <h1 style="margin:0; font-size:1.5rem;">Panel Super Administrador</h1>
+        <p style="margin:0; opacity:0.8; font-size:0.9rem;">Gestión global del sistema</p>
+      </div>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <button onclick="window.location.href='index.html'" 
+        style="padding:8px 16px; background:rgba(255,255,255,0.2); color:white; border:none; border-radius:6px; cursor:pointer;">
+        ← Volver
+      </button>
+      <button onclick="cerrarSesion()"
+        style="padding:8px 16px; background:#dc3545; color:white; border:none; border-radius:6px; cursor:pointer;">
+        🔓 Salir
+      </button>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- TABS -->
+    <div class="tabs" style="margin-top:30px;">
+      <button class="tab-btn activo" onclick="mostrarTab('empresas')">🏢 Empresas</button>
+      <button class="tab-btn" onclick="mostrarTab('admins')">👤 Administradores</button>
+      <button class="tab-btn" onclick="mostrarTab('cargos')">💼 Cargos</button>
+      <button class="tab-btn" onclick="mostrarTab('usuarios')">👥 Todos los usuarios</button>
+    </div>
+
+    <!-- TAB EMPRESAS -->
+    <div id="tab-empresas" class="tab-content activo">
+      <h2>🏢 Empresas</h2>
+      <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:10px; max-width:600px; margin-bottom:20px;">
+        <input type="text" id="empresa-nombre" placeholder="Nombre de la empresa *" />
+        <input type="text" id="empresa-ruc" placeholder="RUC *" maxlength="11" />
+        <button onclick="crearEmpresa()" class="btn-primary">+ Agregar</button>
+      </div>
+      <table id="tabla-empresas">
+        <thead>
+          <tr>
+            <th>Empresa</th>
+            <th>RUC</th>
+            <th>Estado</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- TAB ADMINS -->
+    <div id="tab-admins" class="tab-content">
+      <h2>👤 Crear Administrador</h2>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:700px;">
+        <input type="text" id="admin-nombres" placeholder="Nombres *" />
+        <input type="text" id="admin-apellidos" placeholder="Apellidos *" />
+        <select id="admin-doc-tipo">
+          <option value="DNI">DNI</option>
+          <option value="CE">Carnet de Extranjería</option>
+          <option value="PASAPORTE">Pasaporte</option>
+        </select>
+        <input type="text" id="admin-dni" placeholder="Número de documento *" 
+               oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12" />
+        <input type="email" id="admin-email" placeholder="Correo electrónico *" />
+        <input type="text" id="admin-telefono" placeholder="Teléfono (opcional)" />
+        <select id="admin-empresa">
+          <option value="">-- Selecciona empresa --</option>
+        </select>
+        <select id="admin-cargo">
+          <option value="">-- Selecciona cargo --</option>
+        </select>
+        <input type="date" id="admin-fecha-ingreso" />
+      </div>
+      <button onclick="crearAdmin()" class="btn-primary" style="margin-top:15px;">
+        Crear Administrador
+      </button>
+      <h3 style="margin-top:30px;">Lista de Administradores</h3>
+      <table id="tabla-admins">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Empresa</th>
+            <th>Documento</th>
+            <th>Estado</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- TAB CARGOS -->
+    <div id="tab-cargos" class="tab-content">
+      <h2>💼 Cargos</h2>
+      <div style="display:flex; gap:10px; max-width:400px; margin-bottom:20px;">
+        <input type="text" id="cargo-nombre" placeholder="Nombre del cargo *" style="flex:1;" />
+        <button onclick="crearCargo()" class="btn-primary">+ Agregar</button>
+      </div>
+      <table id="tabla-cargos">
+        <thead>
+          <tr>
+            <th>Cargo</th>
+            <th>Estado</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- TAB TODOS LOS USUARIOS -->
+    <div id="tab-usuarios" class="tab-content">
+      <h2>👥 Todos los Usuarios</h2>
+      <div style="display:flex; gap:10px; margin-bottom:15px;">
+        <input type="text" id="buscar-usuario" placeholder="🔍 Buscar por nombre, email o documento..." 
+               oninput="filtrarUsuarios()" style="flex:1; padding:10px;" />
+        <select id="filtro-empresa" onchange="filtrarUsuarios()" style="padding:10px;">
+          <option value="">Todas las empresas</option>
+        </select>
+      </div>
+      <table id="tabla-usuarios">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Empresa</th>
+            <th>Cargo</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script type="module" src="superadmin.js"></script>
+</body>
+</html>

@@ -2,268 +2,107 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Plataforma de Capacitación</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="theme-color" content="#002855" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Plataforma de Capacitación · CV Global</title>
   <link rel="stylesheet" href="styles.css" />
-  <style>
-    /* PANTALLA DE BIENVENIDA */
-    #splash-screen {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: #f5f7fa;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      z-index: 9999;
-      transition: opacity 0.5s ease;
-    }
-
-    #splash-logo {
-      width: 120px;
-      margin-bottom: 20px;
-      animation: logo-fade 1.2s ease-in-out;
-    }
-
-    @keyframes logo-fade {
-      0% { opacity: 0; transform: scale(0.9); }
-      100% { opacity: 1; transform: scale(1); }
-    }
-
-    #splash-text {
-      font-size: 1.2rem;
-      color: #003366;
-      font-weight: bold;
-    }
-
-    /* ESTILOS ADICIONALES PARA EL SISTEMA DE PASOS */
-    .paso-navegacion {
-      margin: 30px 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 15px;
-      background: #f8f9fa;
-      border-radius: 10px;
-    }
-
-    .btn-navegacion {
-      padding: 12px 25px;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: all 0.3s ease;
-    }
-
-    .btn-anterior {
-      background: #6c757d;
-    }
-
-    .btn-anterior:hover:not(:disabled) {
-      background: #5a6268;
-    }
-
-    .btn-siguiente {
-      background: #28a745;
-    }
-
-    .btn-siguiente:hover:not(:disabled) {
-      background: #218838;
-    }
-
-    .btn-navegacion:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-
-    .info-paso {
-      text-align: center;
-    }
-
-    .titulo-paso {
-      font-weight: bold;
-      color: #002855;
-      font-size: 1.1rem;
-    }
-
-    .contador-paso {
-      color: #666;
-      font-size: 0.9rem;
-      margin-top: 5px;
-    }
-
-    .contenido-paso {
-      background: white;
-      padding: 25px;
-      border-radius: 10px;
-      box-shadow: 0 2px 15px rgba(0,0,0,0.1);
-      margin: 20px 0;
-    }
-
-    .enlace-externo {
-      text-align: center;
-      margin-top: 15px;
-    }
-
-    .enlace-externo a {
-      color: #007bff;
-      text-decoration: none;
-      font-weight: 500;
-    }
-
-    .enlace-externo a:hover {
-      text-decoration: underline;
-    }
-
-    /* ESTILOS PARA IFRAMES */
-    iframe {
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-
-    /* SECCIÓN DE NOTA */
-    #seccion-nota {
-      background: #e8f5e8;
-      padding: 20px;
-      border-radius: 10px;
-      border-left: 4px solid #28a745;
-      margin: 25px 0;
-    }
-
-    #seccion-nota h3 {
-      color: #155724;
-      margin-top: 0;
-    }
-  </style>
 </head>
 <body>
 
-  <!-- 🌀 PANTALLA DE BIENVENIDA -->
+  <!-- ░░ SPLASH SCREEN ░░ -->
   <div id="splash-screen">
-    <img src="logo.png" id="splash-logo" alt="Logo Institucional" />
-    <div id="splash-text">Cargando plataforma...</div>
+    <img src="logo.png" id="splash-logo" alt="CV Global" />
+    <div id="splash-text">Cargando plataforma</div>
+    <div class="splash-bar"></div>
   </div>
 
-  <!-- 🌐 ENCABEZADO PROFESIONAL -->
-  <header style="
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    background-color: #ffffff;
-    padding: 30px 40px;
-    border-bottom: 2px solid #e0e0e0;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  ">
-    <img src="logo.png" alt="Logo Institucional" style="height: 70px; margin-right: 30px;" />
-    <div>
-      <h1 style="
-        margin: 0;
-        color: #002855;
-        font-size: 2rem;
-        font-weight: 600;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      ">
-        Plataforma de Capacitación
-      </h1>
-      <p style="
-        margin: 6px 0 0;
-        color: #666666;
-        font-size: 1rem;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      ">
-        Formación profesional interna para trabajadores
-      </p>
+  <!-- ░░ HEADER ░░ -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <img src="logo.png" alt="CV Global" class="header-logo" />
+        <div>
+          <div class="header-title">CV Global S.A.C.</div>
+          <div class="header-subtitle">Plataforma de Capacitación SST</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button onclick="logout()" class="btn-logout" id="btn-logout" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Salir
+        </button>
+      </div>
     </div>
   </header>
 
-  <!-- 🔐 LOGIN -->
-  <section id="login-section" class="container">
-    <h2>🔑 Ingreso al Sistema</h2>
-    <div class="form-group">
-      <input type="email" id="email" placeholder="Correo electrónico" />
-      <input type="password" id="password" placeholder="Contraseña" />
-      <button onclick="login()" class="btn-primary">Ingresar</button>
-    </div>
-    <p style="text-align: center; margin-top: 15px;">
-      <a href="cambiar-clave.html" style="color: #007bff; text-decoration: none;">¿Olvidaste tu contraseña?</a>
-    </p>
-  </section>
+  <!-- ░░ MAIN ░░ -->
+  <main class="app-main">
 
-  <!-- 📚 CURSOS DISPONIBLES -->
-  <section id="cursos-disponibles" style="display: none;" class="container">
-    <h2>📚 Cursos Disponibles</h2>
-    <p>Selecciona un curso para comenzar tu capacitación:</p>
-    <div id="lista-cursos" class="cursos-grid"></div>
-  </section>
-
-  <!-- 📺 CURSO DETALLE CON SISTEMA DE PASOS -->
-  <section id="curso-section" style="display: none;" class="container">
-    <h2 id="titulo-curso"></h2>
-    
-    <!-- CONTENIDO DINÁMICO DE PASOS -->
-    <div id="video-curso"></div>
-
-    <!-- SECCIÓN DE NOTA (SOLO VISIBLE AL FINAL) -->
-    <div id="seccion-nota" style="display: none;">
-      <h3>📊 Finalizar Curso</h3>
-      <p>¡Felicidades! Has completado todos los pasos del curso. Ahora ingresa tu calificación para finalizar:</p>
-      <div style="display: flex; gap: 10px; align-items: center; justify-content: center; margin: 20px 0;">
-        <input type="number" id="nota" placeholder="Nota (0-20)" min="0" max="20" 
-               style="padding: 10px; border: 2px solid #ddd; border-radius: 5px; width: 120px; text-align: center;" />
-        <button onclick="enviarNota()" class="btn-primary">Enviar Nota y Finalizar</button>
+    <!-- 🔐 LOGIN -->
+    <section id="login-section" class="container" style="max-width:420px; margin:40px auto;">
+      <div class="login-header">
+        <div class="login-icon">🔐</div>
+        <h1 class="login-title">Bienvenido</h1>
+        <p class="login-subtitle">Ingresa tus credenciales para continuar</p>
       </div>
-    </div>
-
-    <!-- BOTÓN VOLVER -->
-    <button onclick="volverACursos()" class="btn-secondary" style="margin-top: 20px;">
-      ← Volver a Cursos
-    </button>
-
-    <!-- 🎓 CERTIFICADO -->
-    <section id="certificado-section" style="display: none; margin-top: 30px;">
-      <div style="background: #d4edda; padding: 20px; border-radius: 10px; border-left: 4px solid #28a745;">
-        <h3>🎓 ¡Felicitaciones!</h3>
-        <p>Has aprobado el curso satisfactoriamente. Ahora puedes generar tu certificado oficial:</p>
-        <button onclick="generarCertificado()" class="btn-success">
-          🏆 Generar Certificado PDF
+      <div class="form-group">
+        <input type="email" id="email" placeholder="Correo electrónico" autocomplete="email" />
+        <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password" />
+        <button onclick="login()" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Ingresar
         </button>
       </div>
+      <p class="link-muted">
+        <a href="recuperar-clave.html">¿Olvidaste tu contraseña?</a>
+      </p>
     </section>
-  </section>
 
-  <!-- ⚙️ PANEL ADMIN -->
-  <div id="admin-panel" style="display: none;" class="container">
-    <h2>👨‍💼 Panel de Administración</h2>
-    <div style="text-align: center; margin: 20px 0;">
-      <button onclick="window.location.href='admin.html'" class="btn-primary" style="padding: 12px 30px;">
-        🛠️ Ir al Panel Completo de Administración
-      </button>
-    </div>
-  </div>
+    <!-- 📚 CURSOS DISPONIBLES -->
+    <section id="cursos-disponibles" style="display:none;" class="container">
+      <h2>📚 Mis Cursos</h2>
+      <p class="section-desc">Selecciona un curso para comenzar tu capacitación</p>
+      <div id="lista-cursos" class="cursos-grid"></div>
+    </section>
 
-  <!-- SCRIPTS -->
+    <!-- 📺 CURSO DETALLE -->
+    <section id="curso-section" style="display:none;" class="container">
+      <h2 id="titulo-curso" style="margin-bottom:16px; font-size:1.1rem;"></h2>
+
+      <!-- Contenido dinámico de pasos -->
+      <div id="video-curso"></div>
+
+      <!-- 🎓 CERTIFICADO -->
+      <section id="certificado-section" style="display:none;">
+        <div class="certificado-banner">
+          <span class="certificado-icon">🏆</span>
+          <h3 class="certificado-title">¡Curso Completado!</h3>
+          <p class="certificado-desc">Has aprobado satisfactoriamente. Tu certificado está listo.</p>
+          <button onclick="generarCertificado()" class="btn-cert">
+            🎓 Obtener Certificado
+          </button>
+        </div>
+      </section>
+    </section>
+
+    <!-- ⚙️ PANEL ADMIN -->
+    <div id="admin-panel" style="display:none;"></div>
+
+  </main>
+
+  <!-- ░░ SCRIPTS ░░ -->
   <script>
-    // Oculta el splash luego de unos segundos
     window.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => {
         const splash = document.getElementById('splash-screen');
-        splash.style.opacity = '0';
-        setTimeout(() => splash.remove(), 500);
-      }, 2500);
+        if (splash) {
+          splash.style.opacity = '0';
+          setTimeout(() => splash.remove(), 600);
+        }
+      }, 2000);
     });
-
-    // Función global para volver a cursos
-    window.volverACursos = function() {
-      document.getElementById('curso-section').style.display = 'none';
-      document.getElementById('certificado-section').style.display = 'none';
-      document.getElementById('cursos-disponibles').style.display = 'block';
-    };
   </script>
 
   <script type="module" src="main.js"></script>

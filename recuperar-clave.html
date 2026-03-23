@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Recuperar Contraseña</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🔑 Recuperar Contraseña</h2>
+    <p>Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.</p>
+    <input type="email" id="email-recuperar" placeholder="Correo electrónico" 
+           style="width:100%; padding:12px; margin-top:10px; border-radius:5px; border:1px solid #ccc;" />
+    <button onclick="enviarEnlace()" 
+            style="width:100%; padding:12px; margin-top:10px; background:#007bff; color:white; border:none; border-radius:5px; cursor:pointer; font-size:1rem;">
+      Enviar enlace
+    </button>
+    <p style="text-align:center; margin-top:15px;">
+      <a href="index.html" style="color:#007bff;">← Volver al login</a>
+    </p>
+  </div>
+
+  <script type="module">
+    import { supabase } from './src/supabaseClient.js';
+
+    async function enviarEnlace() {
+      const email = document.getElementById('email-recuperar').value.trim();
+
+      if (!email) {
+        alert('❌ Ingresa tu correo.');
+        return;
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'https://cursossstcvglobal.netlify.app/cambiar-clave.html'
+      });
+
+      if (error) {
+        alert('❌ Error: ' + error.message);
+      } else {
+        alert('✅ Enlace enviado. Revisa tu correo.');
+        window.location.href = 'index.html';
+      }
+    }
+
+    window.enviarEnlace = enviarEnlace;
+  </script>
+</body>
+</html>

@@ -6,28 +6,63 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+<button onclick="window.location.href='index.html#cursos'" style="
+padding:10px 20px;
+margin-bottom:20px;
+background:#002855;
+color:white;
+border:none;
+border-radius:6px;
+cursor:pointer;
+">
+← Volver a cursos
+</button>
   <h1>🎓 Panel de Administración</h1>
 
-  <section>
-    <h2>👥 Crear cuenta de usuario</h2>
-    <input type="email" id="nuevo-email" placeholder="Correo del usuario" />
-    <input type="text" id="nuevo-dni" placeholder="DNI (será la contraseña inicial)" />
-    <select id="rol">
-      <option value="trabajador">Trabajador</option>
-      <option value="admin">Administrador</option>
+<section>
+  <h2>👥 Crear cuenta de usuario</h2>
+
+  <div id="info-empresa"></div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:700px;">
+    <input type="text" id="nuevo-nombres" placeholder="Nombres *" />
+    <input type="text" id="nuevo-apellidos" placeholder="Apellidos *" />
+    <select id="nuevo-doc-tipo">
+      <option value="DNI">DNI</option>
+      <option value="CE">Carnet de Extranjería</option>
+      <option value="PASAPORTE">Pasaporte</option>
     </select>
-    <button onclick="crearUsuario()">Crear usuario</button>
-  </section>
+    <input type="text" id="nuevo-dni" placeholder="Nº documento * (contraseña inicial)"
+           oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12" />
+           <span id="dni-mensaje" style="font-size:0.85rem;"></span>
+    <input type="email" id="nuevo-email" placeholder="Correo electrónico *" />
+    <input type="text" id="nuevo-telefono" placeholder="Teléfono (opcional)" />
+    <select id="nuevo-cargo">
+      <option value="">-- Selecciona cargo --</option>
+    </select>
+    <input type="date" id="nuevo-fecha-ingreso" />
+  </div>
+  <button onclick="crearUsuario()" class="btn-primary" style="margin-top:15px;">
+    Crear usuario
+  </button>
+</section>
 
   <hr>
 
   <section>
-    <h2>📚 Subir nuevo curso</h2>
-    <input type="text" id="titulo-curso" placeholder="Nombre del curso" />
+  <h2>📚 Subir nuevo curso</h2>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:700px;">
+    <input type="text" id="titulo-curso" placeholder="Nombre del curso *" />
+    <input type="text" id="codigo-prefijo" placeholder="Prefijo del código (ej: IPERC, TEA) *" 
+           oninput="this.value=this.value.toUpperCase()" />
+    <input type="number" id="duracion-curso" placeholder="Duración en horas *" min="1" />
+    <input type="text" id="url-material" placeholder="URL del material (PDF, OneDrive)" />
     <input type="text" id="url-video" placeholder="URL del video (YouTube)" />
-    <input type="text" id="url-material" placeholder="URL del material (PDF, PPT, etc.)" />
-    <button onclick="subirCurso()">Subir curso</button>
-  </section>
+  </div>
+  <button onclick="subirCurso()" class="btn-primary" style="margin-top:15px;">
+    Subir curso
+  </button>
+</section>
 
   <hr>
 

@@ -498,8 +498,8 @@ async function mostrarPasoActual() {
         <div class="nav-step-title">${tituloPaso}</div>
         <div class="nav-step-counter">Paso ${pasoActual + 1} de ${pasosCurso.length}</div>
       </div>
-      <button id="btn-siguiente-paso" onclick="siguientePaso()" class="btn-nav btn-nav-next"
-        ${!siguienteHabilitado || pasoActual === pasosCurso.length - 1 ? 'disabled' : ''}>
+      <button id="btn-siguiente-paso" onclick="${pasoActual === pasosCurso.length - 1 ? 'volverACursos()' : 'siguientePaso()'}" class="btn-nav btn-nav-next"
+        ${!siguienteHabilitado && pasoActual !== pasosCurso.length - 1 ? 'disabled' : ''}>
         ${pasoActual === pasosCurso.length - 1 ? '✓ Fin' : 'Siguiente →'}
       </button>
     </div>

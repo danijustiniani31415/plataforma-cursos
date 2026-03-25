@@ -99,23 +99,22 @@ function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
     if (msgEl) msgEl.textContent = '🔍 Buscando...';
 
     try {
-      const res = await fetch(`https://api.apis.net.pe/v2/reniec/dni?numero=${dni}`, {
-        headers: {
-          'Authorization': 'Bearer sk_14199.BlaC6DKIilEbkTdYzNav3K73rIZR5MS5',
-          'Accept': 'application/json'
-        }
+      const { data, error } = await supabase.functions.invoke('consultar-reniec', {
+        body: { dni }
       });
-      const data = await res.json();
-      if (res.ok && data.nombres) {
+      if (error || data?.error) {
+        if (msgEl) msgEl.textContent = '⚠️ ' + (data?.error || error.message) + ' — ingresa manualmente.';
+        return;
+      }
+      if (data?.nombres) {
         document.getElementById(idNombres).value = data.nombres;
         document.getElementById(idApellidos).value = `${data.apellidoPaterno} ${data.apellidoMaterno}`;
         if (msgEl) msgEl.textContent = '✅ Datos cargados automáticamente';
       } else {
-        if (msgEl) msgEl.textContent = '⚠️ ' + (data.message || 'No encontrado') + ' — ingresa manualmente.';
+        if (msgEl) msgEl.textContent = '⚠️ No encontrado — ingresa manualmente.';
       }
     } catch (err) {
-      console.error('RENIEC error:', err);
-      if (msgEl) msgEl.textContent = '⚠️ ' + err.message + ' — ingresa manualmente.';
+      if (msgEl) msgEl.textContent = '⚠️ Error — ingresa manualmente.';
     }
   });
 }

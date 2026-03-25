@@ -222,6 +222,9 @@ window.crearAdmin = async function () {
    'admin-telefono','admin-fecha-ingreso'].forEach(id => {
     document.getElementById(id).value = '';
   });
+  document.getElementById('admin-doc-tipo').value = 'DNI';
+  document.getElementById('admin-empresa').value = '';
+  document.getElementById('admin-cargo').value = '';
   await cargarAdmins();
 };
 

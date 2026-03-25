@@ -25,8 +25,6 @@ cursor:pointer;
   <div id="info-empresa"></div>
 
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:700px;">
-    <input type="text" id="nuevo-nombres" placeholder="Nombres *" />
-    <input type="text" id="nuevo-apellidos" placeholder="Apellidos *" />
     <select id="nuevo-doc-tipo">
       <option value="DNI">DNI</option>
       <option value="CE">Carnet de Extranjería</option>
@@ -38,6 +36,8 @@ cursor:pointer;
       <span id="dni-mensaje" style="font-size:0.85rem;"></span>
       <span id="nuevo-dni-reniec-msg" style="font-size:0.8rem; color:#555;"></span>
     </div>
+    <input type="text" id="nuevo-nombres" placeholder="Nombres *" disabled />
+    <input type="text" id="nuevo-apellidos" placeholder="Apellidos *" disabled />
     <input type="email" id="nuevo-email" placeholder="Correo electrónico *" />
     <input type="text" id="nuevo-telefono" placeholder="Teléfono (opcional)" />
     <select id="nuevo-cargo">

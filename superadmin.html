@@ -84,8 +84,6 @@
     <div id="tab-admins" class="tab-content">
       <h2>👤 Crear Administrador</h2>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:700px;">
-        <input type="text" id="admin-nombres" placeholder="Nombres *" />
-        <input type="text" id="admin-apellidos" placeholder="Apellidos *" />
         <select id="admin-doc-tipo">
           <option value="DNI">DNI</option>
           <option value="CE">Carnet de Extranjería</option>
@@ -96,6 +94,8 @@
                  oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12" style="width:100%; box-sizing:border-box;" />
           <span id="admin-dni-reniec-msg" style="font-size:0.8rem; color:#555;"></span>
         </div>
+        <input type="text" id="admin-nombres" placeholder="Nombres *" disabled />
+        <input type="text" id="admin-apellidos" placeholder="Apellidos *" disabled />
         <input type="email" id="admin-email" placeholder="Correo electrónico *" />
         <input type="text" id="admin-telefono" placeholder="Teléfono (opcional)" />
         <select id="admin-empresa">

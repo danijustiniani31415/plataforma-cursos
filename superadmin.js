@@ -37,6 +37,15 @@ function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
     if (tipo !== 'DNI' || dni.length !== 8) return;
 
     const msgEl = document.getElementById(idDni + '-reniec-msg');
+    const nombresEl = document.getElementById(idNombres);
+    const apellidosEl = document.getElementById(idApellidos);
+
+    if (tipo !== 'DNI') {
+      nombresEl.disabled = false;
+      apellidosEl.disabled = false;
+      return;
+    }
+
     if (msgEl) msgEl.textContent = '🔍 Buscando...';
 
     try {
@@ -50,13 +59,19 @@ function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
       const json = await res.json();
       const data = json.data || json;
       if (data?.nombres) {
-        document.getElementById(idNombres).value = data.nombres;
-        document.getElementById(idApellidos).value = `${data.apellido_paterno} ${data.apellido_materno}`;
+        nombresEl.value = data.nombres;
+        apellidosEl.value = `${data.apellido_paterno} ${data.apellido_materno}`;
+        nombresEl.disabled = false;
+        apellidosEl.disabled = false;
         if (msgEl) msgEl.textContent = '✅ Datos cargados automáticamente';
       } else {
+        nombresEl.disabled = false;
+        apellidosEl.disabled = false;
         if (msgEl) msgEl.textContent = '⚠️ No encontrado — ingresa manualmente.';
       }
     } catch (err) {
+      nombresEl.disabled = false;
+      apellidosEl.disabled = false;
       if (msgEl) msgEl.textContent = '⚠️ Error — ingresa manualmente.';
     }
   });
@@ -262,6 +277,9 @@ window.crearAdmin = async function () {
   document.getElementById('admin-doc-tipo').value = 'DNI';
   document.getElementById('admin-empresa').value = '';
   document.getElementById('admin-cargo').value = '';
+  document.getElementById('admin-nombres').disabled = true;
+  document.getElementById('admin-apellidos').disabled = true;
+  document.getElementById('admin-dni-reniec-msg').textContent = '';
   await cargarAdmins();
 };
 

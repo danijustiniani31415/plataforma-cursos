@@ -81,6 +81,39 @@ async function cargarDatosAdmin() {
   cargos?.forEach(c => {
     selCargo.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
   });
+
+  configurarRENIEC('nuevo-dni', 'nuevo-doc-tipo', 'nuevo-nombres', 'nuevo-apellidos');
+}
+
+// 🪪 RENIEC autocomplete
+function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
+  const inputDni = document.getElementById(idDni);
+  if (!inputDni) return;
+
+  inputDni.addEventListener('input', async () => {
+    const dni = inputDni.value.trim();
+    const tipo = document.getElementById(idTipo)?.value;
+    if (tipo !== 'DNI' || dni.length !== 8) return;
+
+    const msgEl = document.getElementById(idDni + '-reniec-msg');
+    if (msgEl) msgEl.textContent = '🔍 Buscando...';
+
+    try {
+      const res = await fetch(`https://api.apis.net.pe/v2/reniec/dni?numero=${dni}`, {
+        headers: { Authorization: 'Bearer sk_14199.BlaC6DKIilEbkTdYzNav3K73rIZR5MS5' }
+      });
+      const data = await res.json();
+      if (res.ok && data.nombres) {
+        document.getElementById(idNombres).value = data.nombres;
+        document.getElementById(idApellidos).value = `${data.apellidoPaterno} ${data.apellidoMaterno}`;
+        if (msgEl) msgEl.textContent = '✅ Datos cargados automáticamente';
+      } else {
+        if (msgEl) msgEl.textContent = '⚠️ No encontrado, ingresa manualmente.';
+      }
+    } catch {
+      if (msgEl) msgEl.textContent = '⚠️ Error al consultar RENIEC, ingresa manualmente.';
+    }
+  });
 }
 
 // ═══════════════════════════════

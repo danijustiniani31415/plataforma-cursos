@@ -32,9 +32,12 @@ cursor:pointer;
       <option value="CE">Carnet de Extranjería</option>
       <option value="PASAPORTE">Pasaporte</option>
     </select>
-    <input type="text" id="nuevo-dni" placeholder="Nº documento * (contraseña inicial)"
-           oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12" />
-           <span id="dni-mensaje" style="font-size:0.85rem;"></span>
+    <div>
+      <input type="text" id="nuevo-dni" placeholder="Nº documento * (contraseña inicial)"
+             oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12" style="width:100%; box-sizing:border-box;" />
+      <span id="dni-mensaje" style="font-size:0.85rem;"></span>
+      <span id="nuevo-dni-reniec-msg" style="font-size:0.8rem; color:#555;"></span>
+    </div>
     <input type="email" id="nuevo-email" placeholder="Correo electrónico *" />
     <input type="text" id="nuevo-telefono" placeholder="Teléfono (opcional)" />
     <select id="nuevo-cargo">

@@ -91,8 +91,11 @@
           <option value="CE">Carnet de Extranjería</option>
           <option value="PASAPORTE">Pasaporte</option>
         </select>
-        <input type="text" id="admin-dni" placeholder="Número de documento *" 
-               oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12" />
+        <div>
+          <input type="text" id="admin-dni" placeholder="Número de documento *"
+                 oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12" style="width:100%; box-sizing:border-box;" />
+          <span id="admin-dni-reniec-msg" style="font-size:0.8rem; color:#555;"></span>
+        </div>
         <input type="email" id="admin-email" placeholder="Correo electrónico *" />
         <input type="text" id="admin-telefono" placeholder="Teléfono (opcional)" />
         <select id="admin-empresa">

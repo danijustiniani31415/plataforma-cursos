@@ -100,7 +100,10 @@ function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
 
     try {
       const res = await fetch(`https://api.apis.net.pe/v2/reniec/dni?numero=${dni}`, {
-        headers: { Authorization: 'Bearer sk_14199.BlaC6DKIilEbkTdYzNav3K73rIZR5MS5' }
+        headers: {
+          'Authorization': 'Bearer sk_14199.BlaC6DKIilEbkTdYzNav3K73rIZR5MS5',
+          'Accept': 'application/json'
+        }
       });
       const data = await res.json();
       if (res.ok && data.nombres) {
@@ -108,10 +111,11 @@ function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
         document.getElementById(idApellidos).value = `${data.apellidoPaterno} ${data.apellidoMaterno}`;
         if (msgEl) msgEl.textContent = '✅ Datos cargados automáticamente';
       } else {
-        if (msgEl) msgEl.textContent = '⚠️ No encontrado, ingresa manualmente.';
+        if (msgEl) msgEl.textContent = '⚠️ ' + (data.message || 'No encontrado') + ' — ingresa manualmente.';
       }
-    } catch {
-      if (msgEl) msgEl.textContent = '⚠️ Error al consultar RENIEC, ingresa manualmente.';
+    } catch (err) {
+      console.error('RENIEC error:', err);
+      if (msgEl) msgEl.textContent = '⚠️ ' + err.message + ' — ingresa manualmente.';
     }
   });
 }

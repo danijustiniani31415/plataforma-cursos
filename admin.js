@@ -99,13 +99,15 @@ function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
     if (msgEl) msgEl.textContent = '🔍 Buscando...';
 
     try {
-      const { data, error } = await supabase.functions.invoke('consultar-reniec', {
-        body: { dni }
+      const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/consultar-reniec', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s'
+        },
+        body: JSON.stringify({ dni })
       });
-      if (error || data?.error) {
-        if (msgEl) msgEl.textContent = '⚠️ ' + (data?.error || error.message) + ' — ingresa manualmente.';
-        return;
-      }
+      const data = await res.json();
       if (data?.nombres) {
         document.getElementById(idNombres).value = data.nombres;
         document.getElementById(idApellidos).value = `${data.apellidoPaterno} ${data.apellidoMaterno}`;

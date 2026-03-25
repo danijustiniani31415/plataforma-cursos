@@ -31,6 +31,24 @@ function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
   const inputDni = document.getElementById(idDni);
   if (!inputDni) return;
 
+  // Desbloquear al cambiar a CE o Pasaporte
+  document.getElementById(idTipo)?.addEventListener('change', () => {
+    const tipo = document.getElementById(idTipo).value;
+    const nombresEl = document.getElementById(idNombres);
+    const apellidosEl = document.getElementById(idApellidos);
+    const msgEl = document.getElementById(idDni + '-reniec-msg');
+    if (tipo !== 'DNI') {
+      nombresEl.disabled = false;
+      apellidosEl.disabled = false;
+      if (msgEl) msgEl.textContent = '';
+    } else {
+      nombresEl.disabled = true;
+      apellidosEl.disabled = true;
+      nombresEl.value = '';
+      apellidosEl.value = '';
+    }
+  });
+
   inputDni.addEventListener('input', async () => {
     const dni = inputDni.value.trim();
     const tipo = document.getElementById(idTipo)?.value;
@@ -39,12 +57,6 @@ function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
     const msgEl = document.getElementById(idDni + '-reniec-msg');
     const nombresEl = document.getElementById(idNombres);
     const apellidosEl = document.getElementById(idApellidos);
-
-    if (tipo !== 'DNI') {
-      nombresEl.disabled = false;
-      apellidosEl.disabled = false;
-      return;
-    }
 
     if (msgEl) msgEl.textContent = '🔍 Buscando...';
 

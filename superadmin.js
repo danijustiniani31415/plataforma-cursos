@@ -224,16 +224,31 @@ async function cargarAdmins() {
         <td>${u.empresas?.nombre || '—'}</td>
         <td>${u.documento_tipo}: ${u.documento_numero || '—'}</td>
         <td>${u.activo ? '✅ Activo' : '❌ Inactivo'}</td>
-        <td>
+        <td style="display:flex; gap:6px;">
           <button onclick="toggleUsuario('${u.id}', ${u.activo})"
             style="padding:5px 10px; background:${u.activo ? '#dc3545' : '#28a745'};
                    color:white; border:none; border-radius:4px; cursor:pointer;">
             ${u.activo ? 'Desactivar' : 'Activar'}
           </button>
+          <button onclick="eliminarAdmin('${u.id}', '${u.apellidos} ${u.nombres}')"
+            style="padding:5px 10px; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer;">
+            🗑️ Eliminar
+          </button>
         </td>
       </tr>`;
   });
 }
+
+window.eliminarAdmin = async function (id, nombre) {
+  if (!confirm(`¿Estás seguro de eliminar al administrador "${nombre}"?\nEsta acción no se puede deshacer.`)) return;
+
+  const { error } = await supabase.from('profiles').delete().eq('id', id);
+  if (error) { alert('❌ Error al eliminar: ' + error.message); return; }
+
+  alert('✅ Administrador eliminado.');
+  await cargarAdmins();
+  await cargarTodosUsuarios();
+};
 
 window.crearAdmin = async function () {
   const nombres      = document.getElementById('admin-nombres').value.trim();

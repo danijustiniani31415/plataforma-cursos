@@ -20,6 +20,10 @@
     .badge-admin { background: #ffc107; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; }
     .badge-superadmin { background: #dc3545; color: white; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; }
     .badge-trabajador { background: #28a745; color: white; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; }
+
+    .form-inline { display: grid; grid-template-columns: 1fr auto; gap: 10px; max-width: 600px; margin-bottom: 20px; }
+    .form-inline input { width: 100%; box-sizing: border-box; padding: 12px 14px; font-size: 1rem; }
+    .form-inline button { white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -121,9 +125,9 @@
     <!-- TAB CARGOS -->
     <div id="tab-cargos" class="tab-content">
       <h2>💼 Cargos</h2>
-      <div style="display:flex; gap:10px; max-width:600px; margin-bottom:20px; align-items:center;">
-        <input type="text" id="cargo-nombre" placeholder="Nombre del cargo *" style="flex:1; width:auto; min-width:0; padding:12px 14px; font-size:1rem;" />
-        <button onclick="crearCargo()" class="btn-primary" style="white-space:nowrap; padding:12px 20px;">+ Agregar</button>
+      <div class="form-inline">
+        <input type="text" id="cargo-nombre" placeholder="Nombre del cargo *" />
+        <button onclick="crearCargo()" class="btn-primary">+ Agregar</button>
       </div>
       <table id="tabla-cargos">
         <thead>

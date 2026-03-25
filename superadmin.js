@@ -46,7 +46,7 @@ function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
           'Content-Type': 'application/json',
           'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s'
         },
-        body: JSON.stringify({ dni, token: 'sk_14199.BlaC6DKIilEbkTdYzNav3K73rIZR5MS5' })
+        body: JSON.stringify({ dni, token: 'sk_14199.4hJ9PKMMwKk2amriKg4G7jJ5WZmXmk15' })
       });
       const data = await res.json();
       if (data?.nombres) {

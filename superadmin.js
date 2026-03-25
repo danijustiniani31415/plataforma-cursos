@@ -195,32 +195,26 @@ window.crearAdmin = async function () {
 
   if (existe) { alert('❌ Ese número de documento ya está registrado.'); return; }
 
-  // Crear en Auth
-  const { data, error } = await supabase.auth.admin.createUser({
-    email, password: dni, email_confirm: true
+  // Crear usuario via Edge Function
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await supabase.functions.invoke('crear-usuario', {
+    body: {
+      email,
+      password:         dni,
+      nombres,
+      apellidos,
+      documento_tipo:   doc_tipo,
+      documento_numero: dni,
+      telefono:         telefono || null,
+      empresa_id,
+      cargo_id:         cargo_id || null,
+      fecha_ingreso:    fecha_ingreso || null,
+      rol:              'admin'
+    }
   });
 
-  if (error) { alert('❌ ' + error.message); return; }
-
-  // Insertar en profiles
-  const { error: perfilError } = await supabase.from('profiles').insert({
-    id:                   data.user.id,
-    email,
-    nombres,
-    apellidos,
-    documento_tipo:       doc_tipo,
-    documento_numero:     dni,
-    telefono:             telefono || null,
-    empresa_id:           empresa_id,
-    cargo_id:             cargo_id || null,
-    fecha_ingreso:        fecha_ingreso || null,
-    rol:                  'admin',
-    activo:               true,
-    debe_cambiar_password: true
-  });
-
-  if (perfilError) {
-    alert('⚠️ Auth creado pero error en perfil: ' + perfilError.message); return;
+  if (res.error || res.data?.error) {
+    alert('❌ ' + (res.data?.error || res.error.message)); return;
   }
 
   alert(`✅ Administrador creado.\nContraseña inicial: ${dni}`);

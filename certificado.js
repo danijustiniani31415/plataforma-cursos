@@ -135,11 +135,11 @@ export async function generarCertificadoPDF(curso, nota) {
 
   const codigo = result.codigo;
 
-  alert(`✅ ¡Certificado generado!\nCódigo: ${codigo}\nSe ha enviado a tu correo: ${user.email}`);
+  alert(`✅ ¡Certificado generado!\nCódigo: ${codigo}`);
 
   // Abrir certificado para imprimir (con código real)
   const htmlFinal = htmlCertificado.replace('CODIGO_PLACEHOLDER', codigo);
-  const ventana = window.open('', '_blank');
-  ventana.document.write(htmlFinal);
-  ventana.document.close();
+  const blob = new Blob([htmlFinal], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
 }

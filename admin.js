@@ -496,16 +496,30 @@ window.descargarReporteExcel = async function () {
   const desde = new Date(anio, mes - 1, 1).toISOString();
   const hasta = new Date(anio, mes, 1).toISOString();
 
-  const { data, error } = await supabase
+  // 1. Obtener notas del período
+  const { data: notas, error } = await supabase
     .from('notas')
-    .select('correo, nota, created_at, cursos(titulo), profiles(nombres, apellidos, documento_numero, documento_tipo, cargos(nombre), empresas(nombre))')
+    .select('correo, nota, created_at, cursos(titulo)')
     .gte('created_at', desde)
     .lt('created_at', hasta)
-    .eq('profiles.empresa_id', empresaAdminId)
     .order('created_at', { ascending: true });
 
   if (error) { alert('❌ Error: ' + error.message); return; }
-  if (!data || data.length === 0) { alert('No hay registros para ese mes.'); return; }
+  if (!notas || notas.length === 0) { alert('No hay registros para ese mes.'); return; }
+
+  // 2. Obtener perfiles de la empresa del admin
+  const { data: perfiles } = await supabase
+    .from('profiles')
+    .select('email, nombres, apellidos, documento_numero, documento_tipo, cargos(nombre), empresas(nombre)')
+    .eq('empresa_id', empresaAdminId);
+
+  const perfilMap = {};
+  perfiles?.forEach(p => { perfilMap[p.email] = p; });
+
+  // 3. Filtrar solo los que pertenecen a esta empresa
+  const data = notas.filter(r => perfilMap[r.correo]);
+
+  if (data.length === 0) { alert('No hay registros de tu empresa para ese mes.'); return; }
 
   const mesesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                        'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -515,7 +529,7 @@ window.descargarReporteExcel = async function () {
   ];
 
   data.forEach(r => {
-    const p = r.profiles;
+    const p = perfilMap[r.correo];
     filas.push([
       p?.apellidos || '',
       p?.nombres || '',

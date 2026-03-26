@@ -469,3 +469,71 @@ window.importarDesdeExcel = async function () {
 
   progreso.textContent += ' — ¡Importación completada!';
 };
+
+// ═══════════════════════════════
+// 📊 Descargar reporte Excel por mes/año
+// ═══════════════════════════════
+
+// Llenar selector de años al cargar
+(function () {
+  const sel = document.getElementById('filtro-anio');
+  if (!sel) return;
+  const hoy = new Date();
+  for (let y = hoy.getFullYear(); y >= 2024; y--) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    sel.appendChild(opt);
+  }
+  // Mes actual por defecto
+  document.getElementById('filtro-mes').value = hoy.getMonth() + 1;
+})();
+
+window.descargarReporteExcel = async function () {
+  const mes  = parseInt(document.getElementById('filtro-mes').value);
+  const anio = parseInt(document.getElementById('filtro-anio').value);
+
+  const desde = new Date(anio, mes - 1, 1).toISOString();
+  const hasta = new Date(anio, mes, 1).toISOString();
+
+  const { data, error } = await supabase
+    .from('notas')
+    .select('correo, nota, created_at, cursos(titulo), profiles(nombres, apellidos, documento_numero, documento_tipo, cargos(nombre), empresas(nombre))')
+    .gte('created_at', desde)
+    .lt('created_at', hasta)
+    .eq('profiles.empresa_id', empresaAdminId)
+    .order('created_at', { ascending: true });
+
+  if (error) { alert('❌ Error: ' + error.message); return; }
+  if (!data || data.length === 0) { alert('No hay registros para ese mes.'); return; }
+
+  const mesesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                       'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  const filas = [
+    ['Apellidos', 'Nombres', 'Documento', 'Tipo Doc', 'Cargo', 'Empresa', 'Curso', 'Nota', 'Estado', 'Fecha']
+  ];
+
+  data.forEach(r => {
+    const p = r.profiles;
+    filas.push([
+      p?.apellidos || '',
+      p?.nombres || '',
+      p?.documento_numero || r.correo,
+      p?.documento_tipo || '',
+      p?.cargos?.nombre || '',
+      p?.empresas?.nombre || '',
+      r.cursos?.titulo || '',
+      r.nota,
+      r.nota >= 14 ? 'Aprobado' : 'Desaprobado',
+      new Date(r.created_at).toLocaleDateString('es-PE')
+    ]);
+  });
+
+  const XLSX = window.XLSX;
+  const ws = XLSX.utils.aoa_to_sheet(filas);
+  ws['!cols'] = [20,20,15,10,20,20,30,8,12,12].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Notas');
+  XLSX.writeFile(wb, `Reporte_Notas_${mesesNombre[mes-1]}_${anio}.xlsx`);
+};

@@ -111,6 +111,30 @@ cursor:pointer;
   <hr>
 
   <section>
+    <h2>📊 Descargar reporte de notas por mes</h2>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <select id="filtro-mes" style="padding:8px;">
+        <option value="1">Enero</option>
+        <option value="2">Febrero</option>
+        <option value="3">Marzo</option>
+        <option value="4">Abril</option>
+        <option value="5">Mayo</option>
+        <option value="6">Junio</option>
+        <option value="7">Julio</option>
+        <option value="8">Agosto</option>
+        <option value="9">Septiembre</option>
+        <option value="10">Octubre</option>
+        <option value="11">Noviembre</option>
+        <option value="12">Diciembre</option>
+      </select>
+      <select id="filtro-anio" style="padding:8px;"></select>
+      <button onclick="descargarReporteExcel()" class="btn-primary">⬇️ Descargar Excel</button>
+    </div>
+  </section>
+
+  <hr>
+
+  <section>
     <h2>📋 Ver registros</h2>
     <button onclick="cargarRegistros()">Mostrar registros</button>
     <table border="1" id="tabla-registros">

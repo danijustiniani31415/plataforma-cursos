@@ -346,3 +346,126 @@ document.getElementById('nuevo-dni').addEventListener('blur', async function () 
       '<span style="color:green;">✅ Documento disponible.</span>';
   }
 });
+
+// ═══════════════════════════════
+// 📥 Importar desde Excel
+// ═══════════════════════════════
+let filasExcel = [];
+
+window.descargarPlantilla = function (e) {
+  e.preventDefault();
+  const XLSX = window.XLSX;
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Telefono', 'Fecha Ingreso'],
+    ['12345678', 'García López', 'Juan Carlos', 'juan@empresa.com', 'Operario', '999888777', '2024-01-15'],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Trabajadores');
+  XLSX.writeFile(wb, 'plantilla_trabajadores.xlsx');
+};
+
+window.previsualizarExcel = function () {
+  const archivo = document.getElementById('archivo-excel').files[0];
+  if (!archivo) { alert('Selecciona un archivo Excel.'); return; }
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const XLSX = window.XLSX;
+    const workbook = XLSX.read(e.target.result, { type: 'array' });
+    const hoja = workbook.Sheets[workbook.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
+
+    // Saltar encabezado
+    filasExcel = filas.slice(1).filter(f => f[0] || f[3]);
+
+    const tbody = document.getElementById('tbody-preview');
+    tbody.innerHTML = '';
+    filasExcel.forEach(f => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="padding:5px;">${f[0]}</td>
+        <td style="padding:5px;">${f[1]}</td>
+        <td style="padding:5px;">${f[2]}</td>
+        <td style="padding:5px;">${f[3]}</td>
+        <td style="padding:5px;">${f[4]}</td>
+        <td style="padding:5px;">${f[5]}</td>
+        <td style="padding:5px;">${f[6]}</td>
+        <td style="padding:5px; color:#888;">Pendiente</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('preview-resumen').textContent =
+      `${filasExcel.length} trabajadores encontrados. Revisa los datos antes de importar.`;
+    document.getElementById('preview-excel').style.display = 'block';
+  };
+  reader.readAsArrayBuffer(archivo);
+};
+
+window.importarDesdeExcel = async function () {
+  if (!filasExcel.length) return;
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+
+  const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true);
+
+  const progreso = document.getElementById('progreso-importacion');
+  const filas = document.querySelectorAll('#tbody-preview tr');
+  let ok = 0, errores = 0;
+
+  for (let i = 0; i < filasExcel.length; i++) {
+    const f = filasExcel[i];
+    const dni          = String(f[0]).trim();
+    const apellidos    = String(f[1]).trim();
+    const nombres      = String(f[2]).trim();
+    const email        = String(f[3]).trim();
+    const cargoNombre  = String(f[4]).trim();
+    const telefono     = String(f[5]).trim();
+    const fechaIngreso = String(f[6]).trim();
+
+    const tdEstado = filas[i].querySelectorAll('td')[7];
+    tdEstado.textContent = '⏳ Procesando...';
+    tdEstado.style.color = '#888';
+
+    const cargo = cargos?.find(c => c.nombre.toLowerCase() === cargoNombre.toLowerCase());
+
+    const response = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/crear-usuario', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s'
+      },
+      body: JSON.stringify({
+        email,
+        password:         dni,
+        nombres,
+        apellidos,
+        documento_tipo:   'DNI',
+        documento_numero: dni,
+        telefono:         telefono || null,
+        empresa_id:       empresaAdminId,
+        cargo_id:         cargo?.id || null,
+        fecha_ingreso:    fechaIngreso || null,
+        rol:              'trabajador'
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data?.error) {
+      tdEstado.textContent = '❌ ' + (data?.error || 'Error');
+      tdEstado.style.color = 'red';
+      errores++;
+    } else {
+      tdEstado.textContent = '✅ Creado';
+      tdEstado.style.color = 'green';
+      ok++;
+    }
+
+    progreso.textContent = `Progreso: ${i + 1}/${filasExcel.length} — ✅ ${ok} creados, ❌ ${errores} errores`;
+  }
+
+  progreso.textContent += ' — ¡Importación completada!';
+};

@@ -850,8 +850,7 @@ window.ejecutarActualizacion = async function () {
     const { error } = await supabase
       .from('profiles')
       .update(updates)
-      .eq('documento_numero', dni)
-      .eq('empresa_id', empresaAdminId);
+      .eq('documento_numero', dni);
 
     if (error) {
       tdEstado.textContent = '❌ ' + error.message;

@@ -473,8 +473,14 @@
       <button onclick="cargarDashboardMes()" class="btn-primary" style="margin-bottom:16px;">Actualizar datos</button>
       <div id="cards-mes" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:20px;"></div>
       <div id="detalle-pendientes" style="display:none;">
-        <h3 style="color:#002855; font-size:0.95rem; margin-bottom:10px;">⏳ Trabajadores sin actividad este mes</h3>
-        <div style="overflow-x:auto;">
+        <div onclick="toggleSinActividad()"
+             style="display:flex; align-items:center; justify-content:space-between;
+                    cursor:pointer; padding:10px 14px; background:#fff8e1;
+                    border:1px solid #ffe082; border-radius:8px; margin-bottom:8px;">
+          <span style="font-weight:600; color:#b45309; font-size:0.9rem;">⏳ Trabajadores sin actividad este mes</span>
+          <span id="flecha-sin-actividad" style="font-size:1rem; color:#b45309;">▶</span>
+        </div>
+        <div id="tabla-sin-actividad-wrap" style="display:none; overflow-x:auto;">
           <table class="tabla-trabajadores" id="tabla-sin-actividad">
             <thead><tr><th>Apellidos y Nombres</th><th>DNI</th><th>Cargo</th></tr></thead>
             <tbody id="tbody-sin-actividad"></tbody>
@@ -602,6 +608,14 @@
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script>
+  function toggleSinActividad() {
+    const wrap = document.getElementById('tabla-sin-actividad-wrap');
+    const flecha = document.getElementById('flecha-sin-actividad');
+    const visible = wrap.style.display !== 'none';
+    wrap.style.display = visible ? 'none' : 'block';
+    flecha.textContent = visible ? '▶' : '▼';
+  }
+
   function mostrarTab(tab, btn) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('activo'));
     document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('activo'));

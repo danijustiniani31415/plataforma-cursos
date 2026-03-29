@@ -114,6 +114,53 @@ cursor:pointer;
   <hr>
 
   <section>
+    <h2>👥 Lista de trabajadores</h2>
+    <button onclick="cargarTrabajadores()" class="btn-primary" style="margin-bottom:12px;">Cargar trabajadores</button>
+    <div style="overflow-x:auto;">
+      <table border="1" id="tabla-trabajadores" style="border-collapse:collapse; font-size:0.85rem; width:100%; display:none;">
+        <thead>
+          <tr style="background:#002855; color:white;">
+            <th style="padding:8px;">Apellidos y Nombres</th>
+            <th style="padding:8px;">DNI</th>
+            <th style="padding:8px;">Correo</th>
+            <th style="padding:8px;">Cargo</th>
+            <th style="padding:8px;">Teléfono</th>
+            <th style="padding:8px;">Activo</th>
+            <th style="padding:8px;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-trabajadores"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Modal editar trabajador -->
+  <div id="modal-editar" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+       background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:white; padding:30px; border-radius:12px; width:90%; max-width:500px;">
+      <h3 style="margin-top:0; color:#002855;">✏️ Editar trabajador</h3>
+      <input type="hidden" id="editar-id" />
+      <div style="display:grid; gap:10px;">
+        <input type="text"  id="editar-nombres"    placeholder="Nombres *" />
+        <input type="text"  id="editar-apellidos"  placeholder="Apellidos *" />
+        <input type="email" id="editar-email"      placeholder="Correo electrónico" />
+        <input type="text"  id="editar-telefono"   placeholder="Teléfono" />
+        <input type="text"  id="editar-documento"  placeholder="Nº documento" />
+        <select id="editar-cargo">
+          <option value="">-- Sin cargo --</option>
+        </select>
+        <input type="date"  id="editar-fecha-ingreso" />
+      </div>
+      <div style="display:flex; gap:10px; margin-top:15px;">
+        <button onclick="guardarEdicion()" class="btn-primary">Guardar cambios</button>
+        <button onclick="cerrarModal()" style="padding:10px 20px; border:1px solid #ccc; border-radius:6px; cursor:pointer;">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <section>
     <h2>📊 Descargar reporte de notas por mes</h2>
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <select id="filtro-mes" style="padding:8px;">

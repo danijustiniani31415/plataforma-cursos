@@ -555,3 +555,109 @@ window.descargarReporteExcel = async function () {
   XLSX.utils.book_append_sheet(wb, ws, 'Notas');
   XLSX.writeFile(wb, `Reporte_Notas_${mesesNombre[mes-1]}_${anio}.xlsx`);
 };
+
+// ═══════════════════════════════
+// 👥 Lista y edición de trabajadores
+// ═══════════════════════════════
+let cargosDisponibles = [];
+
+window.cargarTrabajadores = async function () {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, nombres, apellidos, email, documento_numero, telefono, cargo_id, cargo, fecha_ingreso, activo')
+    .eq('empresa_id', empresaAdminId)
+    .eq('rol', 'trabajador')
+    .order('apellidos');
+
+  if (error) { alert('❌ Error: ' + error.message); return; }
+
+  // Cargar cargos para el modal
+  const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true).order('nombre');
+  cargosDisponibles = cargos || [];
+
+  const tbody = document.getElementById('tbody-trabajadores');
+  tbody.innerHTML = '';
+  data?.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="padding:6px;">${u.apellidos || ''} ${u.nombres || ''}</td>
+      <td style="padding:6px;">${u.documento_numero || ''}</td>
+      <td style="padding:6px;">${u.email || ''}</td>
+      <td style="padding:6px;">${u.cargo || ''}</td>
+      <td style="padding:6px;">${u.telefono || ''}</td>
+      <td style="padding:6px; text-align:center;">${u.activo ? '✅' : '❌'}</td>
+      <td style="padding:6px;">
+        <button onclick="abrirEditar('${u.id}')"
+          style="padding:5px 10px; background:#002855; color:white; border:none; border-radius:4px; cursor:pointer;">
+          ✏️ Editar
+        </button>
+        <button onclick="toggleActivo('${u.id}', ${u.activo})"
+          style="padding:5px 10px; background:${u.activo ? '#dc3545' : '#28a745'}; color:white; border:none; border-radius:4px; cursor:pointer; margin-left:4px;">
+          ${u.activo ? 'Desactivar' : 'Activar'}
+        </button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('tabla-trabajadores').style.display = 'table';
+};
+
+window.abrirEditar = async function (id) {
+  const { data: u } = await supabase
+    .from('profiles')
+    .select('id, nombres, apellidos, email, documento_numero, telefono, cargo_id, fecha_ingreso')
+    .eq('id', id)
+    .single();
+
+  document.getElementById('editar-id').value = u.id;
+  document.getElementById('editar-nombres').value = u.nombres || '';
+  document.getElementById('editar-apellidos').value = u.apellidos || '';
+  document.getElementById('editar-email').value = u.email || '';
+  document.getElementById('editar-telefono').value = u.telefono || '';
+  document.getElementById('editar-documento').value = u.documento_numero || '';
+  document.getElementById('editar-fecha-ingreso').value = u.fecha_ingreso || '';
+
+  const selCargo = document.getElementById('editar-cargo');
+  selCargo.innerHTML = '<option value="">-- Sin cargo --</option>';
+  cargosDisponibles.forEach(c => {
+    selCargo.innerHTML += `<option value="${c.id}" ${u.cargo_id === c.id ? 'selected' : ''}>${c.nombre}</option>`;
+  });
+
+  const modal = document.getElementById('modal-editar');
+  modal.style.display = 'flex';
+};
+
+window.cerrarModal = function () {
+  document.getElementById('modal-editar').style.display = 'none';
+};
+
+window.guardarEdicion = async function () {
+  const id          = document.getElementById('editar-id').value;
+  const nombres     = document.getElementById('editar-nombres').value.trim();
+  const apellidos   = document.getElementById('editar-apellidos').value.trim();
+  const email       = document.getElementById('editar-email').value.trim();
+  const telefono    = document.getElementById('editar-telefono').value.trim();
+  const documento   = document.getElementById('editar-documento').value.trim();
+  const cargo_id    = document.getElementById('editar-cargo').value || null;
+  const fecha_ingreso = document.getElementById('editar-fecha-ingreso').value || null;
+
+  if (!nombres || !apellidos) { alert('❌ Nombres y apellidos son obligatorios.'); return; }
+
+  const emailFinal = email || `${documento}@cvglobal-group.com`;
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ nombres, apellidos, email: emailFinal, telefono: telefono || null, documento_numero: documento, cargo_id, fecha_ingreso })
+    .eq('id', id);
+
+  if (error) { alert('❌ Error: ' + error.message); return; }
+
+  alert('✅ Datos actualizados correctamente.');
+  cerrarModal();
+  cargarTrabajadores();
+};
+
+window.toggleActivo = async function (id, activo) {
+  await supabase.from('profiles').update({ activo: !activo }).eq('id', id);
+  cargarTrabajadores();
+};

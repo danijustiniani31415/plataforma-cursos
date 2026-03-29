@@ -161,12 +161,14 @@ window.crearUsuario = async function () {
   const cargo_id      = document.getElementById("nuevo-cargo").value;
   const fecha_ingreso = document.getElementById("nuevo-fecha-ingreso").value;
 
-  if (!email || !dni || !nombres || !apellidos) {
-    alert("❌ Completa los campos obligatorios: nombres, apellidos, documento y correo.");
+  if (!dni || !nombres || !apellidos) {
+    alert("❌ Completa los campos obligatorios: nombres, apellidos y documento.");
     return;
   }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  const emailFinal = email || `${dni}@cvglobal-group.com`;
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     alert("❌ Ingresa un correo electrónico válido.");
     return;
   }
@@ -194,7 +196,7 @@ window.crearUsuario = async function () {
       'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s'
     },
     body: JSON.stringify({
-      email,
+      email:            emailFinal,
       password:         dni,
       nombres,
       apellidos,
@@ -215,7 +217,7 @@ window.crearUsuario = async function () {
     return;
   }
 
-  alert(`✅ Usuario creado correctamente.\nContraseña inicial: ${dni}`);
+  alert(`✅ Usuario creado correctamente.\nCorreo: ${emailFinal}\nContraseña inicial: ${dni}`);
 
   ["nuevo-email", "nuevo-dni", "nuevo-nombres", "nuevo-apellidos",
    "nuevo-telefono", "nuevo-fecha-ingreso"].forEach(id => {
@@ -419,7 +421,8 @@ window.importarDesdeExcel = async function () {
     const dni          = String(f[0]).trim();
     const apellidos    = String(f[1]).trim();
     const nombres      = String(f[2]).trim();
-    const email        = String(f[3]).trim();
+    const emailRaw     = String(f[3]).trim();
+    const email        = emailRaw || `${dni}@cvglobal-group.com`;
     const cargoNombre  = String(f[4]).trim();
     const telefono     = String(f[5]).trim();
     const fechaIngreso = String(f[6]).trim();

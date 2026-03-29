@@ -373,7 +373,7 @@ window.previsualizarExcel = function () {
   const reader = new FileReader();
   reader.onload = function (e) {
     const XLSX = window.XLSX;
-    const workbook = XLSX.read(e.target.result, { type: 'array' });
+    const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
     const hoja = workbook.Sheets[workbook.SheetNames[0]];
     const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
 
@@ -425,7 +425,13 @@ window.importarDesdeExcel = async function () {
     const email        = emailRaw || `${dni}@cvglobal-group.com`;
     const cargoNombre  = String(f[4]).trim();
     const telefono     = String(f[5]).trim();
-    const fechaIngreso = String(f[6]).trim();
+    const fechaRaw = f[6];
+    let fechaIngreso = '';
+    if (fechaRaw instanceof Date) {
+      fechaIngreso = fechaRaw.toISOString().split('T')[0];
+    } else if (fechaRaw) {
+      fechaIngreso = String(fechaRaw).trim();
+    }
 
     const tdEstado = filas[i].querySelectorAll('td')[7];
     tdEstado.textContent = '⏳ Procesando...';

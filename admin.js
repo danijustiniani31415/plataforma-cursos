@@ -428,7 +428,10 @@ window.importarDesdeExcel = async function () {
     const fechaRaw = f[6];
     let fechaIngreso = '';
     if (fechaRaw instanceof Date) {
-      fechaIngreso = fechaRaw.toISOString().split('T')[0];
+      const y = fechaRaw.getFullYear();
+      const m = String(fechaRaw.getMonth() + 1).padStart(2, '0');
+      const d = String(fechaRaw.getDate()).padStart(2, '0');
+      fechaIngreso = `${y}-${m}-${d}`;
     } else if (fechaRaw) {
       fechaIngreso = String(fechaRaw).trim();
     }

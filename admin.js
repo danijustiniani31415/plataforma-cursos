@@ -836,8 +836,16 @@ window.ejecutarActualizacion = async function () {
     const updates = {};
     if (email) updates.email = email;
     if (telefono) updates.telefono = telefono;
-    if (cargo) updates.cargo_id = cargo.id;
+    if (cargo) { updates.cargo_id = cargo.id; updates.cargo = cargo.nombre; }
     if (fechaIngreso) updates.fecha_ingreso = fechaIngreso;
+
+    if (Object.keys(updates).length === 0) {
+      tdEstado.textContent = '⚠️ Sin cambios';
+      tdEstado.style.color = '#888';
+      ok++;
+      progreso.textContent = `Progreso: ${i + 1}/${filasActualizacion.length} — ✅ ${ok} procesados, ❌ ${errores} errores`;
+      continue;
+    }
 
     const { error } = await supabase
       .from('profiles')

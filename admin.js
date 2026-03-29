@@ -54,9 +54,9 @@ async function cargarDatosAdmin() {
     empresaAdminNombre = perfil.empresas?.nombre;
     empresaAdminRuc = perfil.empresas?.ruc;
 
+    document.getElementById('info-empresa-header').textContent = `🏢 ${empresaAdminNombre}`;
     document.getElementById('info-empresa').innerHTML = `
-      <div style="background:#e8f5e8; padding:12px; border-radius:8px; 
-                  border-left:4px solid #28a745; margin-bottom:15px;">
+      <div class="info-box" style="margin-bottom:16px;">
         🏢 <strong>${empresaAdminNombre}</strong> — RUC: ${empresaAdminRuc}
       </div>
     `;
@@ -589,19 +589,15 @@ window.cargarTrabajadores = async function () {
   data?.forEach(u => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td style="padding:6px;">${u.apellidos || ''} ${u.nombres || ''}</td>
-      <td style="padding:6px;">${u.documento_numero || ''}</td>
-      <td style="padding:6px;">${u.email || ''}</td>
-      <td style="padding:6px;">${u.cargo || ''}</td>
-      <td style="padding:6px;">${u.telefono || ''}</td>
-      <td style="padding:6px; text-align:center;">${u.activo ? '✅' : '❌'}</td>
-      <td style="padding:6px;">
-        <button onclick="abrirEditar('${u.id}')"
-          style="padding:5px 10px; background:#002855; color:white; border:none; border-radius:4px; cursor:pointer;">
-          ✏️ Editar
-        </button>
-        <button onclick="toggleActivo('${u.id}', ${u.activo})"
-          style="padding:5px 10px; background:${u.activo ? '#dc3545' : '#28a745'}; color:white; border:none; border-radius:4px; cursor:pointer; margin-left:4px;">
+      <td>${u.apellidos || ''} ${u.nombres || ''}</td>
+      <td>${u.documento_numero || ''}</td>
+      <td>${u.email || ''}</td>
+      <td>${u.cargo || ''}</td>
+      <td>${u.telefono || ''}</td>
+      <td><span class="${u.activo ? 'badge-activo' : 'badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+      <td style="display:flex; gap:6px;">
+        <button class="btn-editar" onclick="abrirEditar('${u.id}')">✏️ Editar</button>
+        <button class="${u.activo ? 'btn-toggle-on' : 'btn-toggle-off'}" onclick="toggleActivo('${u.id}', ${u.activo})">
           ${u.activo ? 'Desactivar' : 'Activar'}
         </button>
       </td>`;

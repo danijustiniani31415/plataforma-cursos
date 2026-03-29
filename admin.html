@@ -2,253 +2,497 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Panel de Administrador</title>
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
+
+    .admin-header {
+      background: #002855;
+      color: white;
+      padding: 16px 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .admin-header h1 { font-size: 1.3rem; font-weight: 600; }
+    .admin-header .header-right { display: flex; align-items: center; gap: 12px; }
+    .btn-volver {
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.3);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.2s;
+    }
+    .btn-volver:hover { background: rgba(255,255,255,0.25); }
+
+    #info-empresa-header {
+      font-size: 0.85rem;
+      color: #c9a84c;
+      font-weight: 500;
+    }
+
+    .admin-nav {
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .nav-tab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 14px 24px;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      color: #666;
+      font-size: 0.8rem;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: all 0.2s;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+    .nav-tab .tab-icon { font-size: 1.4rem; }
+    .nav-tab:hover { background: #f5f7fa; color: #002855; }
+    .nav-tab.activo { border-bottom-color: #002855; color: #002855; background: #f5f7fa; }
+
+    .admin-content { padding: 24px 30px; max-width: 1100px; margin: 0 auto; }
+
+    .tab-panel { display: none; }
+    .tab-panel.activo { display: block; }
+
+    .panel-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+    .panel-card h2 {
+      font-size: 1.05rem;
+      color: #002855;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 680px; }
+    .form-grid input, .form-grid select, .form-grid .field-wrap { width: 100%; }
+    .form-grid input, .form-grid select {
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      width: 100%;
+    }
+    .form-grid input:focus, .form-grid select:focus {
+      outline: none;
+      border-color: #002855;
+    }
+    .field-hint { font-size: 0.75rem; color: #999; margin-top: 4px; }
+
+    .btn-primary {
+      background: #002855;
+      color: white;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #003d7a; }
+    .btn-secondary {
+      background: white;
+      color: #002855;
+      border: 1px solid #002855;
+      padding: 10px 22px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .info-box {
+      background: #e8f4fd;
+      border-left: 4px solid #002855;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: #333;
+      margin-bottom: 16px;
+    }
+    .info-box strong { color: #002855; }
+
+    .plantilla-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #002855;
+      font-size: 0.85rem;
+      text-decoration: none;
+      padding: 7px 14px;
+      border: 1px solid #002855;
+      border-radius: 6px;
+      margin-bottom: 14px;
+      transition: background 0.2s;
+    }
+    .plantilla-link:hover { background: #f0f4ff; }
+
+    .file-input-wrap { margin: 10px 0 14px; }
+    .file-input-wrap input[type="file"] {
+      padding: 8px;
+      border: 1px dashed #ccc;
+      border-radius: 7px;
+      width: 100%;
+      max-width: 400px;
+      font-size: 0.85rem;
+    }
+
+    .preview-table-wrap { overflow-x: auto; margin-top: 14px; }
+    .preview-table-wrap table {
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      width: 100%;
+      min-width: 600px;
+    }
+    .preview-table-wrap th {
+      background: #002855;
+      color: white;
+      padding: 8px 10px;
+      text-align: left;
+    }
+    .preview-table-wrap td { padding: 7px 10px; border-bottom: 1px solid #eee; }
+    .preview-table-wrap tr:hover td { background: #f9f9f9; }
+
+    .progreso { margin-top: 12px; font-size: 0.9rem; font-weight: 600; color: #333; }
+
+    /* Tabla trabajadores */
+    .tabla-trabajadores { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+    .tabla-trabajadores th {
+      background: #002855; color: white; padding: 10px 12px; text-align: left;
+    }
+    .tabla-trabajadores td { padding: 9px 12px; border-bottom: 1px solid #eee; }
+    .tabla-trabajadores tr:hover td { background: #f9f9f9; }
+    .badge-activo { background: #d4edda; color: #155724; padding: 3px 8px; border-radius: 12px; font-size: 0.78rem; }
+    .badge-inactivo { background: #f8d7da; color: #721c24; padding: 3px 8px; border-radius: 12px; font-size: 0.78rem; }
+
+    .btn-editar {
+      padding: 5px 12px; background: #002855; color: white;
+      border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem;
+    }
+    .btn-toggle-on  { padding: 5px 12px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
+    .btn-toggle-off { padding: 5px 12px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
+
+    /* Reporte */
+    .reporte-selects { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .reporte-selects select { padding: 10px 12px; border: 1px solid #ddd; border-radius: 7px; font-size: 0.9rem; }
+
+    /* Registros */
+    #tabla-registros { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+    #tabla-registros th { background: #002855; color: white; padding: 10px 12px; text-align: left; }
+    #tabla-registros td { padding: 9px 12px; border-bottom: 1px solid #eee; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal-box {
+      background: white; padding: 30px; border-radius: 14px;
+      width: 90%; max-width: 480px; box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    }
+    .modal-box h3 { color: #002855; margin-bottom: 18px; font-size: 1.05rem; }
+    .modal-box input, .modal-box select {
+      width: 100%; padding: 10px 12px; border: 1px solid #ddd;
+      border-radius: 7px; font-size: 0.9rem; margin-bottom: 10px;
+    }
+    .modal-actions { display: flex; gap: 10px; margin-top: 6px; }
+
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .admin-content { padding: 16px; }
+      .nav-tab { padding: 12px 14px; font-size: 0.75rem; }
+      .nav-tab .tab-icon { font-size: 1.2rem; }
+    }
+  </style>
 </head>
 <body>
-<button onclick="window.location.href='index.html#cursos'" style="
-padding:10px 20px;
-margin-bottom:20px;
-background:#002855;
-color:white;
-border:none;
-border-radius:6px;
-cursor:pointer;
-">
-← Volver a cursos
-</button>
-  <h1>🎓 Panel de Administración</h1>
 
-<section>
-  <h2>👥 Crear cuenta de usuario</h2>
-
-  <div id="info-empresa"></div>
-
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:700px;">
-    <select id="nuevo-doc-tipo">
-      <option value="DNI">DNI</option>
-      <option value="CE">Carnet de Extranjería</option>
-      <option value="PASAPORTE">Pasaporte</option>
-    </select>
-    <div>
-      <input type="text" id="nuevo-dni" placeholder="Nº documento * (contraseña inicial)"
-             oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12" style="width:100%; box-sizing:border-box;" />
-      <span id="dni-mensaje" style="font-size:0.85rem;"></span>
-      <span id="nuevo-dni-reniec-msg" style="font-size:0.8rem; color:#555;"></span>
-    </div>
-    <input type="text" id="nuevo-nombres" placeholder="Nombres *" disabled />
-    <input type="text" id="nuevo-apellidos" placeholder="Apellidos *" disabled />
-    <div>
-      <input type="email" id="nuevo-email" placeholder="Correo electrónico (opcional)" style="width:100%; box-sizing:border-box;" />
-      <span style="font-size:0.78rem; color:#888;">Si no tiene correo, se generará uno automático con su DNI</span>
-    </div>
-    <input type="text" id="nuevo-telefono" placeholder="Teléfono (opcional)" />
-    <select id="nuevo-cargo">
-      <option value="">-- Selecciona cargo --</option>
-    </select>
-    <input type="date" id="nuevo-fecha-ingreso" />
+<div class="admin-header">
+  <div>
+    <div style="font-size:0.75rem; opacity:0.7; margin-bottom:2px;">CV GLOBAL S.A.C.</div>
+    <h1>Panel de Administración</h1>
   </div>
-  <button onclick="crearUsuario()" class="btn-primary" style="margin-top:15px;">
-    Crear usuario
+  <div class="header-right">
+    <div id="info-empresa-header"></div>
+    <button class="btn-volver" onclick="window.location.href='index.html#cursos'">← Volver a cursos</button>
+  </div>
+</div>
+
+<nav class="admin-nav">
+  <button class="nav-tab activo" onclick="mostrarTab('trabajadores', this)">
+    <span class="tab-icon">👥</span> Trabajadores
   </button>
-</section>
+  <button class="nav-tab" onclick="mostrarTab('importar', this)">
+    <span class="tab-icon">📥</span> Importar
+  </button>
+  <button class="nav-tab" onclick="mostrarTab('actualizar', this)">
+    <span class="tab-icon">🔄</span> Actualizar
+  </button>
+  <button class="nav-tab" onclick="mostrarTab('cursos', this)">
+    <span class="tab-icon">📚</span> Cursos
+  </button>
+  <button class="nav-tab" onclick="mostrarTab('reporte', this)">
+    <span class="tab-icon">📊</span> Reporte
+  </button>
+  <button class="nav-tab" onclick="mostrarTab('registros', this)">
+    <span class="tab-icon">📋</span> Registros
+  </button>
+  <button class="nav-tab" onclick="mostrarTab('acceso', this)">
+    <span class="tab-icon">🔐</span> Acceso
+  </button>
+</nav>
 
-<hr>
+<div class="admin-content">
 
-<section>
-  <h2>📥 Importar trabajadores desde Excel</h2>
-  <p style="color:#555; font-size:0.9rem; margin-bottom:10px;">
-    El archivo Excel debe tener estas columnas en orden:
-    <strong>DNI · Apellidos · Nombres · Email · Cargo · Teléfono · Fecha Ingreso</strong>
-  </p>
-  <a id="descargar-plantilla" href="#" onclick="descargarPlantilla(event)"
-     style="display:inline-block; margin-bottom:12px; color:#002855; font-size:0.9rem;">
-    📄 Descargar plantilla de ejemplo
-  </a><br>
-  <input type="file" id="archivo-excel" accept=".xlsx,.xls" style="margin-bottom:10px;" />
-  <button onclick="previsualizarExcel()" class="btn-primary">Vista previa</button>
-
-  <div id="preview-excel" style="margin-top:15px; display:none;">
-    <p id="preview-resumen" style="font-weight:bold;"></p>
-    <div style="overflow-x:auto;">
-      <table border="1" id="tabla-preview" style="border-collapse:collapse; font-size:0.85rem; width:100%;">
-        <thead>
-          <tr style="background:#002855; color:white;">
-            <th style="padding:6px;">DNI</th>
-            <th style="padding:6px;">Apellidos</th>
-            <th style="padding:6px;">Nombres</th>
-            <th style="padding:6px;">Email</th>
-            <th style="padding:6px;">Cargo</th>
-            <th style="padding:6px;">Teléfono</th>
-            <th style="padding:6px;">Fecha Ingreso</th>
-            <th style="padding:6px;">Estado</th>
-          </tr>
-        </thead>
-        <tbody id="tbody-preview"></tbody>
-      </table>
+  <!-- ═══ TAB: TRABAJADORES ═══ -->
+  <div id="tab-trabajadores" class="tab-panel activo">
+    <div class="panel-card">
+      <h2>➕ Crear cuenta de usuario</h2>
+      <div id="info-empresa"></div>
+      <div class="form-grid">
+        <select id="nuevo-doc-tipo">
+          <option value="DNI">DNI</option>
+          <option value="CE">Carnet de Extranjería</option>
+          <option value="PASAPORTE">Pasaporte</option>
+        </select>
+        <div class="field-wrap">
+          <input type="text" id="nuevo-dni" placeholder="Nº documento * (contraseña inicial)"
+                 oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12" />
+          <div class="field-hint" id="dni-mensaje"></div>
+          <div class="field-hint" id="nuevo-dni-reniec-msg"></div>
+        </div>
+        <input type="text" id="nuevo-nombres"   placeholder="Nombres *"   disabled />
+        <input type="text" id="nuevo-apellidos" placeholder="Apellidos *" disabled />
+        <div class="field-wrap">
+          <input type="email" id="nuevo-email" placeholder="Correo electrónico (opcional)" />
+          <div class="field-hint">Si no tiene correo se generará uno automático con su DNI</div>
+        </div>
+        <input type="text" id="nuevo-telefono" placeholder="Teléfono (opcional)" />
+        <select id="nuevo-cargo">
+          <option value="">-- Selecciona cargo --</option>
+        </select>
+        <input type="date" id="nuevo-fecha-ingreso" />
+      </div>
+      <button onclick="crearUsuario()" class="btn-primary" style="margin-top:16px;">Crear usuario</button>
     </div>
-    <button onclick="importarDesdeExcel()" class="btn-primary" style="margin-top:12px;">
-      ✅ Confirmar importación
-    </button>
-  </div>
-  <div id="progreso-importacion" style="margin-top:10px; font-weight:bold;"></div>
-</section>
 
-  <hr>
-
-  <section>
-    <h2>🔄 Actualización masiva desde Excel</h2>
-    <p style="color:#555; font-size:0.9rem; margin-bottom:10px;">
-      Usa el DNI para identificar al trabajador y actualizar sus datos. Columnas:
-      <strong>DNI · Email · Teléfono · Cargo · Fecha Ingreso</strong>
-    </p>
-    <a href="#" onclick="descargarPlantillaActualizacion(event)"
-       style="display:inline-block; margin-bottom:12px; color:#002855; font-size:0.9rem;">
-      📄 Descargar plantilla de actualización
-    </a><br>
-    <input type="file" id="archivo-actualizacion" accept=".xlsx,.xls" style="margin-bottom:10px;" />
-    <button onclick="previsualizarActualizacion()" class="btn-primary">Vista previa</button>
-
-    <div id="preview-actualizacion" style="margin-top:15px; display:none;">
-      <p id="preview-resumen-act" style="font-weight:bold;"></p>
+    <div class="panel-card">
+      <h2>📋 Lista de trabajadores</h2>
+      <button onclick="cargarTrabajadores()" class="btn-primary" style="margin-bottom:14px;">Cargar trabajadores</button>
       <div style="overflow-x:auto;">
-        <table border="1" style="border-collapse:collapse; font-size:0.85rem; width:100%;">
+        <table class="tabla-trabajadores" id="tabla-trabajadores" style="display:none;">
           <thead>
-            <tr style="background:#002855; color:white;">
-              <th style="padding:6px;">DNI</th>
-              <th style="padding:6px;">Email</th>
-              <th style="padding:6px;">Teléfono</th>
-              <th style="padding:6px;">Cargo</th>
-              <th style="padding:6px;">Fecha Ingreso</th>
-              <th style="padding:6px;">Estado</th>
+            <tr>
+              <th>Apellidos y Nombres</th>
+              <th>DNI</th>
+              <th>Correo</th>
+              <th>Cargo</th>
+              <th>Teléfono</th>
+              <th>Estado</th>
+              <th>Acciones</th>
             </tr>
           </thead>
-          <tbody id="tbody-actualizacion"></tbody>
+          <tbody id="tbody-trabajadores"></tbody>
         </table>
       </div>
-      <button onclick="ejecutarActualizacion()" class="btn-primary" style="margin-top:12px;">
-        ✅ Confirmar actualización
-      </button>
     </div>
-    <div id="progreso-actualizacion" style="margin-top:10px; font-weight:bold;"></div>
-  </section>
-
-  <hr>
-
-  <section>
-  <h2>📚 Subir nuevo curso</h2>
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:700px;">
-    <input type="text" id="titulo-curso" placeholder="Nombre del curso *" />
-    <input type="text" id="codigo-prefijo" placeholder="Prefijo del código (ej: IPERC, TEA) *" 
-           oninput="this.value=this.value.toUpperCase()" />
-    <input type="number" id="duracion-curso" placeholder="Duración en horas *" min="1" />
-    <input type="text" id="url-material" placeholder="URL del material (PDF, OneDrive)" />
-    <input type="text" id="url-video" placeholder="URL del video (YouTube)" />
   </div>
-  <button onclick="subirCurso()" class="btn-primary" style="margin-top:15px;">
-    Subir curso
-  </button>
-</section>
 
-  <hr>
+  <!-- ═══ TAB: IMPORTAR ═══ -->
+  <div id="tab-importar" class="tab-panel">
+    <div class="panel-card">
+      <h2>📥 Importar trabajadores desde Excel</h2>
+      <div class="info-box">
+        Columnas requeridas en orden:
+        <strong>DNI · Apellidos · Nombres · Email · Cargo · Teléfono · Fecha Ingreso</strong><br>
+        El email es opcional — si se deja vacío se genera automático con el DNI.
+      </div>
+      <a href="#" class="plantilla-link" onclick="descargarPlantilla(event)">📄 Descargar plantilla</a>
+      <div class="file-input-wrap">
+        <input type="file" id="archivo-excel" accept=".xlsx,.xls" />
+      </div>
+      <button onclick="previsualizarExcel()" class="btn-primary">Vista previa</button>
 
-  <section>
-    <h2>👥 Lista de trabajadores</h2>
-    <button onclick="cargarTrabajadores()" class="btn-primary" style="margin-bottom:12px;">Cargar trabajadores</button>
-    <div style="overflow-x:auto;">
-      <table border="1" id="tabla-trabajadores" style="border-collapse:collapse; font-size:0.85rem; width:100%; display:none;">
-        <thead>
-          <tr style="background:#002855; color:white;">
-            <th style="padding:8px;">Apellidos y Nombres</th>
-            <th style="padding:8px;">DNI</th>
-            <th style="padding:8px;">Correo</th>
-            <th style="padding:8px;">Cargo</th>
-            <th style="padding:8px;">Teléfono</th>
-            <th style="padding:8px;">Activo</th>
-            <th style="padding:8px;">Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="tbody-trabajadores"></tbody>
-      </table>
+      <div id="preview-excel" style="display:none; margin-top:16px;">
+        <p id="preview-resumen" style="font-weight:600; margin-bottom:10px; color:#333;"></p>
+        <div class="preview-table-wrap">
+          <table id="tabla-preview">
+            <thead>
+              <tr>
+                <th>DNI</th><th>Apellidos</th><th>Nombres</th>
+                <th>Email</th><th>Cargo</th><th>Teléfono</th><th>Fecha Ingreso</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-preview"></tbody>
+          </table>
+        </div>
+        <button onclick="importarDesdeExcel()" class="btn-primary" style="margin-top:14px;">✅ Confirmar importación</button>
+      </div>
+      <div id="progreso-importacion" class="progreso"></div>
     </div>
-  </section>
+  </div>
 
-  <!-- Modal editar trabajador -->
-  <div id="modal-editar" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
-       background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
-    <div style="background:white; padding:30px; border-radius:12px; width:90%; max-width:500px;">
-      <h3 style="margin-top:0; color:#002855;">✏️ Editar trabajador</h3>
-      <input type="hidden" id="editar-id" />
-      <div style="display:grid; gap:10px;">
-        <input type="text"  id="editar-nombres"    placeholder="Nombres *" />
-        <input type="text"  id="editar-apellidos"  placeholder="Apellidos *" />
-        <input type="email" id="editar-email"      placeholder="Correo electrónico" />
-        <input type="text"  id="editar-telefono"   placeholder="Teléfono" />
-        <input type="text"  id="editar-documento"  placeholder="Nº documento" />
-        <select id="editar-cargo">
-          <option value="">-- Sin cargo --</option>
+  <!-- ═══ TAB: ACTUALIZAR ═══ -->
+  <div id="tab-actualizar" class="tab-panel">
+    <div class="panel-card">
+      <h2>🔄 Actualización masiva desde Excel</h2>
+      <div class="info-box">
+        Usa el <strong>DNI</strong> para identificar al trabajador. Columnas:
+        <strong>DNI · Email · Teléfono · Cargo · Fecha Ingreso</strong><br>
+        Solo se actualizan los campos que tengan valor — los vacíos no se modifican.
+      </div>
+      <a href="#" class="plantilla-link" onclick="descargarPlantillaActualizacion(event)">📄 Descargar plantilla</a>
+      <div class="file-input-wrap">
+        <input type="file" id="archivo-actualizacion" accept=".xlsx,.xls" />
+      </div>
+      <button onclick="previsualizarActualizacion()" class="btn-primary">Vista previa</button>
+
+      <div id="preview-actualizacion" style="display:none; margin-top:16px;">
+        <p id="preview-resumen-act" style="font-weight:600; margin-bottom:10px; color:#333;"></p>
+        <div class="preview-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>DNI</th><th>Email</th><th>Teléfono</th><th>Cargo</th><th>Fecha Ingreso</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-actualizacion"></tbody>
+          </table>
+        </div>
+        <button onclick="ejecutarActualizacion()" class="btn-primary" style="margin-top:14px;">✅ Confirmar actualización</button>
+      </div>
+      <div id="progreso-actualizacion" class="progreso"></div>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: CURSOS ═══ -->
+  <div id="tab-cursos" class="tab-panel">
+    <div class="panel-card">
+      <h2>📚 Subir nuevo curso</h2>
+      <div class="form-grid">
+        <input type="text"   id="titulo-curso"    placeholder="Nombre del curso *" />
+        <input type="text"   id="codigo-prefijo"  placeholder="Prefijo del código (ej: IPERC, TEA) *"
+               oninput="this.value=this.value.toUpperCase()" />
+        <input type="number" id="duracion-curso"  placeholder="Duración en horas *" min="1" />
+        <input type="text"   id="url-material"    placeholder="URL del material (PDF, OneDrive)" />
+        <input type="text"   id="url-video"       placeholder="URL del video (YouTube)" />
+      </div>
+      <button onclick="subirCurso()" class="btn-primary" style="margin-top:16px;">Subir curso</button>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: REPORTE ═══ -->
+  <div id="tab-reporte" class="tab-panel">
+    <div class="panel-card">
+      <h2>📊 Descargar reporte de notas</h2>
+      <p style="color:#666; font-size:0.88rem; margin-bottom:16px;">
+        Selecciona el mes y año para descargar el reporte en Excel de todos los trabajadores de tu empresa.
+      </p>
+      <div class="reporte-selects">
+        <select id="filtro-mes">
+          <option value="1">Enero</option><option value="2">Febrero</option>
+          <option value="3">Marzo</option><option value="4">Abril</option>
+          <option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option>
+          <option value="9">Septiembre</option><option value="10">Octubre</option>
+          <option value="11">Noviembre</option><option value="12">Diciembre</option>
         </select>
-        <input type="date"  id="editar-fecha-ingreso" />
-      </div>
-      <div style="display:flex; gap:10px; margin-top:15px;">
-        <button onclick="guardarEdicion()" class="btn-primary">Guardar cambios</button>
-        <button onclick="cerrarModal()" style="padding:10px 20px; border:1px solid #ccc; border-radius:6px; cursor:pointer;">Cancelar</button>
+        <select id="filtro-anio"></select>
+        <button onclick="descargarReporteExcel()" class="btn-primary">⬇️ Descargar Excel</button>
       </div>
     </div>
   </div>
 
-  <hr>
-
-  <section>
-    <h2>📊 Descargar reporte de notas por mes</h2>
-    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-      <select id="filtro-mes" style="padding:8px;">
-        <option value="1">Enero</option>
-        <option value="2">Febrero</option>
-        <option value="3">Marzo</option>
-        <option value="4">Abril</option>
-        <option value="5">Mayo</option>
-        <option value="6">Junio</option>
-        <option value="7">Julio</option>
-        <option value="8">Agosto</option>
-        <option value="9">Septiembre</option>
-        <option value="10">Octubre</option>
-        <option value="11">Noviembre</option>
-        <option value="12">Diciembre</option>
-      </select>
-      <select id="filtro-anio" style="padding:8px;"></select>
-      <button onclick="descargarReporteExcel()" class="btn-primary">⬇️ Descargar Excel</button>
+  <!-- ═══ TAB: REGISTROS ═══ -->
+  <div id="tab-registros" class="tab-panel">
+    <div class="panel-card">
+      <h2>📋 Registros de notas</h2>
+      <button onclick="cargarRegistros()" class="btn-primary" style="margin-bottom:14px;">Cargar registros</button>
+      <div style="overflow-x:auto;">
+        <table id="tabla-registros">
+          <thead>
+            <tr>
+              <th>Email</th><th>Curso</th><th>Nota</th><th>Fecha</th><th>Estado</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
-  </section>
+  </div>
 
-  <hr>
+  <!-- ═══ TAB: ACCESO ═══ -->
+  <div id="tab-acceso" class="tab-panel">
+    <div class="panel-card">
+      <h2>🔐 Resetear contraseña</h2>
+      <p style="color:#666; font-size:0.88rem; margin-bottom:14px;">
+        Envía un enlace de reseteo al correo del usuario.
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <input type="email" id="email-reset" placeholder="Correo del usuario"
+               style="padding:10px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; width:280px;" />
+        <button onclick="resetearContrasena()" class="btn-primary">Enviar enlace</button>
+      </div>
+    </div>
+  </div>
 
-  <section>
-    <h2>📋 Ver registros</h2>
-    <button onclick="cargarRegistros()">Mostrar registros</button>
-    <table border="1" id="tabla-registros">
-      <thead>
-        <tr>
-          <th>Email</th>
-          <th>Curso</th>
-          <th>Nota</th>
-          <th>Fecha</th>
-          <th>Certificado</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </section>
+</div>
 
-  <hr>
+<!-- Modal editar trabajador -->
+<div id="modal-editar" class="modal-overlay">
+  <div class="modal-box">
+    <h3>✏️ Editar trabajador</h3>
+    <input type="hidden" id="editar-id" />
+    <input type="text"  id="editar-nombres"       placeholder="Nombres *" />
+    <input type="text"  id="editar-apellidos"      placeholder="Apellidos *" />
+    <input type="email" id="editar-email"          placeholder="Correo electrónico" />
+    <input type="text"  id="editar-telefono"       placeholder="Teléfono" />
+    <input type="text"  id="editar-documento"      placeholder="Nº documento" />
+    <select id="editar-cargo">
+      <option value="">-- Sin cargo --</option>
+    </select>
+    <input type="date"  id="editar-fecha-ingreso" />
+    <div class="modal-actions">
+      <button onclick="guardarEdicion()" class="btn-primary">Guardar cambios</button>
+      <button onclick="cerrarModal()" class="btn-secondary">Cancelar</button>
+    </div>
+  </div>
+</div>
 
-  <section>
-    <h2>🔐 Resetear contraseña</h2>
-    <input type="email" id="email-reset" placeholder="Correo del usuario" />
-    <button onclick="resetearContrasena()">Enviar enlace de reseteo</button>
-  </section>
-
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-  <script type="module" src="admin.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+  function mostrarTab(tab, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('activo'));
+    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('activo'));
+    document.getElementById('tab-' + tab).classList.add('activo');
+    btn.classList.add('activo');
+  }
+</script>
+<script type="module" src="admin.js"></script>
 </body>
 </html>

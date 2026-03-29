@@ -513,8 +513,11 @@ window.descargarReporteExcel = async function () {
   // 2. Obtener notas del período para esos correos
   const { data: notas, error } = await supabase
     .from('notas')
-    .select('correo, nota, id_curso, cursos(titulo)')
-    .in('correo', correosEmpresa);
+    .select('correo, nota, id_curso, created_at, cursos(titulo)')
+    .in('correo', correosEmpresa)
+    .gte('created_at', desde)
+    .lt('created_at', hasta)
+    .order('created_at', { ascending: true });
 
   if (error) { alert('❌ Error: ' + error.message); return; }
   if (!notas || notas.length === 0) { alert('No hay registros de tu empresa para ese mes.'); return; }
@@ -523,7 +526,7 @@ window.descargarReporteExcel = async function () {
                        'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
   const filas = [
-    ['Apellidos', 'Nombres', 'Documento', 'Tipo Doc', 'Cargo', 'Empresa', 'Curso', 'Nota', 'Estado']
+    ['Apellidos', 'Nombres', 'Documento', 'Tipo Doc', 'Cargo', 'Empresa', 'Curso', 'Nota', 'Estado', 'Fecha']
   ];
 
   notas.forEach(r => {
@@ -537,13 +540,14 @@ window.descargarReporteExcel = async function () {
       p?.empresa || '',
       r.cursos?.titulo || '',
       r.nota,
-      r.nota >= 14 ? 'Aprobado' : 'Desaprobado'
+      r.nota >= 14 ? 'Aprobado' : 'Desaprobado',
+      new Date(r.created_at).toLocaleDateString('es-PE')
     ]);
   });
 
   const XLSX = window.XLSX;
   const ws = XLSX.utils.aoa_to_sheet(filas);
-  ws['!cols'] = [20,20,15,10,20,20,30,8,12].map(w => ({ wch: w }));
+  ws['!cols'] = [20,20,15,10,20,20,30,8,12,12].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Notas');
   XLSX.writeFile(wb, `Reporte_Notas_${mesesNombre[mes-1]}_${anio}.xlsx`);

@@ -666,6 +666,129 @@ window.guardarEdicion = async function () {
   cargarTrabajadores();
 };
 
+// ═══════════════════════════════
+// 🔄 Actualización masiva desde Excel
+// ═══════════════════════════════
+let filasActualizacion = [];
+
+window.descargarPlantillaActualizacion = function (e) {
+  e.preventDefault();
+  const XLSX = window.XLSX;
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['DNI', 'Email', 'Telefono', 'Cargo', 'Fecha Ingreso'],
+    ['12345678', 'juan@empresa.com', '999888777', 'Operario', '2024-01-15'],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Actualizar');
+  XLSX.writeFile(wb, 'plantilla_actualizacion.xlsx');
+};
+
+window.previsualizarActualizacion = function () {
+  const archivo = document.getElementById('archivo-actualizacion').files[0];
+  if (!archivo) { alert('Selecciona un archivo Excel.'); return; }
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const XLSX = window.XLSX;
+    const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+    const hoja = workbook.Sheets[workbook.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
+
+    filasActualizacion = filas.slice(1).filter(f => f[0]);
+
+    const tbody = document.getElementById('tbody-actualizacion');
+    tbody.innerHTML = '';
+    filasActualizacion.forEach(f => {
+      const fechaRaw = f[4];
+      let fecha = '';
+      if (fechaRaw instanceof Date) {
+        const y = fechaRaw.getFullYear();
+        const m = String(fechaRaw.getMonth() + 1).padStart(2, '0');
+        const d = String(fechaRaw.getDate()).padStart(2, '0');
+        fecha = `${y}-${m}-${d}`;
+      } else if (fechaRaw) {
+        fecha = String(fechaRaw).trim();
+      }
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="padding:5px;">${f[0]}</td>
+        <td style="padding:5px;">${f[1]}</td>
+        <td style="padding:5px;">${f[2]}</td>
+        <td style="padding:5px;">${f[3]}</td>
+        <td style="padding:5px;">${fecha}</td>
+        <td style="padding:5px; color:#888;">Pendiente</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('preview-resumen-act').textContent =
+      `${filasActualizacion.length} trabajadores a actualizar.`;
+    document.getElementById('preview-actualizacion').style.display = 'block';
+  };
+  reader.readAsArrayBuffer(archivo);
+};
+
+window.ejecutarActualizacion = async function () {
+  if (!filasActualizacion.length) return;
+
+  const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true);
+  const filas = document.querySelectorAll('#tbody-actualizacion tr');
+  const progreso = document.getElementById('progreso-actualizacion');
+  let ok = 0, errores = 0;
+
+  for (let i = 0; i < filasActualizacion.length; i++) {
+    const f = filasActualizacion[i];
+    const dni      = String(f[0]).trim();
+    const emailRaw = String(f[1]).trim();
+    const telefono = String(f[2]).trim();
+    const cargoNombre = String(f[3]).trim();
+    const fechaRaw = f[4];
+
+    let fechaIngreso = '';
+    if (fechaRaw instanceof Date) {
+      const y = fechaRaw.getFullYear();
+      const m = String(fechaRaw.getMonth() + 1).padStart(2, '0');
+      const d = String(fechaRaw.getDate()).padStart(2, '0');
+      fechaIngreso = `${y}-${m}-${d}`;
+    } else if (fechaRaw) {
+      fechaIngreso = String(fechaRaw).trim();
+    }
+
+    const tdEstado = filas[i].querySelectorAll('td')[5];
+    tdEstado.textContent = '⏳ Actualizando...';
+    tdEstado.style.color = '#888';
+
+    const email = emailRaw.includes('@') ? emailRaw : null;
+    const cargo = cargos?.find(c => c.nombre.toLowerCase() === cargoNombre.toLowerCase());
+
+    const updates = {};
+    if (email) updates.email = email;
+    if (telefono) updates.telefono = telefono;
+    if (cargo) updates.cargo_id = cargo.id;
+    if (fechaIngreso) updates.fecha_ingreso = fechaIngreso;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('documento_numero', dni)
+      .eq('empresa_id', empresaAdminId);
+
+    if (error) {
+      tdEstado.textContent = '❌ ' + error.message;
+      tdEstado.style.color = 'red';
+      errores++;
+    } else {
+      tdEstado.textContent = '✅ Actualizado';
+      tdEstado.style.color = 'green';
+      ok++;
+    }
+
+    progreso.textContent = `Progreso: ${i + 1}/${filasActualizacion.length} — ✅ ${ok} actualizados, ❌ ${errores} errores`;
+  }
+
+  progreso.textContent += ' — ¡Completado!';
+};
+
 window.toggleActivo = async function (id, activo) {
   await supabase.from('profiles').update({ activo: !activo }).eq('id', id);
   cargarTrabajadores();

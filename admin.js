@@ -287,7 +287,7 @@ window.cargarRegistros = async function () {
   tbody.innerHTML = "";
 
   data.forEach(reg => {
-    const aprobado = reg.nota >= 14;
+    const aprobado = reg.nota >= 16;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${reg.correo}</td>
@@ -540,7 +540,7 @@ window.descargarReporteExcel = async function () {
       p?.empresa || '',
       r.cursos?.titulo || '',
       r.nota,
-      r.nota >= 14 ? 'Aprobado' : 'Desaprobado',
+      r.nota >= 16 ? 'Aprobado' : 'Desaprobado',
       new Date(r.created_at).toLocaleDateString('es-PE')
     ]);
   });

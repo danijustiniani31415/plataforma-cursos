@@ -222,6 +222,39 @@
     }
     .modal-actions { display: flex; gap: 10px; margin-top: 6px; }
 
+    .stat-card {
+      background: white;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      border-top: 4px solid #002855;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .stat-card .stat-num { font-size: 2rem; font-weight: 700; color: #002855; line-height: 1; }
+    .stat-card .stat-label { font-size: 0.78rem; color: #666; margin-top: 4px; }
+    .stat-card.verde { border-top-color: #28a745; }
+    .stat-card.verde .stat-num { color: #28a745; }
+    .stat-card.rojo { border-top-color: #dc3545; }
+    .stat-card.rojo .stat-num { color: #dc3545; }
+    .stat-card.naranja { border-top-color: #fd7e14; }
+    .stat-card.naranja .stat-num { color: #fd7e14; }
+
+    .sugerencia-item {
+      padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f0f0f0;
+      font-size: 0.88rem; transition: background 0.15s;
+    }
+    .sugerencia-item:hover { background: #f5f7fa; }
+
+    .curso-item {
+      padding: 8px 12px; border-radius: 7px; margin-bottom: 7px;
+      font-size: 0.83rem; display: flex; justify-content: space-between; align-items: center;
+    }
+    .curso-item.aprobado { background: #d4edda; color: #155724; }
+    .curso-item.desaprobado { background: #f8d7da; color: #721c24; }
+    .curso-item.pendiente { background: #f0f0f0; color: #555; }
+
+    .trabajador-item { padding: 7px 0; font-size: 0.83rem; border-bottom: 1px solid #f0f0f0; color: #333; }
+
     @media (max-width: 600px) {
       .form-grid { grid-template-columns: 1fr; }
       .admin-content { padding: 16px; }
@@ -258,6 +291,9 @@
   </button>
   <button class="nav-tab" onclick="mostrarTab('reporte', this)">
     <span class="tab-icon">📊</span> Reporte
+  </button>
+  <button class="nav-tab" onclick="mostrarTab('dashboard', this)">
+    <span class="tab-icon">📊</span> Dashboard
   </button>
   <button class="nav-tab" onclick="mostrarTab('registros', this)">
     <span class="tab-icon">📋</span> Registros
@@ -428,6 +464,86 @@
     </div>
   </div>
 
+  <!-- ═══ TAB: DASHBOARD ═══ -->
+  <div id="tab-dashboard" class="tab-panel">
+
+    <!-- 1. Estado mensual -->
+    <div class="panel-card">
+      <h2>📅 Estado del mes actual</h2>
+      <button onclick="cargarDashboardMes()" class="btn-primary" style="margin-bottom:16px;">Actualizar datos</button>
+      <div id="cards-mes" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:20px;"></div>
+      <div id="detalle-pendientes" style="display:none;">
+        <h3 style="color:#002855; font-size:0.95rem; margin-bottom:10px;">⏳ Trabajadores sin actividad este mes</h3>
+        <div style="overflow-x:auto;">
+          <table class="tabla-trabajadores" id="tabla-sin-actividad">
+            <thead><tr><th>Apellidos y Nombres</th><th>DNI</th><th>Cargo</th></tr></thead>
+            <tbody id="tbody-sin-actividad"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Buscador por trabajador -->
+    <div class="panel-card">
+      <h2>🔍 Cursos por trabajador</h2>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+        <input type="text" id="buscar-trabajador" placeholder="Buscar por nombre o apellido..."
+               style="padding:10px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; flex:1; min-width:220px;"
+               oninput="buscarTrabajadorDashboard()" />
+      </div>
+      <div id="lista-sugerencias" style="margin-bottom:12px;"></div>
+      <div id="resultado-trabajador" style="display:none;">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+          <div style="background:#002855; color:white; border-radius:50%; width:44px; height:44px;
+                      display:flex; align-items:center; justify-content:center; font-size:1.1rem; font-weight:700;" id="trabajador-inicial"></div>
+          <div>
+            <div style="font-weight:700; font-size:1rem;" id="trabajador-nombre"></div>
+            <div style="color:#666; font-size:0.83rem;" id="trabajador-info"></div>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div>
+            <div style="font-weight:600; color:#28a745; margin-bottom:8px;">✅ Cursos completados</div>
+            <div id="cursos-completados"></div>
+          </div>
+          <div>
+            <div style="font-weight:600; color:#dc3545; margin-bottom:8px;">⏳ Cursos pendientes</div>
+            <div id="cursos-pendientes"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Estado por curso -->
+    <div class="panel-card">
+      <h2>📚 Estado por curso</h2>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+        <select id="select-curso-dashboard" style="padding:10px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; flex:1; min-width:220px;">
+          <option value="">-- Selecciona un curso --</option>
+        </select>
+        <button onclick="cargarEstadoCurso()" class="btn-primary">Ver estado</button>
+      </div>
+      <div id="stats-curso" style="display:none;">
+        <div id="cards-curso" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-bottom:16px;"></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+          <div>
+            <div style="font-weight:600; color:#28a745; margin-bottom:8px;">✅ Aprobados</div>
+            <div id="lista-aprobados-curso"></div>
+          </div>
+          <div>
+            <div style="font-weight:600; color:#dc3545; margin-bottom:8px;">❌ Desaprobados</div>
+            <div id="lista-desaprobados-curso"></div>
+          </div>
+          <div>
+            <div style="font-weight:600; color:#888; margin-bottom:8px;">⏳ No han rendido</div>
+            <div id="lista-pendientes-curso"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
   <!-- ═══ TAB: REGISTROS ═══ -->
   <div id="tab-registros" class="tab-panel">
     <div class="panel-card">
@@ -491,6 +607,10 @@
     document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('activo'));
     document.getElementById('tab-' + tab).classList.add('activo');
     btn.classList.add('activo');
+    if (tab === 'dashboard') {
+      cargarDashboardMes();
+      cargarDatosDashboard();
+    }
   }
 </script>
 <script type="module" src="admin.js"></script>

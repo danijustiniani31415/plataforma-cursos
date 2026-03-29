@@ -801,3 +801,219 @@ window.toggleActivo = async function (id, activo) {
   await supabase.from('profiles').update({ activo: !activo }).eq('id', id);
   cargarTrabajadores();
 };
+
+// ═══════════════════════════════
+// 📊 DASHBOARD
+// ═══════════════════════════════
+
+// ── 1. Estado mensual ──
+window.cargarDashboardMes = async function () {
+  const ahora = new Date();
+  const desde = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString();
+  const hasta = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1).toISOString();
+
+  const { data: trabajadores } = await supabase
+    .from('profiles')
+    .select('id, nombres, apellidos, documento_numero, cargo, email')
+    .eq('empresa_id', empresaAdminId)
+    .eq('rol', 'trabajador')
+    .eq('activo', true);
+
+  if (!trabajadores?.length) {
+    document.getElementById('cards-mes').innerHTML = '<p style="color:#888;">No hay trabajadores activos.</p>';
+    return;
+  }
+
+  const correos = trabajadores.map(t => t.email);
+
+  const { data: notasMes } = await supabase
+    .from('notas')
+    .select('correo, nota')
+    .in('correo', correos)
+    .gte('created_at', desde)
+    .lt('created_at', hasta);
+
+  const correosConActividad = new Set(notasMes?.map(n => n.correo) || []);
+  const aprobados   = new Set(notasMes?.filter(n => n.nota >= 16).map(n => n.correo) || []);
+  const conActividad = correosConActividad.size;
+  const sinActividad = trabajadores.length - conActividad;
+  const pct = Math.round((conActividad / trabajadores.length) * 100);
+
+  const cards = document.getElementById('cards-mes');
+  cards.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-num">${trabajadores.length}</div>
+      <div class="stat-label">Trabajadores activos</div>
+    </div>
+    <div class="stat-card verde">
+      <div class="stat-num">${conActividad}</div>
+      <div class="stat-label">Han rendido este mes</div>
+    </div>
+    <div class="stat-card naranja">
+      <div class="stat-num">${sinActividad}</div>
+      <div class="stat-label">Sin actividad este mes</div>
+    </div>
+    <div class="stat-card verde">
+      <div class="stat-num">${aprobados.size}</div>
+      <div class="stat-label">Aprobaron (≥16)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">${pct}%</div>
+      <div class="stat-label">Participación mensual</div>
+    </div>
+  `;
+
+  // Tabla de sin actividad
+  const sinAct = trabajadores.filter(t => !correosConActividad.has(t.email));
+  const tbody = document.getElementById('tbody-sin-actividad');
+  tbody.innerHTML = '';
+  sinAct.forEach(t => {
+    tbody.innerHTML += `<tr>
+      <td>${t.apellidos || ''} ${t.nombres || ''}</td>
+      <td>${t.documento_numero || ''}</td>
+      <td>${t.cargo || ''}</td>
+    </tr>`;
+  });
+  document.getElementById('detalle-pendientes').style.display = sinAct.length ? 'block' : 'none';
+};
+
+// ── 2. Buscador por trabajador ──
+let todosTrabajadoresDash = [];
+let todosCursosDash = [];
+
+async function cargarDatosDashboard() {
+  if (todosTrabajadoresDash.length) return;
+  const [{ data: trabajadores }, { data: cursos }] = await Promise.all([
+    supabase.from('profiles').select('id, nombres, apellidos, email, documento_numero, cargo')
+      .eq('empresa_id', empresaAdminId).eq('rol', 'trabajador').eq('activo', true).order('apellidos'),
+    supabase.from('cursos').select('id, titulo').eq('activo', true)
+  ]);
+  todosTrabajadoresDash = trabajadores || [];
+  todosCursosDash = cursos || [];
+
+  const sel = document.getElementById('select-curso-dashboard');
+  todosCursosDash.forEach(c => {
+    sel.innerHTML += `<option value="${c.id}">${c.titulo}</option>`;
+  });
+}
+
+window.buscarTrabajadorDashboard = function () {
+  const texto = document.getElementById('buscar-trabajador').value.toLowerCase().trim();
+  const lista = document.getElementById('lista-sugerencias');
+  document.getElementById('resultado-trabajador').style.display = 'none';
+
+  if (!texto || texto.length < 2) { lista.innerHTML = ''; return; }
+
+  cargarDatosDashboard().then(() => {
+    const coinciden = todosTrabajadoresDash.filter(t =>
+      (t.nombres || '').toLowerCase().includes(texto) ||
+      (t.apellidos || '').toLowerCase().includes(texto)
+    ).slice(0, 8);
+
+    if (!coinciden.length) {
+      lista.innerHTML = '<div style="color:#888; font-size:0.85rem; padding:8px;">No se encontraron trabajadores.</div>';
+      return;
+    }
+
+    lista.innerHTML = `<div style="border:1px solid #e0e0e0; border-radius:8px; overflow:hidden; max-width:500px;">
+      ${coinciden.map(t => `
+        <div class="sugerencia-item" onclick="verCursosTrabajador('${t.email}')">
+          <strong>${t.apellidos} ${t.nombres}</strong>
+          <span style="color:#888; margin-left:8px; font-size:0.8rem;">${t.documento_numero || ''} · ${t.cargo || ''}</span>
+        </div>`).join('')}
+    </div>`;
+  });
+};
+
+window.verCursosTrabajador = async function (email) {
+  document.getElementById('lista-sugerencias').innerHTML = '';
+  document.getElementById('buscar-trabajador').value = '';
+
+  await cargarDatosDashboard();
+  const trabajador = todosTrabajadoresDash.find(t => t.email === email);
+  if (!trabajador) return;
+
+  const { data: notas } = await supabase
+    .from('notas')
+    .select('id_curso, nota')
+    .eq('correo', email);
+
+  const notasMap = {};
+  notas?.forEach(n => { notasMap[n.id_curso] = n.nota; });
+
+  const completados = todosCursosDash.filter(c => notasMap[c.id] !== undefined);
+  const pendientes  = todosCursosDash.filter(c => notasMap[c.id] === undefined);
+
+  document.getElementById('trabajador-inicial').textContent =
+    (trabajador.apellidos || '?')[0].toUpperCase();
+  document.getElementById('trabajador-nombre').textContent =
+    `${trabajador.apellidos} ${trabajador.nombres}`;
+  document.getElementById('trabajador-info').textContent =
+    `${trabajador.documento_numero || ''} · ${trabajador.cargo || ''}`;
+
+  document.getElementById('cursos-completados').innerHTML = completados.length
+    ? completados.map(c => {
+        const nota = notasMap[c.id];
+        const cls = nota >= 16 ? 'aprobado' : 'desaprobado';
+        return `<div class="curso-item ${cls}"><span>${c.titulo}</span><strong>${nota}/20</strong></div>`;
+      }).join('')
+    : '<div style="color:#888; font-size:0.83rem;">Ninguno aún</div>';
+
+  document.getElementById('cursos-pendientes').innerHTML = pendientes.length
+    ? pendientes.map(c => `<div class="curso-item pendiente">${c.titulo}</div>`).join('')
+    : '<div style="color:#28a745; font-size:0.83rem;">¡Todos completados!</div>';
+
+  document.getElementById('resultado-trabajador').style.display = 'block';
+};
+
+// ── 3. Estado por curso ──
+window.cargarEstadoCurso = async function () {
+  const cursoId = parseInt(document.getElementById('select-curso-dashboard').value);
+  if (!cursoId) { alert('Selecciona un curso.'); return; }
+
+  await cargarDatosDashboard();
+
+  const correos = todosTrabajadoresDash.map(t => t.email);
+
+  const { data: notas } = await supabase
+    .from('notas')
+    .select('correo, nota')
+    .eq('id_curso', cursoId)
+    .in('correo', correos);
+
+  const notasMap = {};
+  notas?.forEach(n => { notasMap[n.correo] = n.nota; });
+
+  const aprobados     = todosTrabajadoresDash.filter(t => notasMap[t.email] >= 16);
+  const desaprobados  = todosTrabajadoresDash.filter(t => notasMap[t.email] !== undefined && notasMap[t.email] < 16);
+  const pendientes    = todosTrabajadoresDash.filter(t => notasMap[t.email] === undefined);
+  const total         = todosTrabajadoresDash.length;
+
+  document.getElementById('cards-curso').innerHTML = `
+    <div class="stat-card verde">
+      <div class="stat-num">${aprobados.length}</div>
+      <div class="stat-label">Aprobados (${Math.round(aprobados.length/total*100)}%)</div>
+    </div>
+    <div class="stat-card rojo">
+      <div class="stat-num">${desaprobados.length}</div>
+      <div class="stat-label">Desaprobados</div>
+    </div>
+    <div class="stat-card naranja">
+      <div class="stat-num">${pendientes.length}</div>
+      <div class="stat-label">No han rendido</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">${total}</div>
+      <div class="stat-label">Total trabajadores</div>
+    </div>
+  `;
+
+  const fmt = lista => lista.length
+    ? lista.map(t => `<div class="trabajador-item">${t.apellidos} ${t.nombres}${notasMap[t.email] !== undefined ? ` <strong>(${notasMap[t.email]}/20)</strong>` : ''}</div>`).join('')
+    : '<div style="color:#888; font-size:0.83rem;">Ninguno</div>';
+
+  document.getElementById('lista-aprobados-curso').innerHTML    = fmt(aprobados);
+  document.getElementById('lista-desaprobados-curso').innerHTML = fmt(desaprobados);
+  document.getElementById('lista-pendientes-curso').innerHTML   = fmt(pendientes);
+  document.getElementById('stats-curso').style.display = 'block';
+};

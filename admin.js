@@ -407,6 +407,10 @@ window.previsualizarExcel = function () {
 window.importarDesdeExcel = async function () {
   if (!filasExcel.length) return;
 
+  const btnImportar = document.querySelector('#preview-excel .btn-primary');
+  btnImportar.disabled = true;
+  btnImportar.textContent = '⏳ Importando...';
+
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
 
@@ -480,6 +484,8 @@ window.importarDesdeExcel = async function () {
   }
 
   progreso.textContent += ' — ¡Importación completada!';
+  btnImportar.disabled = false;
+  btnImportar.textContent = '✅ Confirmar importación';
 };
 
 // ═══════════════════════════════
@@ -727,6 +733,10 @@ window.previsualizarActualizacion = function () {
 window.ejecutarActualizacion = async function () {
   if (!filasActualizacion.length) return;
 
+  const btnActualizar = document.querySelector('#preview-actualizacion .btn-primary');
+  btnActualizar.disabled = true;
+  btnActualizar.textContent = '⏳ Actualizando...';
+
   const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true);
   const filas = document.querySelectorAll('#tbody-actualizacion tr');
   const progreso = document.getElementById('progreso-actualizacion');
@@ -783,6 +793,8 @@ window.ejecutarActualizacion = async function () {
   }
 
   progreso.textContent += ' — ¡Completado!';
+  btnActualizar.disabled = false;
+  btnActualizar.textContent = '✅ Confirmar actualización';
 };
 
 window.toggleActivo = async function (id, activo) {

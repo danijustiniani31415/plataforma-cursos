@@ -354,15 +354,41 @@ document.getElementById('nuevo-dni').addEventListener('blur', async function () 
 // ═══════════════════════════════
 let filasExcel = [];
 
-window.descargarPlantilla = function (e) {
+window.descargarPlantilla = async function (e) {
   e.preventDefault();
   const XLSX = window.XLSX;
+
+  // Obtener cargos activos
+  const { data: cargos } = await supabase.from('cargos').select('nombre').eq('activo', true).order('nombre');
+  const listaCargos = cargos?.map(c => c.nombre) || [];
+
+  // Hoja principal
   const ws = XLSX.utils.aoa_to_sheet([
     ['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Telefono', 'Fecha Ingreso'],
-    ['12345678', 'García López', 'Juan Carlos', 'juan@empresa.com', 'Operario', '999888777', '2024-01-15'],
+    ['', '', '', '', '', '', ''],
   ]);
+
+  // Hoja oculta con la lista de cargos para el dropdown
+  const wsCargos = XLSX.utils.aoa_to_sheet(listaCargos.map(c => [c]));
+
+  // Ancho de columnas
+  ws['!cols'] = [12, 22, 22, 28, 22, 14, 14].map(w => ({ wch: w }));
+
+  // Validación desplegable en columna E (Cargo) para filas 2-200
+  ws['!dataValidations'] = ws['!dataValidations'] || [];
+  if (listaCargos.length > 0) {
+    ws['!dataValidations'].push({
+      type: 'list',
+      sqref: 'E2:E200',
+      formula1: listaCargos.map(c => `"${c}"`).join(',').length <= 255
+        ? '"' + listaCargos.join(',') + '"'
+        : 'Cargos!$A$1:$A$' + listaCargos.length
+    });
+  }
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Trabajadores');
+  XLSX.utils.book_append_sheet(wb, wsCargos, 'Cargos');
   XLSX.writeFile(wb, 'plantilla_trabajadores.xlsx');
 };
 
@@ -692,15 +718,36 @@ window.guardarEdicion = async function () {
 // ═══════════════════════════════
 let filasActualizacion = [];
 
-window.descargarPlantillaActualizacion = function (e) {
+window.descargarPlantillaActualizacion = async function (e) {
   e.preventDefault();
   const XLSX = window.XLSX;
+
+  const { data: cargos } = await supabase.from('cargos').select('nombre').eq('activo', true).order('nombre');
+  const listaCargos = cargos?.map(c => c.nombre) || [];
+
   const ws = XLSX.utils.aoa_to_sheet([
     ['DNI', 'Email', 'Telefono', 'Cargo', 'Fecha Ingreso'],
-    ['12345678', 'juan@empresa.com', '999888777', 'Operario', '2024-01-15'],
+    ['', '', '', '', ''],
   ]);
+
+  const wsCargos = XLSX.utils.aoa_to_sheet(listaCargos.map(c => [c]));
+
+  ws['!cols'] = [12, 28, 14, 22, 14].map(w => ({ wch: w }));
+
+  ws['!dataValidations'] = ws['!dataValidations'] || [];
+  if (listaCargos.length > 0) {
+    ws['!dataValidations'].push({
+      type: 'list',
+      sqref: 'D2:D200',
+      formula1: listaCargos.map(c => `"${c}"`).join(',').length <= 255
+        ? '"' + listaCargos.join(',') + '"'
+        : 'Cargos!$A$1:$A$' + listaCargos.length
+    });
+  }
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Actualizar');
+  XLSX.utils.book_append_sheet(wb, wsCargos, 'Cargos');
   XLSX.writeFile(wb, 'plantilla_actualizacion.xlsx');
 };
 

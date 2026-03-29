@@ -496,57 +496,54 @@ window.descargarReporteExcel = async function () {
   const desde = new Date(anio, mes - 1, 1).toISOString();
   const hasta = new Date(anio, mes, 1).toISOString();
 
-  // 1. Obtener notas del período
-  const { data: notas, error } = await supabase
-    .from('notas')
-    .select('correo, nota, created_at, cursos(titulo)')
-    .gte('created_at', desde)
-    .lt('created_at', hasta)
-    .order('created_at', { ascending: true });
-
-  if (error) { alert('❌ Error: ' + error.message); return; }
-  if (!notas || notas.length === 0) { alert('No hay registros para ese mes.'); return; }
-
-  // 2. Obtener perfiles de la empresa del admin
-  const { data: perfiles } = await supabase
+  // 1. Obtener perfiles de la empresa del admin
+  const { data: perfiles, error: errPerfiles } = await supabase
     .from('profiles')
-    .select('email, nombres, apellidos, documento_numero, documento_tipo, cargos(nombre), empresas(nombre)')
+    .select('email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
     .eq('empresa_id', empresaAdminId);
 
+  if (errPerfiles) { alert('❌ Error al cargar perfiles: ' + errPerfiles.message); return; }
+
+  const correosEmpresa = perfiles?.map(p => p.email) || [];
+  if (correosEmpresa.length === 0) { alert('No hay trabajadores en tu empresa.'); return; }
+
   const perfilMap = {};
-  perfiles?.forEach(p => { perfilMap[p.email] = p; });
+  perfiles.forEach(p => { perfilMap[p.email] = p; });
 
-  // 3. Filtrar solo los que pertenecen a esta empresa
-  const data = notas.filter(r => perfilMap[r.correo]);
+  // 2. Obtener notas del período para esos correos
+  const { data: notas, error } = await supabase
+    .from('notas')
+    .select('correo, nota, id_curso, cursos(titulo)')
+    .in('correo', correosEmpresa);
 
-  if (data.length === 0) { alert('No hay registros de tu empresa para ese mes.'); return; }
+  if (error) { alert('❌ Error: ' + error.message); return; }
+  if (!notas || notas.length === 0) { alert('No hay registros de tu empresa para ese mes.'); return; }
 
   const mesesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                        'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
   const filas = [
-    ['Apellidos', 'Nombres', 'Documento', 'Tipo Doc', 'Cargo', 'Empresa', 'Curso', 'Nota', 'Estado', 'Fecha']
+    ['Apellidos', 'Nombres', 'Documento', 'Tipo Doc', 'Cargo', 'Empresa', 'Curso', 'Nota', 'Estado']
   ];
 
-  data.forEach(r => {
+  notas.forEach(r => {
     const p = perfilMap[r.correo];
     filas.push([
       p?.apellidos || '',
       p?.nombres || '',
       p?.documento_numero || r.correo,
       p?.documento_tipo || '',
-      p?.cargos?.nombre || '',
-      p?.empresas?.nombre || '',
+      p?.cargo || '',
+      p?.empresa || '',
       r.cursos?.titulo || '',
       r.nota,
-      r.nota >= 14 ? 'Aprobado' : 'Desaprobado',
-      new Date(r.created_at).toLocaleDateString('es-PE')
+      r.nota >= 14 ? 'Aprobado' : 'Desaprobado'
     ]);
   });
 
   const XLSX = window.XLSX;
   const ws = XLSX.utils.aoa_to_sheet(filas);
-  ws['!cols'] = [20,20,15,10,20,20,30,8,12,12].map(w => ({ wch: w }));
+  ws['!cols'] = [20,20,15,10,20,20,30,8,12].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Notas');
   XLSX.writeFile(wb, `Reporte_Notas_${mesesNombre[mes-1]}_${anio}.xlsx`);

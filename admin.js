@@ -656,9 +656,28 @@ window.guardarEdicion = async function () {
 
   const emailFinal = email || `${documento}@cvglobal-group.com`;
 
+  // Obtener nombre del cargo y datos de empresa
+  let cargoNombre = null;
+  if (cargo_id) {
+    const { data: carg } = await supabase.from('cargos').select('nombre').eq('id', cargo_id).single();
+    cargoNombre = carg?.nombre || null;
+  }
+
+  const { data: emp } = await supabase.from('empresas').select('nombre, ruc').eq('id', empresaAdminId).single();
+
   const { error } = await supabase
     .from('profiles')
-    .update({ nombres, apellidos, email: emailFinal, telefono: telefono || null, documento_numero: documento, cargo_id, fecha_ingreso })
+    .update({
+      nombres, apellidos,
+      email:            emailFinal,
+      telefono:         telefono || null,
+      documento_numero: documento,
+      cargo_id,
+      cargo:            cargoNombre,
+      empresa:          emp?.nombre || null,
+      empresa_ruc:      emp?.ruc || null,
+      fecha_ingreso
+    })
     .eq('id', id);
 
   if (error) { alert('❌ Error: ' + error.message); return; }

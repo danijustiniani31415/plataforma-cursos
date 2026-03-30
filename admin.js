@@ -1546,7 +1546,7 @@ window.cargarEstadoCurso = async function () {
 // 📝 GESTIÓN DE FORMULARIOS (EXAMEN / EFICACIA)
 // ═══════════════════════════════════════════════
 
-async function initSelectCursoForm() {
+window.initSelectCursoForm = async function initSelectCursoForm() {
   const sel = document.getElementById('select-curso-form');
   if (!sel || sel.options.length > 1) return;
   const { data } = await supabase.from('cursos').select('id, titulo').eq('activo', true).order('titulo');

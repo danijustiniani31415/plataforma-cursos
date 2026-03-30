@@ -911,23 +911,17 @@ window.cargarDashboardMes = async function () {
 
   const userIds = trabajadores.map(t => t.id);
 
-  const { data: formsExamen } = await supabase
-    .from('formularios')
-    .select('id')
-    .eq('tipo', 'examen');
-  const examFormIds = formsExamen?.map(f => f.id) || [];
-
   const { data: enviosMes } = await supabase
     .from('envios_formulario')
-    .select('usuario_id, aprobado')
+    .select('usuario_id, aprobado, formularios(tipo)')
     .in('usuario_id', userIds)
-    .in('id_formulario', examFormIds.length ? examFormIds : ['00000000-0000-0000-0000-000000000000'])
     .eq('estado', 'completado')
     .gte('created_at', desde)
     .lt('created_at', hasta);
 
-  const idsConActividad = new Set(enviosMes?.map(n => n.usuario_id) || []);
-  const aprobados   = new Set(enviosMes?.filter(n => n.aprobado).map(n => n.usuario_id) || []);
+  const examenesMes = enviosMes?.filter(n => n.formularios?.tipo === 'examen') || [];
+  const idsConActividad = new Set(examenesMes.map(n => n.usuario_id));
+  const aprobados   = new Set(examenesMes.filter(n => n.aprobado).map(n => n.usuario_id));
   const conActividad = idsConActividad.size;
   const sinActividad = trabajadores.length - conActividad;
   const pct = Math.round((conActividad / trabajadores.length) * 100);
@@ -1026,21 +1020,15 @@ window.verCursosTrabajador = async function (email) {
   const trabajador = todosTrabajadoresDash.find(t => t.email === email);
   if (!trabajador) return;
 
-  const { data: formsExamen } = await supabase
-    .from('formularios')
-    .select('id, id_curso')
-    .eq('tipo', 'examen');
-  const examFormIds = formsExamen?.map(f => f.id) || [];
-
   const { data: envios } = await supabase
     .from('envios_formulario')
-    .select('id_curso, puntaje')
+    .select('id_curso, puntaje, formularios(tipo)')
     .eq('usuario_email', email)
-    .in('id_formulario', examFormIds.length ? examFormIds : ['00000000-0000-0000-0000-000000000000'])
     .eq('estado', 'completado');
 
   const notasMap = {};
-  envios?.forEach(n => { notasMap[n.id_curso] = n.puntaje; });
+  envios?.filter(n => n.formularios?.tipo === 'examen')
+         .forEach(n => { notasMap[n.id_curso] = n.puntaje; });
 
   const completados = todosCursosDash.filter(c => notasMap[c.id] !== undefined);
   const pendientes  = todosCursosDash.filter(c => notasMap[c.id] === undefined);
@@ -1074,24 +1062,17 @@ window.cargarEstadoCurso = async function () {
 
   await cargarDatosDashboard();
 
-  const { data: formExamen } = await supabase
-    .from('formularios')
-    .select('id')
-    .eq('tipo', 'examen')
+  const emails = todosTrabajadoresDash.map(t => t.email);
+  const { data: envios } = await supabase
+    .from('envios_formulario')
+    .select('usuario_email, puntaje, formularios(tipo)')
     .eq('id_curso', cursoId)
-    .maybeSingle();
+    .in('usuario_email', emails)
+    .eq('estado', 'completado');
 
   const notasMap = {};
-  if (formExamen) {
-    const emails = todosTrabajadoresDash.map(t => t.email);
-    const { data: envios } = await supabase
-      .from('envios_formulario')
-      .select('usuario_email, puntaje')
-      .eq('id_formulario', formExamen.id)
-      .in('usuario_email', emails)
-      .eq('estado', 'completado');
-    envios?.forEach(n => { notasMap[n.usuario_email] = n.puntaje; });
-  }
+  envios?.filter(n => n.formularios?.tipo === 'examen')
+         .forEach(n => { notasMap[n.usuario_email] = n.puntaje; });
 
   const aprobados     = todosTrabajadoresDash.filter(t => notasMap[t.email] !== undefined && notasMap[t.email] >= 16);
   const desaprobados  = todosTrabajadoresDash.filter(t => notasMap[t.email] !== undefined && notasMap[t.email] < 16);

@@ -286,6 +286,9 @@
   <button class="nav-tab" onclick="mostrarTab('actualizar', this)">
     <span class="tab-icon">🔄</span> Actualizar
   </button>
+  <button class="nav-tab" onclick="mostrarTab('asignacion', this)">
+    <span class="tab-icon">📅</span> Asignación
+  </button>
   <button class="nav-tab" onclick="mostrarTab('cursos', this)">
     <span class="tab-icon">📚</span> Cursos
   </button>
@@ -423,6 +426,61 @@
         <button onclick="ejecutarActualizacion()" class="btn-primary" style="margin-top:14px;">✅ Confirmar actualización</button>
       </div>
       <div id="progreso-actualizacion" class="progreso"></div>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: ASIGNACIÓN MENSUAL ═══ -->
+  <div id="tab-asignacion" class="tab-panel">
+    <div class="panel-card">
+      <h2>📅 Asignación mensual de trabajadores</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:16px;">
+        Sube un Excel con los DNIs de los trabajadores que deben capacitarse este mes.
+        Si el trabajador ya existe se asigna al mes. Si hay duplicado se ignora.
+      </p>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
+        <select id="asig-mes" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <select id="asig-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
+        <a href="#" onclick="descargarPlantillaAsignacion(event)" class="btn-primary" style="text-decoration:none;">⬇️ Descargar plantilla</a>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <input type="file" id="archivo-asignacion" accept=".xlsx,.xls"
+               style="padding:8px; border:1px solid #ddd; border-radius:7px; font-size:0.88rem;"
+               onchange="previsualizarAsignacion()" />
+      </div>
+
+      <div id="preview-asignacion" style="display:none;">
+        <p id="preview-resumen-asig" style="font-size:0.88rem; color:#555; margin-bottom:10px;"></p>
+        <div style="overflow-x:auto; margin-bottom:12px;">
+          <table class="preview-table">
+            <thead><tr><th>DNI</th><th>Trabajador</th><th>Estado</th></tr></thead>
+            <tbody id="tbody-asignacion"></tbody>
+          </table>
+        </div>
+        <button onclick="importarAsignacion()" class="btn-primary">✅ Confirmar asignación</button>
+        <span id="progreso-asignacion" class="progreso"></span>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h2>👁️ Ver asignados del mes</h2>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+        <select id="ver-asig-mes" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <select id="ver-asig-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
+        <button onclick="verAsignadosMes()" class="btn-primary">Ver lista</button>
+      </div>
+      <div id="lista-asignados-mes"></div>
     </div>
   </div>
 

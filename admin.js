@@ -561,7 +561,163 @@ window.importarDesdeExcel = async function () {
       selSat.appendChild(opt);
     }
   }
+
+  // Asignación mensual
+  for (const idSel of ['asig-anio', 'ver-asig-anio']) {
+    const sel = document.getElementById(idSel);
+    if (!sel) continue;
+    for (let y = anioActual; y >= 2024; y--) {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      sel.appendChild(opt);
+    }
+  }
+  const selAsigMes = document.getElementById('asig-mes');
+  const selVerMes  = document.getElementById('ver-asig-mes');
+  if (selAsigMes) selAsigMes.value = mesActual;
+  if (selVerMes)  selVerMes.value  = mesActual;
 })();
+
+// ═══════════════════════════════
+// 📅 ASIGNACIÓN MENSUAL
+// ═══════════════════════════════
+
+window.descargarPlantillaAsignacion = function (e) {
+  e.preventDefault();
+  const XLSX = window.XLSX;
+  const ws = XLSX.utils.aoa_to_sheet([['DNI'], ['']]);
+  ws['!cols'] = [{ wch: 14 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Asignacion');
+  XLSX.writeFile(wb, 'plantilla_asignacion_mensual.xlsx');
+};
+
+let filasAsignacion = [];
+
+window.previsualizarAsignacion = async function () {
+  const archivo = document.getElementById('archivo-asignacion').files[0];
+  if (!archivo) return;
+
+  const reader = new FileReader();
+  reader.onload = async function (e) {
+    const XLSX = window.XLSX;
+    const wb   = XLSX.read(e.target.result, { type: 'array' });
+    const hoja = wb.Sheets[wb.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
+
+    filasAsignacion = filas.slice(1).map(f => String(f[0]).trim()).filter(Boolean);
+
+    // Buscar trabajadores por DNI
+    const { data: perfiles } = await supabase
+      .from('profiles')
+      .select('documento_numero, nombres, apellidos, email')
+      .in('documento_numero', filasAsignacion)
+      .eq('empresa_id', empresaAdminId);
+
+    const perfilMap = {};
+    perfiles?.forEach(p => { perfilMap[p.documento_numero] = p; });
+
+    const tbody = document.getElementById('tbody-asignacion');
+    tbody.innerHTML = '';
+    let encontrados = 0;
+
+    filasAsignacion.forEach(dni => {
+      const p = perfilMap[dni];
+      const tr = document.createElement('tr');
+      if (p) {
+        encontrados++;
+        tr.innerHTML = `<td>${dni}</td><td>${p.apellidos} ${p.nombres}</td>
+          <td style="color:green;">✅ Encontrado</td>`;
+      } else {
+        tr.innerHTML = `<td>${dni}</td><td style="color:#888;">—</td>
+          <td style="color:orange;">⚠️ No existe en el sistema</td>`;
+      }
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('preview-resumen-asig').textContent =
+      `${filasAsignacion.length} DNIs — ${encontrados} encontrados, ${filasAsignacion.length - encontrados} no existen.`;
+    document.getElementById('preview-asignacion').style.display = 'block';
+  };
+  reader.readAsArrayBuffer(archivo);
+};
+
+window.importarAsignacion = async function () {
+  if (!filasAsignacion.length) return;
+
+  const mes  = parseInt(document.getElementById('asig-mes').value);
+  const anio = parseInt(document.getElementById('asig-anio').value);
+  const btn  = document.querySelector('#tab-asignacion .btn-primary:last-of-type');
+  btn.disabled = true;
+  btn.textContent = '⏳ Asignando...';
+
+  const { data: perfiles } = await supabase
+    .from('profiles')
+    .select('id, documento_numero, email')
+    .in('documento_numero', filasAsignacion)
+    .eq('empresa_id', empresaAdminId);
+
+  const perfilMap = {};
+  perfiles?.forEach(p => { perfilMap[p.documento_numero] = p; });
+
+  const registros = filasAsignacion
+    .filter(dni => perfilMap[dni])
+    .map(dni => ({
+      empresa_id:       empresaAdminId,
+      usuario_id:       perfilMap[dni].id,
+      usuario_email:    perfilMap[dni].email,
+      documento_numero: dni,
+      mes,
+      anio
+    }));
+
+  const { error } = await supabase
+    .from('asignaciones_mes')
+    .upsert(registros, { onConflict: 'empresa_id,documento_numero,mes,anio' });
+
+  if (error) {
+    alert('❌ Error: ' + error.message);
+  } else {
+    document.getElementById('progreso-asignacion').textContent =
+      `✅ ${registros.length} trabajadores asignados al mes ${mes}/${anio}.`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✅ Confirmar asignación';
+};
+
+window.verAsignadosMes = async function () {
+  const mes  = parseInt(document.getElementById('ver-asig-mes').value);
+  const anio = parseInt(document.getElementById('ver-asig-anio').value);
+
+  const { data, error } = await supabase
+    .from('asignaciones_mes')
+    .select('documento_numero, usuario_email, profiles(nombres, apellidos, cargo)')
+    .eq('empresa_id', empresaAdminId)
+    .eq('mes', mes)
+    .eq('anio', anio)
+    .order('documento_numero');
+
+  const cont = document.getElementById('lista-asignados-mes');
+  if (error || !data?.length) {
+    cont.innerHTML = '<p style="color:#888;">No hay asignaciones para ese mes.</p>';
+    return;
+  }
+
+  cont.innerHTML = `
+    <p style="font-size:0.88rem; color:#555; margin-bottom:10px;">${data.length} trabajadores asignados</p>
+    <div style="overflow-x:auto;">
+      <table class="tabla-trabajadores">
+        <thead><tr><th>DNI</th><th>Apellidos y Nombres</th><th>Cargo</th><th>Email</th></tr></thead>
+        <tbody>${data.map(r => `<tr>
+          <td>${r.documento_numero}</td>
+          <td>${r.profiles?.apellidos || ''} ${r.profiles?.nombres || ''}</td>
+          <td>${r.profiles?.cargo || ''}</td>
+          <td>${r.usuario_email || ''}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+};
 
 window.descargarReporteExcel = async function () {
   const mes  = parseInt(document.getElementById('filtro-mes').value);
@@ -1030,19 +1186,42 @@ window.cargarDashboardMes = async function () {
   const desde = new Date(Date.UTC(anio, mes - 1, 1, 5, 0, 0)).toISOString();
   const hasta = new Date(Date.UTC(anio, mes,     1, 5, 0, 0)).toISOString();
 
-  const { data: trabajadores } = await supabase
-    .from('profiles')
-    .select('id, nombres, apellidos, documento_numero, cargo, email')
+  // Usar asignaciones del mes si existen, sino todos los activos
+  const { data: asignaciones } = await supabase
+    .from('asignaciones_mes')
+    .select('usuario_email, documento_numero')
     .eq('empresa_id', empresaAdminId)
-    .eq('rol', 'trabajador')
-    .eq('activo', true);
+    .eq('mes', mes)
+    .eq('anio', anio);
 
-  if (!trabajadores?.length) {
-    document.getElementById('cards-mes').innerHTML = '<p style="color:#888;">No hay trabajadores activos.</p>';
-    return;
+  let trabajadores, emails, fuenteLabel;
+
+  if (asignaciones?.length) {
+    // Usar lista de asignados
+    emails = asignaciones.map(a => a.usuario_email).filter(Boolean);
+    const { data: perfs } = await supabase
+      .from('profiles')
+      .select('id, nombres, apellidos, documento_numero, cargo, email')
+      .in('email', emails);
+    trabajadores = perfs || [];
+    fuenteLabel  = `📋 Lista asignada (${asignaciones.length} trabajadores)`;
+  } else {
+    // Fallback: todos los activos de la empresa
+    const { data: todos } = await supabase
+      .from('profiles')
+      .select('id, nombres, apellidos, documento_numero, cargo, email')
+      .eq('empresa_id', empresaAdminId)
+      .eq('rol', 'trabajador')
+      .eq('activo', true);
+    trabajadores = todos || [];
+    emails = trabajadores.map(t => t.email);
+    fuenteLabel = `👥 Todos los activos (sin lista asignada)`;
   }
 
-  const emails = trabajadores.map(t => t.email);
+  if (!trabajadores.length) {
+    document.getElementById('cards-mes').innerHTML = '<p style="color:#888;">No hay trabajadores para este mes.</p>';
+    return;
+  }
 
   const { data: enviosMes } = await supabase
     .from('envios_formulario')
@@ -1060,9 +1239,10 @@ window.cargarDashboardMes = async function () {
 
   const cards = document.getElementById('cards-mes');
   cards.innerHTML = `
+    <div style="grid-column:1/-1; font-size:0.8rem; color:#888; margin-bottom:4px;">${fuenteLabel}</div>
     <div class="stat-card">
       <div class="stat-num">${trabajadores.length}</div>
-      <div class="stat-label">Trabajadores activos</div>
+      <div class="stat-label">Asignados al mes</div>
     </div>
     <div class="stat-card verde">
       <div class="stat-num">${conActividad}</div>

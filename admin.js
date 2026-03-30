@@ -551,6 +551,16 @@ window.importarDesdeExcel = async function () {
     document.getElementById('dash-mes').value  = mesActual;
     document.getElementById('dash-anio').value = anioActual;
   }
+
+  // Satisfacción
+  const selSat = document.getElementById('sat-anio');
+  if (selSat) {
+    for (let y = anioActual; y >= 2024; y--) {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      selSat.appendChild(opt);
+    }
+  }
 })();
 
 window.descargarReporteExcel = async function () {
@@ -915,6 +925,102 @@ window.toggleActivo = async function (id, activo) {
 // ═══════════════════════════════
 // 📊 DASHBOARD
 // ═══════════════════════════════
+
+let graficaSatisfaccionChart = null;
+
+window.cargarGraficaSatisfaccion = async function () {
+  const anio = parseInt(document.getElementById('sat-anio').value);
+
+  // Emails de trabajadores de la empresa
+  const { data: trabajadores } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('empresa_id', empresaAdminId)
+    .eq('rol', 'trabajador')
+    .eq('activo', true);
+  if (!trabajadores?.length) return;
+  const emails = trabajadores.map(t => t.email);
+
+  // IDs de formularios tipo encuesta
+  const { data: formsEncuesta } = await supabase
+    .from('formularios').select('id').eq('tipo', 'encuesta');
+  const encuestaIds = formsEncuesta?.map(f => f.id) || [];
+  if (!encuestaIds.length) { alert('No hay encuestas configuradas.'); return; }
+
+  // Envíos de encuesta del año seleccionado
+  const desde = new Date(Date.UTC(anio,  0, 1, 5, 0, 0)).toISOString();
+  const hasta = new Date(Date.UTC(anio + 1, 0, 1, 5, 0, 0)).toISOString();
+
+  const { data: envios } = await supabase
+    .from('envios_formulario')
+    .select('porcentaje, created_at')
+    .in('usuario_email', emails)
+    .in('id_formulario', encuestaIds)
+    .eq('estado', 'completado')
+    .gte('created_at', desde)
+    .lt('created_at', hasta);
+
+  // Agrupar por mes y calcular promedio
+  const mesesNombre = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const sumaMes  = Array(12).fill(0);
+  const countMes = Array(12).fill(0);
+
+  envios?.forEach(e => {
+    if (e.porcentaje == null || e.porcentaje === 100) return; // ignorar registros sin puntaje real
+    const mes = new Date(e.created_at).getMonth(); // 0-11
+    sumaMes[mes]  += e.porcentaje;
+    countMes[mes] += 1;
+  });
+
+  const promedios = sumaMes.map((s, i) => countMes[i] > 0 ? parseFloat((s / countMes[i]).toFixed(1)) : null);
+  const promedioGlobal = promedios.filter(v => v !== null);
+  const promedioAnual  = promedioGlobal.length
+    ? (promedioGlobal.reduce((a, b) => a + b, 0) / promedioGlobal.length).toFixed(1)
+    : null;
+
+  document.getElementById('sat-promedio').textContent = promedioAnual
+    ? `Promedio anual: ${promedioAnual}%`
+    : 'Sin datos para este año';
+
+  const ctx = document.getElementById('grafica-satisfaccion').getContext('2d');
+  if (graficaSatisfaccionChart) graficaSatisfaccionChart.destroy();
+
+  graficaSatisfaccionChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: mesesNombre,
+      datasets: [{
+        label: `Satisfacción % — ${anio}`,
+        data: promedios,
+        borderColor: '#002855',
+        backgroundColor: 'rgba(0,40,85,0.08)',
+        borderWidth: 2,
+        pointRadius: 5,
+        pointBackgroundColor: '#002855',
+        tension: 0.3,
+        spanGaps: true
+      }, {
+        label: 'Meta (80%)',
+        data: Array(12).fill(80),
+        borderColor: '#28a745',
+        borderDash: [6, 4],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 100, ticks: { callback: v => v + '%' } }
+      },
+      plugins: {
+        tooltip: { callbacks: { label: ctx => ctx.parsed.y !== null ? ctx.parsed.y + '%' : 'Sin datos' } }
+      }
+    }
+  });
+};
 
 // ── 1. Estado mensual ──
 window.cargarDashboardMes = async function () {

@@ -498,7 +498,20 @@
       </div>
     </div>
 
-    <!-- 2. Buscador por trabajador -->
+    <!-- 2. Gráfica de satisfacción -->
+    <div class="panel-card">
+      <h2>😊 Nivel de satisfacción</h2>
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap;">
+        <select id="sat-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
+        <button onclick="cargarGraficaSatisfaccion()" class="btn-primary">Ver gráfica</button>
+        <span id="sat-promedio" style="font-size:0.9rem; color:#555;"></span>
+      </div>
+      <div style="position:relative; height:280px;">
+        <canvas id="grafica-satisfaccion"></canvas>
+      </div>
+    </div>
+
+    <!-- 3. Buscador por trabajador -->
     <div class="panel-card">
       <h2>🔍 Cursos por trabajador</h2>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
@@ -620,6 +633,7 @@
 </div>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
   function toggleSinActividad() {
     const wrap = document.getElementById('tabla-sin-actividad-wrap');

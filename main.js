@@ -604,6 +604,8 @@ window.enviarFormulario = async function (tipoPaso) {
     if (tipoPaso === 'encuesta') {
       const opcionId = parseInt(seleccionado.value);
       const opcion   = p.opciones_pregunta?.find(o => o.id === opcionId);
+      if (opcion?.puntaje != null) puntajeTotal += opcion.puntaje;
+      puntajeMaximo += 5; // escala Likert máximo 5
       respuestas.push({
         id_envio: envioId, id_formulario: formulario.id,
         id_pregunta: p.id, respuesta_texto: opcion?.opcion || ''

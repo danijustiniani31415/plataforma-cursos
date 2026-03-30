@@ -276,9 +276,10 @@ window.subirCurso = async function () {
 // ═══════════════════════════════
 window.cargarRegistros = async function () {
   const { data, error } = await supabase
-    .from("notas")
-    .select("correo, nota, created_at, cursos(titulo)")
-    .order("created_at", { ascending: false });
+    .from('envios_formulario')
+    .select('usuario_email, puntaje, aprobado, created_at, formularios(tipo), cursos(titulo)')
+    .eq('estado', 'completado')
+    .order('created_at', { ascending: false });
 
   if (error) {
     alert("❌ Error al cargar registros: " + error.message);
@@ -288,16 +289,20 @@ window.cargarRegistros = async function () {
   const tbody = document.querySelector("#tabla-registros tbody");
   tbody.innerHTML = "";
 
+  const tipoLabel = { encuesta: 'Encuesta', examen: 'Examen', eficacia: 'Eficacia' };
+
   data.forEach(reg => {
-    const aprobado = reg.nota >= 16;
+    const tipo = reg.formularios?.tipo || '';
+    const esEncuesta = tipo === 'encuesta';
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${reg.correo}</td>
+      <td>${reg.usuario_email}</td>
       <td>${reg.cursos?.titulo || "Curso eliminado"}</td>
-      <td>${reg.nota}</td>
+      <td>${tipoLabel[tipo] || tipo}</td>
+      <td>${esEncuesta ? '—' : (reg.puntaje ?? '—')}</td>
       <td>${new Date(reg.created_at).toLocaleDateString()}</td>
-      <td style="color: ${aprobado ? 'green' : 'red'}">
-        ${aprobado ? "✅ Aprobado" : "❌ No aprobado"}
+      <td style="color: ${reg.aprobado ? 'green' : esEncuesta ? '#888' : 'red'}">
+        ${esEncuesta ? '✅ Completada' : reg.aprobado ? '✅ Aprobado' : '❌ No aprobado'}
       </td>
     `;
     tbody.appendChild(tr);
@@ -543,58 +548,65 @@ window.descargarReporteExcel = async function () {
   // 1. Obtener perfiles de la empresa del admin
   const { data: perfiles, error: errPerfiles } = await supabase
     .from('profiles')
-    .select('email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
+    .select('id, email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
     .eq('empresa_id', empresaAdminId);
 
   if (errPerfiles) { alert('❌ Error al cargar perfiles: ' + errPerfiles.message); return; }
 
-  const correosEmpresa = perfiles?.map(p => p.email) || [];
-  if (correosEmpresa.length === 0) { alert('No hay trabajadores en tu empresa.'); return; }
+  if (!perfiles || perfiles.length === 0) { alert('No hay trabajadores en tu empresa.'); return; }
 
   const perfilMap = {};
-  perfiles.forEach(p => { perfilMap[p.email] = p; });
+  perfiles.forEach(p => { perfilMap[p.id] = p; });
 
-  // 2. Obtener notas del período para esos correos
-  const { data: notas, error } = await supabase
-    .from('notas')
-    .select('correo, nota, id_curso, created_at, cursos(titulo)')
-    .in('correo', correosEmpresa)
+  // 2. Obtener resultados del período para usuarios de la empresa
+  const userIds = perfiles.map(p => p.id);
+  const { data: envios, error } = await supabase
+    .from('envios_formulario')
+    .select('usuario_id, usuario_email, puntaje, porcentaje, aprobado, created_at, formularios(tipo, titulo), cursos(titulo)')
+    .in('usuario_id', userIds)
+    .eq('estado', 'completado')
     .gte('created_at', desde)
     .lt('created_at', hasta)
     .order('created_at', { ascending: true });
 
   if (error) { alert('❌ Error: ' + error.message); return; }
-  if (!notas || notas.length === 0) { alert('No hay registros de tu empresa para ese mes.'); return; }
+  if (!envios || envios.length === 0) { alert('No hay registros de tu empresa para ese mes.'); return; }
 
   const mesesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                        'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+  const tipoLabel = { encuesta: 'Encuesta', examen: 'Examen', eficacia: 'Eficacia' };
+
   const filas = [
-    ['Apellidos', 'Nombres', 'Documento', 'Tipo Doc', 'Cargo', 'Empresa', 'Curso', 'Nota', 'Estado', 'Fecha']
+    ['Apellidos', 'Nombres', 'Documento', 'Tipo Doc', 'Cargo', 'Empresa', 'Curso', 'Tipo Evaluación', 'Nota (/20)', 'Porcentaje', 'Estado', 'Fecha']
   ];
 
-  notas.forEach(r => {
-    const p = perfilMap[r.correo];
+  envios.forEach(r => {
+    const p = perfilMap[r.usuario_id];
+    const tipo = r.formularios?.tipo || '';
+    const esEncuesta = tipo === 'encuesta';
     filas.push([
       p?.apellidos || '',
       p?.nombres || '',
-      p?.documento_numero || r.correo,
+      p?.documento_numero || r.usuario_email,
       p?.documento_tipo || '',
       p?.cargo || '',
       p?.empresa || '',
       r.cursos?.titulo || '',
-      r.nota,
-      r.nota >= 16 ? 'Aprobado' : 'Desaprobado',
+      tipoLabel[tipo] || tipo,
+      esEncuesta ? '—' : (r.puntaje ?? '—'),
+      esEncuesta ? '—' : (r.porcentaje != null ? r.porcentaje.toFixed(1) + '%' : '—'),
+      esEncuesta ? 'Completada' : (r.aprobado ? 'Aprobado' : 'Desaprobado'),
       new Date(r.created_at).toLocaleDateString('es-PE')
     ]);
   });
 
   const XLSX = window.XLSX;
   const ws = XLSX.utils.aoa_to_sheet(filas);
-  ws['!cols'] = [20,20,15,10,20,20,30,8,12,12].map(w => ({ wch: w }));
+  ws['!cols'] = [20,20,15,10,20,20,30,16,10,12,12,12].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Notas');
-  XLSX.writeFile(wb, `Reporte_Notas_${mesesNombre[mes-1]}_${anio}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, 'Resultados');
+  XLSX.writeFile(wb, `Reporte_Capacitaciones_${mesesNombre[mes-1]}_${anio}.xlsx`);
 };
 
 // ═══════════════════════════════
@@ -897,18 +909,26 @@ window.cargarDashboardMes = async function () {
     return;
   }
 
-  const correos = trabajadores.map(t => t.email);
+  const userIds = trabajadores.map(t => t.id);
 
-  const { data: notasMes } = await supabase
-    .from('notas')
-    .select('correo, nota')
-    .in('correo', correos)
+  const { data: formsExamen } = await supabase
+    .from('formularios')
+    .select('id')
+    .eq('tipo', 'examen');
+  const examFormIds = formsExamen?.map(f => f.id) || [];
+
+  const { data: enviosMes } = await supabase
+    .from('envios_formulario')
+    .select('usuario_id, aprobado')
+    .in('usuario_id', userIds)
+    .in('id_formulario', examFormIds.length ? examFormIds : ['00000000-0000-0000-0000-000000000000'])
+    .eq('estado', 'completado')
     .gte('created_at', desde)
     .lt('created_at', hasta);
 
-  const correosConActividad = new Set(notasMes?.map(n => n.correo) || []);
-  const aprobados   = new Set(notasMes?.filter(n => n.nota >= 16).map(n => n.correo) || []);
-  const conActividad = correosConActividad.size;
+  const idsConActividad = new Set(enviosMes?.map(n => n.usuario_id) || []);
+  const aprobados   = new Set(enviosMes?.filter(n => n.aprobado).map(n => n.usuario_id) || []);
+  const conActividad = idsConActividad.size;
   const sinActividad = trabajadores.length - conActividad;
   const pct = Math.round((conActividad / trabajadores.length) * 100);
 
@@ -937,7 +957,7 @@ window.cargarDashboardMes = async function () {
   `;
 
   // Tabla de sin actividad
-  const sinAct = trabajadores.filter(t => !correosConActividad.has(t.email));
+  const sinAct = trabajadores.filter(t => !idsConActividad.has(t.id));
   const tbody = document.getElementById('tbody-sin-actividad');
   tbody.innerHTML = '';
   sinAct.forEach(t => {
@@ -1006,13 +1026,21 @@ window.verCursosTrabajador = async function (email) {
   const trabajador = todosTrabajadoresDash.find(t => t.email === email);
   if (!trabajador) return;
 
-  const { data: notas } = await supabase
-    .from('notas')
-    .select('id_curso, nota')
-    .eq('correo', email);
+  const { data: formsExamen } = await supabase
+    .from('formularios')
+    .select('id, id_curso')
+    .eq('tipo', 'examen');
+  const examFormIds = formsExamen?.map(f => f.id) || [];
+
+  const { data: envios } = await supabase
+    .from('envios_formulario')
+    .select('id_curso, puntaje')
+    .eq('usuario_email', email)
+    .in('id_formulario', examFormIds.length ? examFormIds : ['00000000-0000-0000-0000-000000000000'])
+    .eq('estado', 'completado');
 
   const notasMap = {};
-  notas?.forEach(n => { notasMap[n.id_curso] = n.nota; });
+  envios?.forEach(n => { notasMap[n.id_curso] = n.puntaje; });
 
   const completados = todosCursosDash.filter(c => notasMap[c.id] !== undefined);
   const pendientes  = todosCursosDash.filter(c => notasMap[c.id] === undefined);
@@ -1046,18 +1074,26 @@ window.cargarEstadoCurso = async function () {
 
   await cargarDatosDashboard();
 
-  const correos = todosTrabajadoresDash.map(t => t.email);
-
-  const { data: notas } = await supabase
-    .from('notas')
-    .select('correo, nota')
+  const { data: formExamen } = await supabase
+    .from('formularios')
+    .select('id')
+    .eq('tipo', 'examen')
     .eq('id_curso', cursoId)
-    .in('correo', correos);
+    .maybeSingle();
 
   const notasMap = {};
-  notas?.forEach(n => { notasMap[n.correo] = n.nota; });
+  if (formExamen) {
+    const emails = todosTrabajadoresDash.map(t => t.email);
+    const { data: envios } = await supabase
+      .from('envios_formulario')
+      .select('usuario_email, puntaje')
+      .eq('id_formulario', formExamen.id)
+      .in('usuario_email', emails)
+      .eq('estado', 'completado');
+    envios?.forEach(n => { notasMap[n.usuario_email] = n.puntaje; });
+  }
 
-  const aprobados     = todosTrabajadoresDash.filter(t => notasMap[t.email] >= 16);
+  const aprobados     = todosTrabajadoresDash.filter(t => notasMap[t.email] !== undefined && notasMap[t.email] >= 16);
   const desaprobados  = todosTrabajadoresDash.filter(t => notasMap[t.email] !== undefined && notasMap[t.email] < 16);
   const pendientes    = todosTrabajadoresDash.filter(t => notasMap[t.email] === undefined);
   const total         = todosTrabajadoresDash.length;

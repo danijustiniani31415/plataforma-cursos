@@ -582,13 +582,32 @@ window.importarDesdeExcel = async function () {
 // 📅 ASIGNACIÓN MENSUAL
 // ═══════════════════════════════
 
-window.descargarPlantillaAsignacion = function (e) {
+window.descargarPlantillaAsignacion = async function (e) {
   e.preventDefault();
   const XLSX = window.XLSX;
-  const ws = XLSX.utils.aoa_to_sheet([['DNI'], ['']]);
-  ws['!cols'] = [{ wch: 14 }];
+
+  const { data: cargos } = await supabase.from('cargos').select('nombre').eq('activo', true).order('nombre');
+  const listaCargos = cargos?.map(c => c.nombre) || [];
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Telefono', 'Fecha Ingreso'],
+    ['', '', '', '', '', '', '']
+  ]);
+  ws['!cols'] = [12, 22, 22, 28, 22, 14, 14].map(w => ({ wch: w }));
+
+  if (listaCargos.length > 0) {
+    ws['!dataValidations'] = [{
+      type: 'list', sqref: 'E2:E500',
+      formula1: listaCargos.join(',').length <= 255
+        ? '"' + listaCargos.join(',') + '"'
+        : 'Cargos!$A$1:$A$' + listaCargos.length
+    }];
+  }
+
+  const wsCargos = XLSX.utils.aoa_to_sheet(listaCargos.map(c => [c]));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Asignacion');
+  XLSX.utils.book_append_sheet(wb, wsCargos, 'Cargos');
   XLSX.writeFile(wb, 'plantilla_asignacion_mensual.xlsx');
 };
 
@@ -601,17 +620,18 @@ window.previsualizarAsignacion = async function () {
   const reader = new FileReader();
   reader.onload = async function (e) {
     const XLSX = window.XLSX;
-    const wb   = XLSX.read(e.target.result, { type: 'array' });
+    const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: true });
     const hoja = wb.Sheets[wb.SheetNames[0]];
     const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
 
-    filasAsignacion = filas.slice(1).map(f => String(f[0]).trim()).filter(Boolean);
+    filasAsignacion = filas.slice(1).filter(f => f[0]);
 
-    // Buscar trabajadores por DNI
+    const dnis = filasAsignacion.map(f => String(f[0]).trim());
+
     const { data: perfiles } = await supabase
       .from('profiles')
       .select('documento_numero, nombres, apellidos, email')
-      .in('documento_numero', filasAsignacion)
+      .in('documento_numero', dnis)
       .eq('empresa_id', empresaAdminId);
 
     const perfilMap = {};
@@ -619,24 +639,35 @@ window.previsualizarAsignacion = async function () {
 
     const tbody = document.getElementById('tbody-asignacion');
     tbody.innerHTML = '';
-    let encontrados = 0;
+    let existentes = 0, nuevos = 0;
 
-    filasAsignacion.forEach(dni => {
+    filasAsignacion.forEach(f => {
+      const dni      = String(f[0]).trim();
+      const apellidos = String(f[1]).trim();
+      const nombres   = String(f[2]).trim();
+      const cargo     = String(f[4]).trim();
       const p = perfilMap[dni];
       const tr = document.createElement('tr');
       if (p) {
-        encontrados++;
+        existentes++;
         tr.innerHTML = `<td>${dni}</td><td>${p.apellidos} ${p.nombres}</td>
-          <td style="color:green;">✅ Encontrado</td>`;
+          <td>${p.cargo || ''}</td>
+          <td style="color:#007bff;">🔵 Ya existe — solo se asigna</td>`;
+      } else if (apellidos && nombres) {
+        nuevos++;
+        tr.innerHTML = `<td>${dni}</td><td>${apellidos} ${nombres}</td>
+          <td>${cargo}</td>
+          <td style="color:green;">🟢 Nuevo — se creará y asignará</td>`;
       } else {
-        tr.innerHTML = `<td>${dni}</td><td style="color:#888;">—</td>
-          <td style="color:orange;">⚠️ No existe en el sistema</td>`;
+        tr.innerHTML = `<td>${dni}</td><td style="color:#888;">Sin nombres</td>
+          <td></td>
+          <td style="color:red;">❌ Falta Apellidos/Nombres</td>`;
       }
       tbody.appendChild(tr);
     });
 
     document.getElementById('preview-resumen-asig').textContent =
-      `${filasAsignacion.length} DNIs — ${encontrados} encontrados, ${filasAsignacion.length - encontrados} no existen.`;
+      `${filasAsignacion.length} filas — 🔵 ${existentes} existentes, 🟢 ${nuevos} nuevos a crear.`;
     document.getElementById('preview-asignacion').style.display = 'block';
   };
   reader.readAsArrayBuffer(archivo);
@@ -647,41 +678,109 @@ window.importarAsignacion = async function () {
 
   const mes  = parseInt(document.getElementById('asig-mes').value);
   const anio = parseInt(document.getElementById('asig-anio').value);
-  const btn  = document.querySelector('#tab-asignacion .btn-primary:last-of-type');
+  const btn  = document.getElementById('btn-confirmar-asignacion');
   btn.disabled = true;
-  btn.textContent = '⏳ Asignando...';
+  btn.textContent = '⏳ Procesando...';
 
-  const { data: perfiles } = await supabase
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+
+  const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true);
+  const { data: perfilesExistentes } = await supabase
     .from('profiles')
     .select('id, documento_numero, email')
-    .in('documento_numero', filasAsignacion)
+    .in('documento_numero', filasAsignacion.map(f => String(f[0]).trim()))
     .eq('empresa_id', empresaAdminId);
 
   const perfilMap = {};
-  perfiles?.forEach(p => { perfilMap[p.documento_numero] = p; });
+  perfilesExistentes?.forEach(p => { perfilMap[p.documento_numero] = p; });
 
-  const registros = filasAsignacion
-    .filter(dni => perfilMap[dni])
-    .map(dni => ({
-      empresa_id:       empresaAdminId,
-      usuario_id:       perfilMap[dni].id,
-      usuario_email:    perfilMap[dni].email,
-      documento_numero: dni,
-      mes,
-      anio
-    }));
+  const filas = document.querySelectorAll('#tbody-asignacion tr');
+  const progreso = document.getElementById('progreso-asignacion');
+  let ok = 0, errores = 0;
+  const registros = [];
 
-  const { error } = await supabase
-    .from('asignaciones_mes')
-    .upsert(registros, { onConflict: 'empresa_id,documento_numero,mes,anio' });
+  for (let i = 0; i < filasAsignacion.length; i++) {
+    const f          = filasAsignacion[i];
+    const dni        = String(f[0]).trim();
+    const apellidos  = String(f[1]).trim();
+    const nombres    = String(f[2]).trim();
+    const emailRaw   = String(f[3]).trim();
+    const cargoNombre = String(f[4]).trim();
+    const telefono   = String(f[5]).trim();
+    const fechaRaw   = f[6];
+    let fechaIngreso = '';
+    if (fechaRaw instanceof Date) {
+      fechaIngreso = `${fechaRaw.getFullYear()}-${String(fechaRaw.getMonth()+1).padStart(2,'0')}-${String(fechaRaw.getDate()).padStart(2,'0')}`;
+    } else if (fechaRaw) {
+      fechaIngreso = String(fechaRaw).trim();
+    }
 
-  if (error) {
-    alert('❌ Error: ' + error.message);
-  } else {
-    document.getElementById('progreso-asignacion').textContent =
-      `✅ ${registros.length} trabajadores asignados al mes ${mes}/${anio}.`;
+    const tdEstado = filas[i]?.querySelectorAll('td')[3];
+
+    if (perfilMap[dni]) {
+      // Trabajador existente — solo asignar
+      registros.push({
+        empresa_id: empresaAdminId,
+        usuario_id: perfilMap[dni].id,
+        usuario_email: perfilMap[dni].email,
+        documento_numero: dni, mes, anio
+      });
+      if (tdEstado) { tdEstado.textContent = '✅ Asignado'; tdEstado.style.color = 'green'; }
+      ok++;
+    } else if (apellidos && nombres) {
+      // Trabajador nuevo — crear cuenta y asignar
+      const email  = emailRaw.includes('@') ? emailRaw : `${dni}@cvglobal-group.com`;
+      const cargo  = cargos?.find(c => c.nombre.toLowerCase() === cargoNombre.toLowerCase());
+      if (tdEstado) { tdEstado.textContent = '⏳ Creando...'; tdEstado.style.color = '#888'; }
+
+      const res  = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/crear-usuario', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s'
+        },
+        body: JSON.stringify({
+          email, password: dni, nombres, apellidos,
+          documento_tipo: 'DNI', documento_numero: dni,
+          telefono: telefono || null, empresa_id: empresaAdminId,
+          cargo_id: cargo?.id || null, fecha_ingreso: fechaIngreso || null, rol: 'trabajador'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || data?.error) {
+        if (tdEstado) { tdEstado.textContent = '❌ ' + (data?.error || 'Error'); tdEstado.style.color = 'red'; }
+        errores++;
+      } else {
+        // Buscar el perfil recién creado para obtener su ID
+        const { data: nuevoPerfil } = await supabase
+          .from('profiles').select('id, email').eq('documento_numero', dni).single();
+        if (nuevoPerfil) {
+          registros.push({
+            empresa_id: empresaAdminId,
+            usuario_id: nuevoPerfil.id,
+            usuario_email: nuevoPerfil.email,
+            documento_numero: dni, mes, anio
+          });
+        }
+        if (tdEstado) { tdEstado.textContent = '✅ Creado y asignado'; tdEstado.style.color = 'green'; }
+        ok++;
+      }
+    } else {
+      if (tdEstado) { tdEstado.textContent = '⚠️ Saltado'; tdEstado.style.color = 'orange'; }
+    }
+
+    progreso.textContent = `Progreso: ${i+1}/${filasAsignacion.length} — ✅ ${ok}, ❌ ${errores}`;
   }
 
+  // Insertar todas las asignaciones de una vez
+  if (registros.length) {
+    await supabase.from('asignaciones_mes')
+      .upsert(registros, { onConflict: 'empresa_id,documento_numero,mes,anio' });
+  }
+
+  progreso.textContent += ` — ¡Completado! ${registros.length} asignados al ${mes}/${anio}.`;
   btn.disabled = false;
   btn.textContent = '✅ Confirmar asignación';
 };

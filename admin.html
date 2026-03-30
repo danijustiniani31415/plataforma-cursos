@@ -459,11 +459,11 @@
         <p id="preview-resumen-asig" style="font-size:0.88rem; color:#555; margin-bottom:10px;"></p>
         <div style="overflow-x:auto; margin-bottom:12px;">
           <table class="preview-table">
-            <thead><tr><th>DNI</th><th>Trabajador</th><th>Estado</th></tr></thead>
+            <thead><tr><th>DNI</th><th>Apellidos y Nombres</th><th>Cargo</th><th>Estado</th></tr></thead>
             <tbody id="tbody-asignacion"></tbody>
           </table>
         </div>
-        <button onclick="importarAsignacion()" class="btn-primary">✅ Confirmar asignación</button>
+        <button id="btn-confirmar-asignacion" onclick="importarAsignacion()" class="btn-primary">✅ Confirmar asignación</button>
         <span id="progreso-asignacion" class="progreso"></span>
       </div>
     </div>

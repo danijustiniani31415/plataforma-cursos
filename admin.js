@@ -1556,7 +1556,7 @@ window.initSelectCursoForm = async function initSelectCursoForm() {
 window.cargarFormulariosCurso = async function () {
   await initSelectCursoForm();
   const sel = document.getElementById('select-curso-form');
-  const cursoId = parseInt(sel.value);
+  const cursoId = sel.value;
   if (!cursoId) { alert('Selecciona un curso.'); return; }
 
   const { data: forms } = await supabase

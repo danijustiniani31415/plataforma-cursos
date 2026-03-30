@@ -911,15 +911,20 @@ window.cargarDashboardMes = async function () {
 
   const userIds = trabajadores.map(t => t.id);
 
+  const { data: todosFormularios } = await supabase
+    .from('formularios').select('id, tipo');
+  const tipoFormMap = {};
+  todosFormularios?.forEach(f => { tipoFormMap[f.id] = f.tipo; });
+
   const { data: enviosMes } = await supabase
     .from('envios_formulario')
-    .select('usuario_id, aprobado, formularios(tipo)')
+    .select('usuario_id, id_formulario, aprobado')
     .in('usuario_id', userIds)
     .eq('estado', 'completado')
     .gte('created_at', desde)
     .lt('created_at', hasta);
 
-  const examenesMes = enviosMes?.filter(n => n.formularios?.tipo === 'examen') || [];
+  const examenesMes = enviosMes?.filter(n => tipoFormMap[n.id_formulario] === 'examen') || [];
   const idsConActividad = new Set(examenesMes.map(n => n.usuario_id));
   const aprobados   = new Set(examenesMes.filter(n => n.aprobado).map(n => n.usuario_id));
   const conActividad = idsConActividad.size;
@@ -994,7 +999,8 @@ window.buscarTrabajadorDashboard = function () {
   cargarDatosDashboard().then(() => {
     const coinciden = todosTrabajadoresDash.filter(t =>
       (t.nombres || '').toLowerCase().includes(texto) ||
-      (t.apellidos || '').toLowerCase().includes(texto)
+      (t.apellidos || '').toLowerCase().includes(texto) ||
+      (t.documento_numero || '').includes(texto)
     ).slice(0, 8);
 
     if (!coinciden.length) {
@@ -1020,14 +1026,19 @@ window.verCursosTrabajador = async function (email) {
   const trabajador = todosTrabajadoresDash.find(t => t.email === email);
   if (!trabajador) return;
 
+  const { data: todosFormularios } = await supabase
+    .from('formularios').select('id, tipo');
+  const tipoFormMap = {};
+  todosFormularios?.forEach(f => { tipoFormMap[f.id] = f.tipo; });
+
   const { data: envios } = await supabase
     .from('envios_formulario')
-    .select('id_curso, puntaje, formularios(tipo)')
+    .select('id_curso, id_formulario, puntaje')
     .eq('usuario_email', email)
     .eq('estado', 'completado');
 
   const notasMap = {};
-  envios?.filter(n => n.formularios?.tipo === 'examen')
+  envios?.filter(n => tipoFormMap[n.id_formulario] === 'examen')
          .forEach(n => { notasMap[n.id_curso] = n.puntaje; });
 
   const completados = todosCursosDash.filter(c => notasMap[c.id] !== undefined);
@@ -1062,16 +1073,21 @@ window.cargarEstadoCurso = async function () {
 
   await cargarDatosDashboard();
 
+  const { data: todosFormularios } = await supabase
+    .from('formularios').select('id, tipo');
+  const tipoFormMap = {};
+  todosFormularios?.forEach(f => { tipoFormMap[f.id] = f.tipo; });
+
   const emails = todosTrabajadoresDash.map(t => t.email);
   const { data: envios } = await supabase
     .from('envios_formulario')
-    .select('usuario_email, puntaje, formularios(tipo)')
+    .select('usuario_email, id_formulario, puntaje')
     .eq('id_curso', cursoId)
     .in('usuario_email', emails)
     .eq('estado', 'completado');
 
   const notasMap = {};
-  envios?.filter(n => n.formularios?.tipo === 'examen')
+  envios?.filter(n => tipoFormMap[n.id_formulario] === 'examen')
          .forEach(n => { notasMap[n.usuario_email] = n.puntaje; });
 
   const aprobados     = todosTrabajadoresDash.filter(t => notasMap[t.email] !== undefined && notasMap[t.email] >= 16);

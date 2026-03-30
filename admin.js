@@ -893,9 +893,10 @@ window.toggleActivo = async function (id, activo) {
 
 // ── 1. Estado mensual ──
 window.cargarDashboardMes = async function () {
-  const ahora = new Date();
-  const desde = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString();
-  const hasta = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1).toISOString();
+  // Rango del mes en hora Perú (UTC-5)
+  const ahoraPeru = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Lima' }));
+  const desde = new Date(Date.UTC(ahoraPeru.getFullYear(), ahoraPeru.getMonth(), 1, 5, 0, 0)).toISOString();
+  const hasta = new Date(Date.UTC(ahoraPeru.getFullYear(), ahoraPeru.getMonth() + 1, 1, 5, 0, 0)).toISOString();
 
   const { data: trabajadores } = await supabase
     .from('profiles')
@@ -909,7 +910,7 @@ window.cargarDashboardMes = async function () {
     return;
   }
 
-  const userIds = trabajadores.map(t => t.id);
+  const emails = trabajadores.map(t => t.email);
 
   const { data: todosFormularios } = await supabase
     .from('formularios').select('id, tipo');
@@ -918,16 +919,16 @@ window.cargarDashboardMes = async function () {
 
   const { data: enviosMes } = await supabase
     .from('envios_formulario')
-    .select('usuario_id, id_formulario, aprobado')
-    .in('usuario_id', userIds)
+    .select('usuario_email, id_formulario, aprobado')
+    .in('usuario_email', emails)
     .eq('estado', 'completado')
     .gte('created_at', desde)
     .lt('created_at', hasta);
 
   const examenesMes = enviosMes?.filter(n => tipoFormMap[n.id_formulario] === 'examen') || [];
-  const idsConActividad = new Set(examenesMes.map(n => n.usuario_id));
-  const aprobados   = new Set(examenesMes.filter(n => n.aprobado).map(n => n.usuario_id));
-  const conActividad = idsConActividad.size;
+  const correosConActividad = new Set(examenesMes.map(n => n.usuario_email));
+  const aprobados = new Set(examenesMes.filter(n => n.aprobado).map(n => n.usuario_email));
+  const conActividad = correosConActividad.size;
   const sinActividad = trabajadores.length - conActividad;
   const pct = Math.round((conActividad / trabajadores.length) * 100);
 
@@ -947,7 +948,7 @@ window.cargarDashboardMes = async function () {
     </div>
     <div class="stat-card verde">
       <div class="stat-num">${aprobados.size}</div>
-      <div class="stat-label">Aprobaron (≥16)</div>
+      <div class="stat-label">Aprobaron examen (≥16)</div>
     </div>
     <div class="stat-card">
       <div class="stat-num">${pct}%</div>
@@ -956,7 +957,7 @@ window.cargarDashboardMes = async function () {
   `;
 
   // Tabla de sin actividad
-  const sinAct = trabajadores.filter(t => !idsConActividad.has(t.id));
+  const sinAct = trabajadores.filter(t => !correosConActividad.has(t.email));
   const tbody = document.getElementById('tbody-sin-actividad');
   tbody.innerHTML = '';
   sinAct.forEach(t => {

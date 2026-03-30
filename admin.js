@@ -557,28 +557,38 @@ window.descargarReporteExcel = async function () {
   const mes  = parseInt(document.getElementById('filtro-mes').value);
   const anio = parseInt(document.getElementById('filtro-anio').value);
 
-  const desde = new Date(anio, mes - 1, 1).toISOString();
-  const hasta = new Date(anio, mes, 1).toISOString();
+  // Rango en hora Perú (UTC-5)
+  const desde = new Date(Date.UTC(anio, mes - 1, 1, 5, 0, 0)).toISOString();
+  const hasta = new Date(Date.UTC(anio, mes,     1, 5, 0, 0)).toISOString();
 
-  // 1. Obtener perfiles de la empresa del admin
+  // 1. Perfiles de la empresa
   const { data: perfiles, error: errPerfiles } = await supabase
     .from('profiles')
-    .select('id, email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
+    .select('email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
     .eq('empresa_id', empresaAdminId);
 
   if (errPerfiles) { alert('❌ Error al cargar perfiles: ' + errPerfiles.message); return; }
-
   if (!perfiles || perfiles.length === 0) { alert('No hay trabajadores en tu empresa.'); return; }
 
   const perfilMap = {};
-  perfiles.forEach(p => { perfilMap[p.id] = p; });
+  perfiles.forEach(p => { perfilMap[p.email] = p; });
+  const emails = perfiles.map(p => p.email);
 
-  // 2. Obtener resultados del período para usuarios de la empresa
-  const userIds = perfiles.map(p => p.id);
+  // 2. Formularios y cursos (sin joins)
+  const [{ data: todosFormularios }, { data: todosCursos }] = await Promise.all([
+    supabase.from('formularios').select('id, tipo'),
+    supabase.from('cursos').select('id, titulo')
+  ]);
+  const tipoFormMap  = {};
+  todosFormularios?.forEach(f => { tipoFormMap[f.id]  = f.tipo; });
+  const cursoTitMap  = {};
+  todosCursos?.forEach(c => { cursoTitMap[c.id] = c.titulo; });
+
+  // 3. Envíos del período
   const { data: envios, error } = await supabase
     .from('envios_formulario')
-    .select('usuario_id, usuario_email, puntaje, porcentaje, aprobado, created_at, formularios(tipo, titulo), cursos(titulo)')
-    .in('usuario_id', userIds)
+    .select('usuario_email, id_formulario, id_curso, puntaje, porcentaje, aprobado, created_at')
+    .in('usuario_email', emails)
     .eq('estado', 'completado')
     .gte('created_at', desde)
     .lt('created_at', hasta)
@@ -597,8 +607,8 @@ window.descargarReporteExcel = async function () {
   ];
 
   envios.forEach(r => {
-    const p = perfilMap[r.usuario_id];
-    const tipo = r.formularios?.tipo || '';
+    const p = perfilMap[r.usuario_email];
+    const tipo = tipoFormMap[r.id_formulario] || '';
     const esEncuesta = tipo === 'encuesta';
     filas.push([
       p?.apellidos || '',
@@ -607,7 +617,7 @@ window.descargarReporteExcel = async function () {
       p?.documento_tipo || '',
       p?.cargo || '',
       p?.empresa || '',
-      r.cursos?.titulo || '',
+      cursoTitMap[r.id_curso] || '',
       tipoLabel[tipo] || tipo,
       esEncuesta ? '—' : (r.puntaje ?? '—'),
       esEncuesta ? '—' : (r.porcentaje != null ? r.porcentaje.toFixed(1) + '%' : '—'),

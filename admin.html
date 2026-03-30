@@ -498,6 +498,30 @@
       </div>
       <button onclick="subirCurso()" class="btn-primary" style="margin-top:16px;">Subir curso</button>
     </div>
+
+    <div class="panel-card">
+      <h2>📝 Examen y Eficacia por curso</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
+        Selecciona un curso para gestionar sus preguntas de examen y eficacia.
+      </p>
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap;">
+        <select id="select-curso-form"
+                style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; flex:1; min-width:220px;">
+          <option value="">-- Selecciona un curso --</option>
+        </select>
+        <button onclick="cargarFormulariosCurso()" class="btn-primary">Ver formularios</button>
+      </div>
+      <div id="contenedor-formularios"></div>
+    </div>
+
+    <div class="panel-card">
+      <h2>📋 Encuesta de satisfacción (global)</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:12px;">
+        La encuesta aplica a todos los cursos. Cada pregunta genera automáticamente las 5 opciones Likert.
+      </p>
+      <button onclick="cargarEncuestaGlobal()" class="btn-primary" style="margin-bottom:16px;">Cargar encuesta</button>
+      <div id="contenedor-encuesta-global"></div>
+    </div>
   </div>
 
   <!-- ═══ TAB: REPORTE ═══ -->

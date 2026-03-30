@@ -1541,3 +1541,273 @@ window.cargarEstadoCurso = async function () {
   document.getElementById('lista-pendientes-curso').innerHTML   = fmt(pendientes);
   document.getElementById('stats-curso').style.display = 'block';
 };
+
+// ═══════════════════════════════════════════════
+// 📝 GESTIÓN DE FORMULARIOS (EXAMEN / EFICACIA)
+// ═══════════════════════════════════════════════
+
+async function initSelectCursoForm() {
+  const sel = document.getElementById('select-curso-form');
+  if (!sel || sel.options.length > 1) return;
+  const { data } = await supabase.from('cursos').select('id, titulo').eq('activo', true).order('titulo');
+  data?.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.titulo}</option>`; });
+}
+
+window.cargarFormulariosCurso = async function () {
+  await initSelectCursoForm();
+  const sel = document.getElementById('select-curso-form');
+  const cursoId = parseInt(sel.value);
+  if (!cursoId) { alert('Selecciona un curso.'); return; }
+
+  const { data: forms } = await supabase
+    .from('formularios').select('*')
+    .eq('id_curso', cursoId).in('tipo', ['examen', 'eficacia']);
+
+  const cont = document.getElementById('contenedor-formularios');
+  cont.innerHTML = '';
+
+  for (const tipo of ['examen', 'eficacia']) {
+    const form  = forms?.find(f => f.tipo === tipo);
+    const label = tipo === 'examen' ? '📝 Examen' : '✅ Eficacia';
+    const color = tipo === 'examen' ? '#002855' : '#28a745';
+    const bloque = document.createElement('div');
+    bloque.style.cssText = 'border:1px solid #e0e0e0;border-radius:10px;padding:16px;margin-bottom:16px;';
+
+    if (!form) {
+      bloque.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="margin:0;color:${color};">${label}</h3>
+          <button onclick="crearFormulario(${cursoId},'${tipo}')" class="btn-primary" style="font-size:0.85rem;">+ Crear ${tipo}</button>
+        </div>
+        <p style="color:#888;font-size:0.85rem;margin-top:8px;">No existe aún para este curso.</p>`;
+    } else {
+      bloque.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="margin:0;color:${color};">${label}</h3>
+          <button onclick="mostrarFormPregunta(${form.id},'${tipo}')" class="btn-primary" style="font-size:0.85rem;">+ Nueva pregunta</button>
+        </div>
+        <div id="lista-preguntas-${form.id}"><em style="color:#888;font-size:0.85rem;">Cargando...</em></div>
+        <div id="form-nueva-pregunta-${form.id}" style="display:none;background:#f8f9fa;border-radius:8px;padding:14px;margin-top:12px;">
+          <p style="font-weight:600;margin:0 0 10px;">Nueva pregunta</p>
+          <input id="txt-pregunta-${form.id}" type="text" placeholder="Texto de la pregunta *"
+            style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.88rem;margin-bottom:8px;box-sizing:border-box;" />
+          <div style="display:flex;gap:8px;align-items:center;">
+            <label style="font-size:0.85rem;">Puntaje:</label>
+            <input id="pts-pregunta-${form.id}" type="number" value="1" min="1"
+              style="width:70px;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:0.88rem;" />
+            <button onclick="guardarNuevaPregunta(${form.id},'${tipo}')" class="btn-primary" style="font-size:0.85rem;">Guardar</button>
+            <button onclick="document.getElementById('form-nueva-pregunta-${form.id}').style.display='none'"
+              style="background:#e0e0e0;border:none;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:0.85rem;">Cancelar</button>
+          </div>
+        </div>`;
+      cargarPreguntas(form.id, tipo);
+    }
+    cont.appendChild(bloque);
+  }
+};
+
+window.crearFormulario = async function (cursoId, tipo) {
+  const label = tipo === 'examen' ? 'Examen' : 'Eficacia';
+  const { error } = await supabase.from('formularios').insert([{ tipo, titulo: label, id_curso: cursoId, activo: true }]);
+  if (error) { alert('❌ ' + error.message); return; }
+  cargarFormulariosCurso();
+};
+
+window.mostrarFormPregunta = function (formularioId, tipo) {
+  const div = document.getElementById(`form-nueva-pregunta-${formularioId}`);
+  if (div) { div.style.display = 'block'; document.getElementById(`txt-pregunta-${formularioId}`).focus(); }
+};
+
+window.guardarNuevaPregunta = async function (formularioId, tipo) {
+  const texto = document.getElementById(`txt-pregunta-${formularioId}`).value.trim();
+  const pts   = parseFloat(document.getElementById(`pts-pregunta-${formularioId}`).value) || 1;
+  if (!texto) { alert('Escribe el texto de la pregunta.'); return; }
+
+  const { data: ult } = await supabase.from('preguntas').select('orden')
+    .eq('id_formulario', formularioId).order('orden', { ascending: false }).limit(1);
+  const orden = (ult?.[0]?.orden || 0) + 1;
+
+  const { error } = await supabase.from('preguntas').insert([{ id_formulario: formularioId, pregunta: texto, orden, puntaje: pts }]);
+  if (error) { alert('❌ ' + error.message); return; }
+  document.getElementById(`txt-pregunta-${formularioId}`).value = '';
+  document.getElementById(`form-nueva-pregunta-${formularioId}`).style.display = 'none';
+  cargarPreguntas(formularioId, tipo);
+};
+
+async function cargarPreguntas(formularioId, tipo) {
+  const { data: preguntas } = await supabase
+    .from('preguntas').select('*, opciones_pregunta(*)')
+    .eq('id_formulario', formularioId).order('orden');
+
+  const cont = document.getElementById(`lista-preguntas-${formularioId}`);
+  if (!cont) return;
+
+  if (!preguntas?.length) {
+    cont.innerHTML = '<p style="color:#888;font-size:0.85rem;">Sin preguntas. Agrega la primera.</p>';
+    return;
+  }
+
+  cont.innerHTML = preguntas.map((p, i) => {
+    const opciones = (p.opciones_pregunta || []).sort((a, b) => a.orden - b.orden).map(o => `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:4px;
+        background:${o.es_correcta ? '#d4edda' : '#f8f9fa'};border-radius:6px;font-size:0.85rem;">
+        <span style="flex:1;">${o.opcion}</span>
+        <button onclick="toggleCorrecta(${o.id},${p.id},${formularioId},'${tipo}')"
+          style="background:${o.es_correcta ? '#28a745' : '#e0e0e0'};color:${o.es_correcta ? 'white' : '#555'};
+          border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:0.78rem;">
+          ${o.es_correcta ? '✓ Correcta' : 'Marcar'}</button>
+        <button onclick="eliminarOpcion(${o.id},${p.id},${formularioId},'${tipo}')"
+          style="background:#dc3545;color:white;border:none;border-radius:4px;padding:3px 7px;cursor:pointer;font-size:0.78rem;">✕</button>
+      </div>`).join('');
+
+    return `
+      <div style="border-left:3px solid #002855;padding:10px 14px;margin-bottom:12px;background:#fafafa;border-radius:0 8px 8px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+          <div>
+            <span style="font-weight:600;color:#002855;font-size:0.85rem;">${i + 1}.</span>
+            <span style="font-size:0.9rem;margin-left:6px;">${p.pregunta}</span>
+            <span style="color:#888;font-size:0.78rem;margin-left:8px;">(${p.puntaje} pt${p.puntaje !== 1 ? 's' : ''})</span>
+          </div>
+          <button onclick="eliminarPregunta(${p.id},${formularioId},'${tipo}')"
+            style="background:#dc3545;color:white;border:none;border-radius:5px;padding:4px 9px;cursor:pointer;font-size:0.8rem;white-space:nowrap;margin-left:8px;">
+            🗑️ Eliminar</button>
+        </div>
+        <div>${opciones || '<em style="color:#aaa;font-size:0.82rem;">Sin opciones</em>'}</div>
+        <div id="form-opcion-${p.id}" style="display:none;margin-top:8px;">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <input id="txt-opcion-${p.id}" type="text" placeholder="Texto de la opción *"
+              style="flex:1;min-width:180px;padding:6px 9px;border:1px solid #ddd;border-radius:5px;font-size:0.85rem;" />
+            <button onclick="guardarNuevaOpcion(${p.id},${formularioId},'${tipo}')" class="btn-primary" style="font-size:0.82rem;padding:6px 12px;">Guardar</button>
+            <button onclick="document.getElementById('form-opcion-${p.id}').style.display='none'"
+              style="background:#e0e0e0;border:none;border-radius:5px;padding:6px 10px;cursor:pointer;font-size:0.82rem;">✕</button>
+          </div>
+        </div>
+        <button onclick="document.getElementById('form-opcion-${p.id}').style.display='flex';document.getElementById('txt-opcion-${p.id}').focus()"
+          style="margin-top:8px;background:transparent;border:1px dashed #aaa;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:0.8rem;color:#666;">
+          + Agregar opción</button>
+      </div>`;
+  }).join('');
+}
+
+window.eliminarPregunta = async function (preguntaId, formularioId, tipo) {
+  if (!confirm('¿Eliminar esta pregunta y todas sus opciones?')) return;
+  await supabase.from('opciones_pregunta').delete().eq('id_pregunta', preguntaId);
+  await supabase.from('preguntas').delete().eq('id', preguntaId);
+  cargarPreguntas(formularioId, tipo);
+};
+
+window.guardarNuevaOpcion = async function (preguntaId, formularioId, tipo) {
+  const texto = document.getElementById(`txt-opcion-${preguntaId}`).value.trim();
+  if (!texto) { alert('Escribe el texto de la opción.'); return; }
+
+  const { data: ult } = await supabase.from('opciones_pregunta').select('orden')
+    .eq('id_pregunta', preguntaId).order('orden', { ascending: false }).limit(1);
+  const orden = (ult?.[0]?.orden || 0) + 1;
+
+  const { error } = await supabase.from('opciones_pregunta').insert([{ id_pregunta: preguntaId, opcion: texto, orden, es_correcta: false }]);
+  if (error) { alert('❌ ' + error.message); return; }
+  document.getElementById(`txt-opcion-${preguntaId}`).value = '';
+  document.getElementById(`form-opcion-${preguntaId}`).style.display = 'none';
+  cargarPreguntas(formularioId, tipo);
+};
+
+window.eliminarOpcion = async function (opcionId, preguntaId, formularioId, tipo) {
+  await supabase.from('opciones_pregunta').delete().eq('id', opcionId);
+  cargarPreguntas(formularioId, tipo);
+};
+
+window.toggleCorrecta = async function (opcionId, preguntaId, formularioId, tipo) {
+  const { data: op } = await supabase.from('opciones_pregunta').select('es_correcta').eq('id', opcionId).single();
+  if (op?.es_correcta) {
+    await supabase.from('opciones_pregunta').update({ es_correcta: false }).eq('id', opcionId);
+  } else {
+    await supabase.from('opciones_pregunta').update({ es_correcta: false }).eq('id_pregunta', preguntaId);
+    await supabase.from('opciones_pregunta').update({ es_correcta: true  }).eq('id', opcionId);
+  }
+  cargarPreguntas(formularioId, tipo);
+};
+
+// ═══════════════════════════════════════════════
+// 📋 ENCUESTA GLOBAL (LIKERT)
+// ═══════════════════════════════════════════════
+
+const OPCIONES_LIKERT = [
+  { opcion: 'Totalmente de acuerdo',           puntaje: 5, orden: 1 },
+  { opcion: 'De acuerdo',                       puntaje: 4, orden: 2 },
+  { opcion: 'Ni de acuerdo ni en desacuerdo',   puntaje: 3, orden: 3 },
+  { opcion: 'En desacuerdo',                    puntaje: 2, orden: 4 },
+  { opcion: 'Totalmente en desacuerdo',         puntaje: 1, orden: 5 },
+];
+
+window.cargarEncuestaGlobal = async function () {
+  let { data: form } = await supabase
+    .from('formularios').select('*').eq('tipo', 'encuesta').is('id_curso', null).maybeSingle();
+
+  if (!form) {
+    const { data: nuevo } = await supabase
+      .from('formularios').insert([{ tipo: 'encuesta', titulo: 'Encuesta de satisfacción', activo: true }]).select().single();
+    form = nuevo;
+  }
+  if (!form) { alert('❌ Error al cargar la encuesta.'); return; }
+
+  const { data: preguntas } = await supabase
+    .from('preguntas').select('id, pregunta, orden').eq('id_formulario', form.id).order('orden');
+
+  const cont = document.getElementById('contenedor-encuesta-global');
+  cont.innerHTML = `
+    <div style="border:1px solid #e0e0e0;border-radius:10px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <span style="font-size:0.85rem;color:#555;">${preguntas?.length || 0} preguntas · Opciones Likert auto-generadas</span>
+        <button onclick="mostrarFormPreguntaEncuesta(${form.id})" class="btn-primary" style="font-size:0.85rem;">+ Nueva pregunta</button>
+      </div>
+      <div id="lista-preguntas-encuesta">
+        ${preguntas?.length
+          ? preguntas.map((p, i) => `
+            <div style="border-left:3px solid #f0ad4e;padding:8px 14px;margin-bottom:8px;background:#fffdf5;border-radius:0 8px 8px 0;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:0.88rem;"><b>${i+1}.</b> ${p.pregunta}</span>
+              <button onclick="eliminarPreguntaEncuesta(${p.id},${form.id})"
+                style="background:#dc3545;color:white;border:none;border-radius:5px;padding:4px 9px;cursor:pointer;font-size:0.8rem;margin-left:10px;">🗑️</button>
+            </div>`).join('')
+          : '<p style="color:#888;font-size:0.85rem;">Sin preguntas aún.</p>'}
+      </div>
+      <div id="form-preg-encuesta-${form.id}" style="display:none;background:#f8f9fa;border-radius:8px;padding:12px;margin-top:12px;">
+        <input id="txt-preg-encuesta-${form.id}" type="text" placeholder="Ej: ¿El contenido fue claro y relevante? *"
+          style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.88rem;margin-bottom:8px;box-sizing:border-box;" />
+        <div style="display:flex;gap:8px;">
+          <button onclick="guardarPreguntaEncuesta(${form.id})" class="btn-primary" style="font-size:0.85rem;">Guardar</button>
+          <button onclick="document.getElementById('form-preg-encuesta-${form.id}').style.display='none'"
+            style="background:#e0e0e0;border:none;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:0.85rem;">Cancelar</button>
+        </div>
+      </div>
+    </div>`;
+};
+
+window.mostrarFormPreguntaEncuesta = function (formId) {
+  const div = document.getElementById(`form-preg-encuesta-${formId}`);
+  if (div) { div.style.display = 'block'; document.getElementById(`txt-preg-encuesta-${formId}`).focus(); }
+};
+
+window.guardarPreguntaEncuesta = async function (formularioId) {
+  const texto = document.getElementById(`txt-preg-encuesta-${formularioId}`).value.trim();
+  if (!texto) { alert('Escribe el texto de la pregunta.'); return; }
+
+  const { data: ult } = await supabase.from('preguntas').select('orden')
+    .eq('id_formulario', formularioId).order('orden', { ascending: false }).limit(1);
+  const orden = (ult?.[0]?.orden || 0) + 1;
+
+  const { data: nueva, error } = await supabase
+    .from('preguntas').insert([{ id_formulario: formularioId, pregunta: texto, orden, puntaje: 5 }]).select().single();
+  if (error || !nueva) { alert('❌ ' + error?.message); return; }
+
+  await supabase.from('opciones_pregunta').insert(
+    OPCIONES_LIKERT.map(o => ({ id_pregunta: nueva.id, ...o, es_correcta: false }))
+  );
+  cargarEncuestaGlobal();
+};
+
+window.eliminarPreguntaEncuesta = async function (preguntaId, formularioId) {
+  if (!confirm('¿Eliminar esta pregunta?')) return;
+  await supabase.from('opciones_pregunta').delete().eq('id_pregunta', preguntaId);
+  await supabase.from('preguntas').delete().eq('id', preguntaId);
+  cargarEncuestaGlobal();
+};

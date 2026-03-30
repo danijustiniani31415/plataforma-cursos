@@ -469,8 +469,17 @@
 
     <!-- 1. Estado mensual -->
     <div class="panel-card">
-      <h2>📅 Estado del mes actual</h2>
-      <button onclick="cargarDashboardMes()" class="btn-primary" style="margin-bottom:16px;">Actualizar datos</button>
+      <h2>📅 Estado mensual</h2>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
+        <select id="dash-mes" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <select id="dash-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
+        <button onclick="cargarDashboardMes()" class="btn-primary">Actualizar datos</button>
+      </div>
       <div id="cards-mes" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:20px;"></div>
       <div id="detalle-pendientes" style="display:none;">
         <div onclick="toggleSinActividad()"
@@ -493,7 +502,7 @@
     <div class="panel-card">
       <h2>🔍 Cursos por trabajador</h2>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
-        <input type="text" id="buscar-trabajador" placeholder="Buscar por nombre o apellido..."
+        <input type="text" id="buscar-trabajador" placeholder="Buscar por nombre, apellido o DNI..."
                style="padding:10px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; flex:1; min-width:220px;"
                oninput="buscarTrabajadorDashboard()" />
       </div>
@@ -507,13 +516,17 @@
             <div style="color:#666; font-size:0.83rem;" id="trabajador-info"></div>
           </div>
         </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
           <div>
-            <div style="font-weight:600; color:#28a745; margin-bottom:8px;">✅ Cursos completados</div>
-            <div id="cursos-completados"></div>
+            <div style="font-weight:600; color:#28a745; margin-bottom:8px;">🟢 Vigentes (menos de 1 año)</div>
+            <div id="cursos-vigentes"></div>
           </div>
           <div>
-            <div style="font-weight:600; color:#dc3545; margin-bottom:8px;">⏳ Cursos pendientes</div>
+            <div style="font-weight:600; color:#e67e22; margin-bottom:8px;">🔴 Vencidos (más de 1 año)</div>
+            <div id="cursos-vencidos"></div>
+          </div>
+          <div>
+            <div style="font-weight:600; color:#888; margin-bottom:8px;">⏳ Pendientes</div>
             <div id="cursos-pendientes"></div>
           </div>
         </div>

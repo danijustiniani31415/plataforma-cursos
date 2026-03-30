@@ -523,19 +523,34 @@ window.importarDesdeExcel = async function () {
 // 📊 Descargar reporte Excel por mes/año
 // ═══════════════════════════════
 
-// Llenar selector de años al cargar
+// Llenar selectores de años al cargar
 (function () {
-  const sel = document.getElementById('filtro-anio');
-  if (!sel) return;
-  const hoy = new Date();
-  for (let y = hoy.getFullYear(); y >= 2024; y--) {
-    const opt = document.createElement('option');
-    opt.value = y;
-    opt.textContent = y;
-    sel.appendChild(opt);
+  const hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Lima' }));
+  const anioActual = hoy.getFullYear();
+  const mesActual  = hoy.getMonth() + 1;
+
+  // Reporte Excel
+  const selReporte = document.getElementById('filtro-anio');
+  if (selReporte) {
+    for (let y = anioActual; y >= 2024; y--) {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      selReporte.appendChild(opt);
+    }
+    document.getElementById('filtro-mes').value = mesActual;
   }
-  // Mes actual por defecto
-  document.getElementById('filtro-mes').value = hoy.getMonth() + 1;
+
+  // Dashboard
+  const selDash = document.getElementById('dash-anio');
+  if (selDash) {
+    for (let y = anioActual; y >= 2024; y--) {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      selDash.appendChild(opt);
+    }
+    document.getElementById('dash-mes').value  = mesActual;
+    document.getElementById('dash-anio').value = anioActual;
+  }
 })();
 
 window.descargarReporteExcel = async function () {
@@ -893,10 +908,11 @@ window.toggleActivo = async function (id, activo) {
 
 // ── 1. Estado mensual ──
 window.cargarDashboardMes = async function () {
-  // Rango del mes en hora Perú (UTC-5)
-  const ahoraPeru = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Lima' }));
-  const desde = new Date(Date.UTC(ahoraPeru.getFullYear(), ahoraPeru.getMonth(), 1, 5, 0, 0)).toISOString();
-  const hasta = new Date(Date.UTC(ahoraPeru.getFullYear(), ahoraPeru.getMonth() + 1, 1, 5, 0, 0)).toISOString();
+  const mes  = parseInt(document.getElementById('dash-mes')?.value  || (new Date().getMonth() + 1));
+  const anio = parseInt(document.getElementById('dash-anio')?.value || new Date().getFullYear());
+  // Rango en hora Perú (UTC-5): medianoche Lima = 05:00 UTC
+  const desde = new Date(Date.UTC(anio, mes - 1, 1, 5, 0, 0)).toISOString();
+  const hasta = new Date(Date.UTC(anio, mes,     1, 5, 0, 0)).toISOString();
 
   const { data: trabajadores } = await supabase
     .from('profiles')
@@ -912,22 +928,16 @@ window.cargarDashboardMes = async function () {
 
   const emails = trabajadores.map(t => t.email);
 
-  const { data: todosFormularios } = await supabase
-    .from('formularios').select('id, tipo');
-  const tipoFormMap = {};
-  todosFormularios?.forEach(f => { tipoFormMap[f.id] = f.tipo; });
-
   const { data: enviosMes } = await supabase
     .from('envios_formulario')
-    .select('usuario_email, id_formulario, aprobado')
+    .select('usuario_email, aprobado')
     .in('usuario_email', emails)
     .eq('estado', 'completado')
     .gte('created_at', desde)
     .lt('created_at', hasta);
 
-  const examenesMes = enviosMes?.filter(n => tipoFormMap[n.id_formulario] === 'examen') || [];
-  const correosConActividad = new Set(examenesMes.map(n => n.usuario_email));
-  const aprobados = new Set(examenesMes.filter(n => n.aprobado).map(n => n.usuario_email));
+  const correosConActividad = new Set(enviosMes?.map(n => n.usuario_email) || []);
+  const aprobados = new Set(enviosMes?.filter(n => n.aprobado).map(n => n.usuario_email) || []);
   const conActividad = correosConActividad.size;
   const sinActividad = trabajadores.length - conActividad;
   const pct = Math.round((conActividad / trabajadores.length) * 100);
@@ -1034,16 +1044,25 @@ window.verCursosTrabajador = async function (email) {
 
   const { data: envios } = await supabase
     .from('envios_formulario')
-    .select('id_curso, id_formulario, puntaje')
+    .select('id_curso, id_formulario, puntaje, created_at')
     .eq('usuario_email', email)
-    .eq('estado', 'completado');
+    .eq('estado', 'completado')
+    .order('created_at', { ascending: false });
 
+  // Guardar el resultado más reciente del examen por curso
   const notasMap = {};
   envios?.filter(n => tipoFormMap[n.id_formulario] === 'examen')
-         .forEach(n => { notasMap[n.id_curso] = n.puntaje; });
+         .forEach(n => {
+           if (!notasMap[n.id_curso]) // solo el más reciente
+             notasMap[n.id_curso] = { puntaje: n.puntaje, fecha: n.created_at };
+         });
 
-  const completados = todosCursosDash.filter(c => notasMap[c.id] !== undefined);
-  const pendientes  = todosCursosDash.filter(c => notasMap[c.id] === undefined);
+  const UN_ANIO_MS = 365 * 24 * 60 * 60 * 1000;
+  const ahora = Date.now();
+
+  const vigentes   = todosCursosDash.filter(c => notasMap[c.id] && (ahora - new Date(notasMap[c.id].fecha).getTime()) < UN_ANIO_MS);
+  const vencidos   = todosCursosDash.filter(c => notasMap[c.id] && (ahora - new Date(notasMap[c.id].fecha).getTime()) >= UN_ANIO_MS);
+  const pendientes = todosCursosDash.filter(c => !notasMap[c.id]);
 
   document.getElementById('trabajador-inicial').textContent =
     (trabajador.apellidos || '?')[0].toUpperCase();
@@ -1052,17 +1071,20 @@ window.verCursosTrabajador = async function (email) {
   document.getElementById('trabajador-info').textContent =
     `${trabajador.documento_numero || ''} · ${trabajador.cargo || ''}`;
 
-  document.getElementById('cursos-completados').innerHTML = completados.length
-    ? completados.map(c => {
-        const nota = notasMap[c.id];
-        const cls = nota >= 16 ? 'aprobado' : 'desaprobado';
-        return `<div class="curso-item ${cls}"><span>${c.titulo}</span><strong>${nota}/20</strong></div>`;
-      }).join('')
-    : '<div style="color:#888; font-size:0.83rem;">Ninguno aún</div>';
+  const renderCurso = c => {
+    const info = notasMap[c.id];
+    const cls  = info.puntaje >= 16 ? 'aprobado' : 'desaprobado';
+    const fecha = new Date(info.fecha).toLocaleDateString('es-PE');
+    return `<div class="curso-item ${cls}">
+      <span>${c.titulo}</span>
+      <div style="font-size:0.75rem; color:#666;">${fecha}</div>
+      <strong>${info.puntaje}/20</strong>
+    </div>`;
+  };
 
-  document.getElementById('cursos-pendientes').innerHTML = pendientes.length
-    ? pendientes.map(c => `<div class="curso-item pendiente">${c.titulo}</div>`).join('')
-    : '<div style="color:#28a745; font-size:0.83rem;">¡Todos completados!</div>';
+  document.getElementById('cursos-vigentes').innerHTML  = vigentes.length  ? vigentes.map(renderCurso).join('')  : '<div style="color:#888; font-size:0.83rem;">Ninguno</div>';
+  document.getElementById('cursos-vencidos').innerHTML  = vencidos.length  ? vencidos.map(renderCurso).join('')  : '<div style="color:#888; font-size:0.83rem;">Ninguno</div>';
+  document.getElementById('cursos-pendientes').innerHTML = pendientes.length ? pendientes.map(c => `<div class="curso-item pendiente">${c.titulo}</div>`).join('') : '<div style="color:#28a745; font-size:0.83rem;">¡Todos completados!</div>';
 
   document.getElementById('resultado-trabajador').style.display = 'block';
 };

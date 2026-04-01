@@ -6,6 +6,11 @@
   <meta name="theme-color" content="#002855" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CV Global SST" />
+  <meta name="description" content="Plataforma de capacitación SST - CV Global" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/Logo.png" />
   <title>Plataforma de Capacitación · CV Global</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -108,6 +113,10 @@
   <script type="module" src="main.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script type="module" src="certificado.js"></script>
-
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
 </body>
 </html>

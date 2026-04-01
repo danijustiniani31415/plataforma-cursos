@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Panel de Administrador</title>
+  <meta name="theme-color" content="#002855" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Admin SST" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/Logo.png" />
+  <title>Panel de Administrador · CV Global</title>
   <link rel="stylesheet" href="styles.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -312,6 +318,12 @@
   </button>
   <button class="nav-tab" onclick="mostrarTab('cumplimiento', this)">
     <span class="tab-icon">✅</span> Cumplimiento
+  </button>
+  <button class="nav-tab" onclick="mostrarTab('rutas', this)">
+    <span class="tab-icon">🗺️</span> Rutas
+  </button>
+  <button class="nav-tab" onclick="mostrarTab('sunafil', this)">
+    <span class="tab-icon">🏛️</span> SUNAFIL
   </button>
 </nav>
 
@@ -811,6 +823,75 @@
     </div>
   </div>
 
+  <!-- ═══ TAB: RUTAS DE APRENDIZAJE ═══ -->
+  <div id="tab-rutas" class="tab-panel">
+
+    <!-- Crear/editar ruta -->
+    <div class="panel-card">
+      <h2>🗺️ Rutas de aprendizaje por cargo</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:16px;">
+        Define qué cursos debe completar cada cargo, en qué orden. Los trabajadores verán su progreso automáticamente.
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
+        <div>
+          <label style="display:block; font-size:0.82rem; color:#555; margin-bottom:4px;">Cargo</label>
+          <select id="ruta-cargo" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; min-width:200px;">
+            <option value="">-- Selecciona un cargo --</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.82rem; color:#555; margin-bottom:4px;">Nombre de la ruta</label>
+          <input type="text" id="ruta-nombre" placeholder="Ej: Inducción Supervisor" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; width:240px;" />
+        </div>
+        <button onclick="crearRuta()" class="btn-primary">+ Crear ruta</button>
+      </div>
+    </div>
+
+    <!-- Rutas existentes -->
+    <div class="panel-card">
+      <h2>📋 Rutas creadas</h2>
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
+        <select id="sel-ruta-ver" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; flex:1; min-width:200px;">
+          <option value="">-- Selecciona una ruta --</option>
+        </select>
+        <button onclick="cargarRuta()" class="btn-primary">Ver ruta</button>
+      </div>
+
+      <div id="panel-ruta" style="display:none;">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+          <select id="ruta-add-curso" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; flex:1; min-width:200px;">
+            <option value="">-- Agregar curso --</option>
+          </select>
+          <select id="ruta-add-orden" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+            <option value="1">Orden 1</option><option value="2">Orden 2</option><option value="3">Orden 3</option>
+            <option value="4">Orden 4</option><option value="5">Orden 5</option><option value="6">Orden 6</option>
+            <option value="7">Orden 7</option><option value="8">Orden 8</option><option value="9">Orden 9</option>
+            <option value="10">Orden 10</option>
+          </select>
+          <label style="display:flex; align-items:center; gap:6px; font-size:0.88rem; color:#555;">
+            <input type="checkbox" id="ruta-obligatorio" checked /> Obligatorio
+          </label>
+          <button onclick="agregarCursoRuta()" class="btn-primary">+ Agregar</button>
+        </div>
+        <div id="lista-cursos-ruta"></div>
+      </div>
+    </div>
+
+    <!-- Progreso de trabajadores en la ruta -->
+    <div class="panel-card">
+      <h2>📊 Progreso de trabajadores en la ruta</h2>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+        <select id="sel-ruta-progreso" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; flex:1; min-width:200px;">
+          <option value="">-- Selecciona una ruta --</option>
+        </select>
+        <button onclick="cargarProgresoRuta()" class="btn-primary">Ver progreso</button>
+        <button onclick="exportarProgresoRuta()" class="btn-secondary" style="background:#198754;color:white;border:none;">⬇️ Excel</button>
+      </div>
+      <div id="tabla-progreso-ruta"></div>
+    </div>
+
+  </div>
+
   <!-- ═══ TAB: CUMPLIMIENTO ═══ -->
   <div id="tab-cumplimiento" class="tab-panel">
 
@@ -859,6 +940,41 @@
       <div id="preview-notificaciones"></div>
     </div>
 
+  </div>
+
+  <!-- ═══ TAB: SUNAFIL ═══ -->
+  <div id="tab-sunafil" class="tab-panel">
+    <div class="panel-card">
+      <h2>🏛️ Reporte de Capacitaciones para SUNAFIL</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:16px;">
+        Genera el registro de capacitaciones en el formato requerido por SUNAFIL para fiscalizaciones
+        (Ley 29783 — Seguridad y Salud en el Trabajo).
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:20px;">
+        <div>
+          <label style="display:block; font-size:0.82rem; color:#555; margin-bottom:4px;">Año</label>
+          <select id="sunafil-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.82rem; color:#555; margin-bottom:4px;">Tipo de curso</label>
+          <select id="sunafil-tipo" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+            <option value="">Todos</option>
+            <option value="examen">Capacitaciones con examen</option>
+            <option value="encuesta">Solo con encuesta</option>
+          </select>
+        </div>
+        <div style="align-self:flex-end;">
+          <button onclick="generarReporteSUNAFIL()" class="btn-primary">⬇️ Descargar Excel SUNAFIL</button>
+        </div>
+      </div>
+
+      <div style="background:#fff8e1; border:1px solid #ffd54f; border-radius:8px; padding:14px 16px; font-size:0.85rem; color:#555;">
+        <strong>📌 Columnas incluidas en el reporte:</strong><br/>
+        Razón Social · RUC · Apellidos y Nombres · DNI · Cargo · Tema de Capacitación ·
+        Tipo (Inducción/Específica/Periódica) · Modalidad · Fecha · Duración (hrs) ·
+        N° Participantes · Aprobado/Desaprobado · Nota
+      </div>
+    </div>
   </div>
 
   <!-- ═══ TAB: ACCESO ═══ -->
@@ -932,8 +1048,19 @@
     if (tab === 'cumplimiento') {
       initCumplimiento();
     }
+    if (tab === 'rutas') {
+      initRutas();
+    }
+    if (tab === 'sunafil') {
+      initSelectorSUNAFIL();
+    }
   }
 </script>
 <script type="module" src="admin.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+</script>
 </body>
 </html>

@@ -2576,3 +2576,327 @@ window.exportarCumplimientoExcel = function () {
   XLSX.utils.book_append_sheet(wb, ws, 'Cumplimiento');
   XLSX.writeFile(wb, `Matriz_Cumplimiento_${new Date().getFullYear()}.xlsx`);
 };
+
+// ═══════════════════════════════════════════════
+// 🗺️ RUTAS DE APRENDIZAJE
+// ═══════════════════════════════════════════════
+
+let rutaActualId = null;
+
+window.initRutas = async function () {
+  const [{ data: cargos }, { data: cursos }, { data: rutas }] = await Promise.all([
+    supabase.from('cargos').select('id, nombre').eq('activo', true).order('nombre'),
+    supabase.from('cursos').select('id, titulo').eq('activo', true).order('titulo'),
+    supabase.from('rutas_aprendizaje').select('id, nombre, cargos(nombre)').eq('empresa_id', empresaAdminId).order('nombre'),
+  ]);
+
+  // Selector cargo
+  const selCargo = document.getElementById('ruta-cargo');
+  selCargo.innerHTML = '<option value="">-- Selecciona un cargo --</option>';
+  (cargos || []).forEach(c => selCargo.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.nombre}</option>`));
+
+  // Selector cursos para agregar
+  const selCurso = document.getElementById('ruta-add-curso');
+  selCurso.innerHTML = '<option value="">-- Agregar curso --</option>';
+  (cursos || []).forEach(c => selCurso.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.titulo}</option>`));
+
+  // Selector rutas (ver y progreso)
+  const rutaOpts = (rutas || []).map(r => `<option value="${r.id}">${r.nombre} (${r.cargos?.nombre || 'sin cargo'})</option>`).join('');
+  ['sel-ruta-ver', 'sel-ruta-progreso'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '<option value="">-- Selecciona una ruta --</option>' + rutaOpts;
+  });
+};
+
+window.crearRuta = async function () {
+  const cargoId = document.getElementById('ruta-cargo').value;
+  const nombre  = document.getElementById('ruta-nombre').value.trim();
+  if (!nombre) { alert('Escribe un nombre para la ruta.'); return; }
+
+  const { error } = await supabase.from('rutas_aprendizaje').insert({
+    empresa_id: empresaAdminId,
+    cargo_id: cargoId || null,
+    nombre,
+  });
+
+  if (error) { alert('❌ ' + error.message); return; }
+  alert('✅ Ruta creada.');
+  document.getElementById('ruta-nombre').value = '';
+  initRutas();
+};
+
+window.cargarRuta = async function () {
+  const rutaId = document.getElementById('sel-ruta-ver').value;
+  if (!rutaId) return;
+  rutaActualId = rutaId;
+
+  const { data: cursos } = await supabase
+    .from('ruta_cursos')
+    .select('id, orden, obligatorio, cursos(id, titulo)')
+    .eq('ruta_id', rutaId)
+    .order('orden');
+
+  document.getElementById('panel-ruta').style.display = 'block';
+
+  if (!cursos?.length) {
+    document.getElementById('lista-cursos-ruta').innerHTML =
+      '<p style="color:#888;font-size:0.88rem;">No hay cursos en esta ruta. Agrega el primero.</p>';
+    return;
+  }
+
+  document.getElementById('lista-cursos-ruta').innerHTML = `
+    <table style="border-collapse:collapse;width:100%;font-size:0.88rem;">
+      <thead><tr style="background:#002855;color:white;">
+        <th style="padding:8px 10px;">Orden</th>
+        <th style="padding:8px 10px;text-align:left;">Curso</th>
+        <th style="padding:8px 10px;">Obligatorio</th>
+        <th style="padding:8px 10px;">Acción</th>
+      </tr></thead>
+      <tbody>
+        ${cursos.map(c => `
+          <tr style="border-bottom:1px solid #eee;">
+            <td style="padding:7px 10px;text-align:center;font-weight:700;color:#002855;">${c.orden}</td>
+            <td style="padding:7px 10px;">${c.cursos?.titulo || ''}</td>
+            <td style="padding:7px 10px;text-align:center;">${c.obligatorio ? '✅' : '—'}</td>
+            <td style="padding:7px 10px;text-align:center;">
+              <button onclick="eliminarCursoRuta('${c.id}')" style="background:#dc3545;color:white;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.8rem;">Quitar</button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+};
+
+window.agregarCursoRuta = async function () {
+  if (!rutaActualId) { alert('Selecciona una ruta primero.'); return; }
+  const cursoId    = document.getElementById('ruta-add-curso').value;
+  const orden      = parseInt(document.getElementById('ruta-add-orden').value);
+  const obligatorio= document.getElementById('ruta-obligatorio').checked;
+  if (!cursoId) { alert('Selecciona un curso.'); return; }
+
+  const { error } = await supabase.from('ruta_cursos').insert({
+    ruta_id: rutaActualId, curso_id: cursoId, orden, obligatorio,
+  });
+  if (error) { alert('❌ ' + error.message); return; }
+  cargarRuta();
+};
+
+window.eliminarCursoRuta = async function (id) {
+  if (!confirm('¿Quitar este curso de la ruta?')) return;
+  await supabase.from('ruta_cursos').delete().eq('id', id);
+  cargarRuta();
+};
+
+window.cargarProgresoRuta = async function () {
+  const rutaId = document.getElementById('sel-ruta-progreso').value;
+  if (!rutaId) return;
+  const cont = document.getElementById('tabla-progreso-ruta');
+  cont.innerHTML = '<p style="color:#888;">Cargando...</p>';
+
+  const [{ data: rutaCursos }, { data: workers }] = await Promise.all([
+    supabase.from('ruta_cursos').select('orden, obligatorio, cursos(id, titulo, vigencia_meses)').eq('ruta_id', rutaId).order('orden'),
+    supabase.from('profiles').select('id, nombres, apellidos, email, documento_numero, cargo').eq('empresa_id', empresaAdminId).eq('activo', true).order('apellidos'),
+  ]);
+
+  if (!rutaCursos?.length || !workers?.length) {
+    cont.innerHTML = '<p style="color:#888;">Sin datos suficientes.</p>';
+    return;
+  }
+
+  const emails = workers.map(w => w.email);
+  const { data: envios } = await supabase
+    .from('envios_formulario')
+    .select('usuario_email, id_curso, created_at, formularios(tipo)')
+    .in('usuario_email', emails)
+    .eq('aprobado', true);
+
+  const lastSub = {};
+  (envios || []).filter(e => e.formularios?.tipo === 'examen').forEach(e => {
+    const key = `${e.usuario_email}__${e.id_curso}`;
+    if (!lastSub[key] || new Date(e.created_at) > new Date(lastSub[key].created_at)) lastSub[key] = e;
+  });
+
+  const now = new Date();
+  const cursos = rutaCursos.map(rc => rc.cursos);
+
+  const headerCursos = cursos.map(c => `<th style="padding:8px 6px;font-size:0.78rem;max-width:100px;">${c?.titulo || ''}</th>`).join('');
+
+  const filas = workers.map(w => {
+    let completados = 0;
+    const celdas = cursos.map(c => {
+      const sub = lastSub[`${w.email}__${c?.id}`];
+      if (!sub) return `<td style="padding:6px;text-align:center;color:#aaa;">—</td>`;
+      const venc = new Date(sub.created_at);
+      venc.setMonth(venc.getMonth() + (c?.vigencia_meses || 12));
+      const vigente = venc > now;
+      if (vigente) completados++;
+      return `<td style="padding:6px;text-align:center;">
+        <span style="background:${vigente ? '#198754' : '#dc3545'};color:white;padding:2px 7px;border-radius:8px;font-size:0.75rem;">
+          ${vigente ? '✓' : 'Venc.'}
+        </span>
+      </td>`;
+    });
+    const pct = Math.round(completados / cursos.length * 100);
+    const barColor = pct === 100 ? '#198754' : pct >= 50 ? '#fd7e14' : '#dc3545';
+    return `<tr style="border-bottom:1px solid #eee;">
+      <td style="padding:7px 10px;font-weight:500;white-space:nowrap;">${w.apellidos}, ${w.nombres}</td>
+      <td style="padding:7px 10px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="flex:1;background:#eee;border-radius:4px;height:8px;">
+            <div style="width:${pct}%;background:${barColor};height:8px;border-radius:4px;"></div>
+          </div>
+          <span style="font-size:0.78rem;color:${barColor};font-weight:600;">${pct}%</span>
+        </div>
+      </td>
+      ${celdas.join('')}
+    </tr>`;
+  }).join('');
+
+  cont.innerHTML = `
+    <div style="overflow-x:auto;">
+      <table style="border-collapse:collapse;width:100%;font-size:0.84rem;min-width:600px;">
+        <thead><tr style="background:#002855;color:white;">
+          <th style="padding:8px 10px;text-align:left;">Trabajador</th>
+          <th style="padding:8px 10px;min-width:120px;">Progreso</th>
+          ${headerCursos}
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>`;
+
+  // Guardar para exportar
+  window._progresoRuta = { workers, cursos, lastSub, now };
+};
+
+window.exportarProgresoRuta = function () {
+  const d = window._progresoRuta;
+  if (!d) { alert('Primero carga el progreso.'); return; }
+  const XLSX = window.XLSX;
+  const header = ['Apellidos', 'Nombres', 'Documento', ...d.cursos.map(c => c?.titulo || '')];
+  const rows = d.workers.map(w => {
+    const celdas = d.cursos.map(c => {
+      const sub = d.lastSub[`${w.email}__${c?.id}`];
+      if (!sub) return 'Pendiente';
+      const venc = new Date(sub.created_at);
+      venc.setMonth(venc.getMonth() + (c?.vigencia_meses || 12));
+      return venc > d.now ? 'Vigente' : 'Vencido';
+    });
+    return [w.apellidos, w.nombres, w.documento_numero, ...celdas];
+  });
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = [20, 20, 15, ...d.cursos.map(() => ({ wch: 14 }))].map(v => typeof v === 'number' ? { wch: v } : v);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Progreso Ruta');
+  XLSX.writeFile(wb, `Progreso_Ruta_${new Date().getFullYear()}.xlsx`);
+};
+
+// ═══════════════════════════════════════════════
+// 🏛️ REPORTE SUNAFIL
+// ═══════════════════════════════════════════════
+
+window.initSelectorSUNAFIL = function () {
+  const anioActual = new Date().getFullYear();
+  const sel = document.getElementById('sunafil-anio');
+  if (!sel || sel.options.length > 1) return;
+  for (let a = anioActual; a >= anioActual - 3; a--) {
+    const opt = document.createElement('option');
+    opt.value = a; opt.textContent = a;
+    if (a === anioActual) opt.selected = true;
+    sel.appendChild(opt);
+  }
+};
+
+window.generarReporteSUNAFIL = async function () {
+  const anio = parseInt(document.getElementById('sunafil-anio').value);
+  const tipo  = document.getElementById('sunafil-tipo').value;
+
+  const inicioAnio = new Date(`${anio}-01-01T00:00:00-05:00`).toISOString();
+  const finAnio    = new Date(`${anio}-12-31T23:59:59-05:00`).toISOString();
+
+  // 1. Datos de empresa
+  const { data: emp } = await supabase.from('empresas').select('nombre, ruc').eq('id', empresaAdminId).single();
+
+  // 2. Envíos del año con perfil + curso + formulario
+  let query = supabase
+    .from('envios_formulario')
+    .select('usuario_email, id_curso, puntaje, porcentaje, aprobado, created_at, formularios(tipo, titulo), cursos(titulo, duracion)')
+    .eq('estado', 'completado')
+    .gte('created_at', inicioAnio)
+    .lte('created_at', finAnio);
+
+  if (tipo) query = query.eq('formularios.tipo', tipo);
+
+  const { data: envios } = await query;
+  if (!envios?.length) { alert('No hay registros para ese año.'); return; }
+
+  // 3. Perfiles
+  const emails = [...new Set(envios.map(e => e.usuario_email))];
+  const { data: perfiles } = await supabase
+    .from('profiles')
+    .select('email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
+    .in('email', emails);
+
+  const perfilMap = {};
+  (perfiles || []).forEach(p => { perfilMap[p.email] = p; });
+
+  // 4. Contar participantes por curso+fecha (día)
+  const participantesPorCursoFecha = {};
+  envios.forEach(e => {
+    const fecha = new Date(e.created_at).toLocaleDateString('es-PE');
+    const key   = `${e.id_curso}__${fecha}`;
+    participantesPorCursoFecha[key] = (participantesPorCursoFecha[key] || 0) + 1;
+  });
+
+  // 5. Construir filas SUNAFIL
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  const filas = envios.map(e => {
+    const p       = perfilMap[e.usuario_email] || {};
+    const fecha   = new Date(e.created_at);
+    const fechaStr= fecha.toLocaleDateString('es-PE');
+    const key     = `${e.id_curso}__${fechaStr}`;
+    const tipoForm= e.formularios?.tipo || '';
+    const tipoSUN = tipoForm === 'examen' ? 'Específica' : tipoForm === 'encuesta' ? 'Inducción' : 'Periódica';
+    const nota    = tipoForm === 'examen' ? (e.puntaje ?? '') : '';
+    const estado  = tipoForm === 'examen' ? (e.aprobado ? 'Aprobado' : 'Desaprobado') : 'Completado';
+
+    return [
+      emp?.nombre || empresaAdminNombre || '',          // Razón Social
+      emp?.ruc    || empresaAdminRuc    || '',          // RUC
+      `${p.apellidos || ''} ${p.nombres || ''}`.trim(), // Apellidos y Nombres
+      p.documento_numero || '',                          // N° Documento
+      p.documento_tipo   || 'DNI',                      // Tipo Doc
+      p.cargo            || '',                          // Cargo
+      e.cursos?.titulo   || '',                          // Tema de Capacitación
+      tipoSUN,                                           // Tipo (Inducción/Específica/Periódica)
+      'Virtual',                                         // Modalidad
+      fechaStr,                                          // Fecha
+      MESES[fecha.getMonth()],                           // Mes
+      e.cursos?.duracion || '',                          // Duración (hrs)
+      participantesPorCursoFecha[key] || 1,              // N° Participantes
+      estado,                                            // Estado
+      nota,                                              // Nota (/20)
+      e.porcentaje != null ? `${e.porcentaje}%` : '',   // Porcentaje
+    ];
+  });
+
+  const XLSX = window.XLSX;
+  const encabezado = [
+    'Razón Social', 'RUC', 'Apellidos y Nombres', 'N° Documento', 'Tipo Doc',
+    'Cargo', 'Tema de Capacitación', 'Tipo', 'Modalidad', 'Fecha', 'Mes',
+    'Duración (hrs)', 'N° Participantes', 'Estado', 'Nota (/20)', 'Porcentaje'
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([encabezado, ...filas]);
+  ws['!cols'] = [22,13,28,14,9,20,35,12,10,12,10,13,14,12,10,11].map(w => ({ wch: w }));
+
+  // Estilo encabezado (SheetJS básico)
+  const rango = XLSX.utils.decode_range(ws['!ref']);
+  for (let C = rango.s.c; C <= rango.e.c; C++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: 0, c: C })];
+    if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: '002855' } }, font: { color: { rgb: 'FFFFFF' }, bold: true } };
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, `Capacitaciones ${anio}`);
+  XLSX.writeFile(wb, `Reporte_SUNAFIL_${emp?.ruc || 'empresa'}_${anio}.xlsx`);
+};

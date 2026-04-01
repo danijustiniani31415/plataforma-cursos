@@ -2,7 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Super Administrador</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#002855" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/Logo.png" />
+  <title>Super Administrador · CV Global</title>
   <link rel="stylesheet" href="styles.css" />
   <style>
     .tabs { display: flex; gap: 10px; margin-bottom: 30px; }
@@ -173,5 +177,10 @@
   </div>
 
   <script type="module" src="superadmin.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
 </body>
 </html>

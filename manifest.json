@@ -1,0 +1,35 @@
+{
+  "name": "Plataforma de Capacitaciones SST · CV Global",
+  "short_name": "CV Global SST",
+  "description": "Plataforma de capacitación en Seguridad, Salud en el Trabajo y Medio Ambiente",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#002855",
+  "background_color": "#ffffff",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/Logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["education", "business"],
+  "shortcuts": [
+    {
+      "name": "Mis cursos",
+      "url": "/index.html",
+      "description": "Ver mis cursos asignados"
+    }
+  ]
+}

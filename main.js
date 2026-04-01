@@ -253,6 +253,8 @@ async function cargarCursos() {
     btn.onclick = () => mostrarCurso(curso);
     listaCursos.appendChild(btn);
   });
+
+  await cargarGamificacion();
 }
 
 // ═══════════════════════════════
@@ -739,6 +741,20 @@ window.enviarFormulario = async function (tipoPaso) {
     alert(`❌ No aprobaste.\nNota: ${notaSobre20.toFixed(1)}/20\nNecesitas 16 para aprobar.`);
   } else {
     alert(`✅ ¡Aprobaste!\nNota: ${notaSobre20.toFixed(1)}/20`);
+    // ── Gamificación ──
+    await otorgarXP(usuarioActual.id, 100);
+    // Bonus primer intento: contar todos los envíos para este formulario+curso
+    const { count: intentos } = await supabase
+      .from('envios_formulario')
+      .select('id', { count: 'exact', head: true })
+      .eq('id_formulario', formulario.id)
+      .eq('usuario_id', usuarioActual.id)
+      .eq('id_curso', cursoSeleccionado.id);
+    if (intentos === 1) {
+      await otorgarXP(usuarioActual.id, 50);
+      await otorgarBadgePrimerIntento(usuarioActual.id);
+    }
+    await verificarBadges(usuarioActual.id);
   }
 
   await mostrarPasoActual();
@@ -823,6 +839,146 @@ async function generarCertificado() {
   await generarCertificadoPDF(cursoSeleccionado, nota);
 }
 window.generarCertificado = generarCertificado;
+
+// ═══════════════════════════════
+// 🎮 GAMIFICACIÓN
+// ═══════════════════════════════
+const NIVELES = [
+  { nivel: 1, nombre: 'Aprendiz',      min: 0,    color: '#64748b' },
+  { nivel: 2, nombre: 'Practicante',   min: 150,  color: '#0ea5e9' },
+  { nivel: 3, nombre: 'Competente',    min: 350,  color: '#10b981' },
+  { nivel: 4, nombre: 'Avanzado SST',  min: 600,  color: '#f59e0b' },
+  { nivel: 5, nombre: 'Experto SST',   min: 1000, color: '#8b5cf6' },
+];
+
+const BADGES_DEF = {
+  primer_curso:   { emoji: '🥇', nombre: 'Primer Curso',   desc: 'Completaste tu primer curso' },
+  primer_intento: { emoji: '💡', nombre: 'Sin Errores',     desc: 'Aprobaste un examen al primer intento' },
+  velocista:      { emoji: '⚡', nombre: 'Velocista',       desc: 'Aprobaste 3 cursos o más' },
+  completista:    { emoji: '🏆', nombre: 'SST Champion',    desc: 'Completaste todos los cursos disponibles' },
+};
+
+function calcularNivel(xp) {
+  let actual = NIVELES[0];
+  for (const n of NIVELES) {
+    if (xp >= n.min) actual = n;
+    else break;
+  }
+  const idx = NIVELES.indexOf(actual);
+  const siguiente = NIVELES[idx + 1];
+  const progreso = siguiente
+    ? Math.round(((xp - actual.min) / (siguiente.min - actual.min)) * 100)
+    : 100;
+  return { ...actual, siguiente, progreso, xp };
+}
+
+async function otorgarXP(userId, cantidad) {
+  const { data: perfil } = await supabase.from('profiles').select('xp').eq('id', userId).single();
+  const xpNuevo = (perfil?.xp || 0) + cantidad;
+  const nivelNuevo = calcularNivel(xpNuevo).nivel;
+  await supabase.from('profiles').update({ xp: xpNuevo, nivel: nivelNuevo }).eq('id', userId);
+  return xpNuevo;
+}
+
+async function verificarBadges(userId) {
+  const { data: yaGanados } = await supabase
+    .from('badges_usuario').select('badge_code').eq('usuario_id', userId);
+  const ganados = new Set((yaGanados || []).map(b => b.badge_code));
+
+  const { count: examenes } = await supabase
+    .from('envios_formulario')
+    .select('id', { count: 'exact', head: true })
+    .eq('usuario_id', userId)
+    .eq('estado', 'completado')
+    .eq('aprobado', true);
+
+  const { count: totalCursos } = await supabase
+    .from('cursos').select('id', { count: 'exact', head: true }).eq('activo', true);
+
+  const nuevos = [];
+  if (!ganados.has('primer_curso') && examenes >= 1)  nuevos.push('primer_curso');
+  if (!ganados.has('velocista')    && examenes >= 3)  nuevos.push('velocista');
+  if (!ganados.has('completista')  && totalCursos > 0 && examenes >= totalCursos) nuevos.push('completista');
+
+  if (nuevos.length > 0) {
+    await supabase.from('badges_usuario').insert(
+      nuevos.map(code => ({ usuario_id: userId, badge_code: code }))
+    );
+    nuevos.forEach(code => mostrarNotifBadge(BADGES_DEF[code]));
+  }
+}
+
+async function otorgarBadgePrimerIntento(userId) {
+  const { data: ya } = await supabase.from('badges_usuario')
+    .select('id').eq('usuario_id', userId).eq('badge_code', 'primer_intento').maybeSingle();
+  if (!ya) {
+    await supabase.from('badges_usuario').insert({ usuario_id: userId, badge_code: 'primer_intento' });
+    mostrarNotifBadge(BADGES_DEF['primer_intento']);
+  }
+}
+
+function mostrarNotifBadge(badge) {
+  if (!badge) return;
+  const notif = document.createElement('div');
+  notif.style.cssText = `
+    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    background:#1e3a5f; color:white; padding:14px 24px; border-radius:50px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.25); font-size:0.88rem; font-weight:600;
+    display:flex; align-items:center; gap:10px; z-index:9999;
+    animation:slideUp 0.4s ease; white-space:nowrap;
+  `;
+  notif.innerHTML = `<span style="font-size:1.4rem">${badge.emoji}</span> ¡Insignia desbloqueada! <strong>${badge.nombre}</strong>`;
+  document.body.appendChild(notif);
+  setTimeout(() => { notif.style.opacity = '0'; notif.style.transition = 'opacity 0.5s'; }, 3500);
+  setTimeout(() => notif.remove(), 4100);
+}
+
+async function cargarGamificacion() {
+  const widget = document.getElementById('gamificacion-widget');
+  if (!widget) return;
+
+  const { data: perfil } = await supabase
+    .from('profiles').select('xp, nivel, empresa_id').eq('id', usuarioActual.id).single();
+
+  const xp = perfil?.xp || 0;
+  const nivelInfo = calcularNivel(xp);
+
+  const { data: badges } = await supabase
+    .from('badges_usuario').select('badge_code').eq('usuario_id', usuarioActual.id);
+
+  let rankingHTML = '';
+  if (perfil?.empresa_id) {
+    const { data: ranking } = await supabase
+      .from('profiles').select('id, xp').eq('empresa_id', perfil.empresa_id).order('xp', { ascending: false });
+    if (ranking) {
+      const pos = ranking.findIndex(r => r.id === usuarioActual.id) + 1;
+      rankingHTML = `<div class="gami-ranking">🏅 Posición <strong>#${pos}</strong> de ${ranking.length} en tu empresa</div>`;
+    }
+  }
+
+  const badgesHTML = (badges || []).map(b => {
+    const def = BADGES_DEF[b.badge_code];
+    return def ? `<span class="gami-badge" title="${def.desc}">${def.emoji} ${def.nombre}</span>` : '';
+  }).join('');
+
+  widget.innerHTML = `
+    <div class="gami-card">
+      <div class="gami-header">
+        <div class="gami-nivel" style="color:${nivelInfo.color}">⚡ Nivel ${nivelInfo.nivel} · ${nivelInfo.nombre}</div>
+        <div class="gami-xp">${xp} XP</div>
+      </div>
+      <div class="gami-bar-wrap">
+        <div class="gami-bar-fill" style="width:${nivelInfo.progreso}%; background:${nivelInfo.color}"></div>
+      </div>
+      ${nivelInfo.siguiente
+        ? `<div class="gami-bar-label">${xp} / ${nivelInfo.siguiente.min} XP para ${nivelInfo.siguiente.nombre}</div>`
+        : '<div class="gami-bar-label">🏆 Nivel máximo alcanzado</div>'}
+      ${rankingHTML}
+      ${badgesHTML ? `<div class="gami-badges">${badgesHTML}</div>` : ''}
+    </div>
+  `;
+  widget.style.display = 'block';
+}
 
 // ═══════════════════════════════
 // 🔤 HELPER TÍTULOS

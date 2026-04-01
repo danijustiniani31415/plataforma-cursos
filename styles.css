@@ -1376,3 +1376,82 @@ body {
 
   .step-content-inner { padding: 16px; }
 }
+
+/* ═══════════════════════════════════════════
+   GAMIFICACIÓN
+═══════════════════════════════════════════ */
+.gami-card {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  color: white;
+}
+
+.gami-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.gami-nivel {
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+.gami-xp {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--gold-light);
+}
+
+.gami-bar-wrap {
+  height: 8px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.gami-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gami-bar-label {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.65);
+  margin-bottom: 10px;
+}
+
+.gami-ranking {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.85);
+  margin-bottom: 10px;
+}
+
+.gami-ranking strong { color: var(--gold-light); }
+
+.gami-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.gami-badge {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  cursor: default;
+}
+
+/* Notificación badge */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

@@ -1,4 +1,6 @@
 import { supabase } from './src/supabaseClient.js';
+import { alertToToast } from './toast.js';
+const alert = alertToToast;
 
 let empresaAdminId = null;
 let empresaAdminNombre = null;

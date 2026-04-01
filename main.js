@@ -1,5 +1,7 @@
 import { supabase } from './src/supabaseClient.js';
 import { generarCertificadoPDF } from './certificado.js';
+import { toast, alertToToast } from './toast.js';
+const alert = alertToToast;
 
 const loginSection            = document.getElementById('login-section');
 const cursosDisponiblesSection = document.getElementById('cursos-disponibles');
@@ -49,10 +51,15 @@ async function login() {
   const email    = document.getElementById('email').value;
   const password = document.getElementById('password').value;
 
+  const btnLogin = document.querySelector('#login-section .btn-primary');
+  if (btnLogin) { btnLogin.disabled = true; btnLogin.textContent = 'Ingresando...'; }
+
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
+  if (btnLogin) { btnLogin.disabled = false; btnLogin.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Ingresar'; }
+
   if (error) {
-    alert("❌ Error al iniciar sesión: " + error.message);
+    alert("❌ Correo o contraseña incorrectos.");
     return;
   }
 
@@ -736,11 +743,11 @@ window.enviarFormulario = async function (tipoPaso) {
   }).eq('id', envioId);
 
   if (tipoPaso === 'encuesta') {
-    alert('✅ ¡Gracias por tu opinión!');
+    toast('¡Gracias por tu opinión!', 'success');
   } else if (!aprobado) {
-    alert(`❌ No aprobaste.\nNota: ${notaSobre20.toFixed(1)}/20\nNecesitas 16 para aprobar.`);
+    toast(`No aprobaste — Nota: ${notaSobre20.toFixed(1)}/20. Necesitas 16 para aprobar.`, 'error', 5000);
   } else {
-    alert(`✅ ¡Aprobaste!\nNota: ${notaSobre20.toFixed(1)}/20`);
+    toast(`¡Aprobaste! Nota: ${notaSobre20.toFixed(1)}/20 🎉`, 'success', 4000);
     // ── Gamificación ──
     await otorgarXP(usuarioActual.id, 100);
     // Bonus primer intento: contar todos los envíos para este formulario+curso

@@ -1,4 +1,6 @@
 import { supabase } from './src/supabaseClient.js';
+import { alertToToast } from './toast.js';
+const alert = alertToToast;
 
 // ✅ Verificar que sea superadmin
 (async () => {

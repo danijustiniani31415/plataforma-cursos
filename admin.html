@@ -310,6 +310,9 @@
   <button class="nav-tab" onclick="mostrarTab('stats-sst', this)">
     <span class="tab-icon">📊</span> Estadísticas SST
   </button>
+  <button class="nav-tab" onclick="mostrarTab('cumplimiento', this)">
+    <span class="tab-icon">✅</span> Cumplimiento
+  </button>
 </nav>
 
 <div class="admin-content">
@@ -498,9 +501,10 @@
         <input type="text"   id="titulo-curso"    placeholder="Nombre del curso *" />
         <input type="text"   id="codigo-prefijo"  placeholder="Prefijo del código (ej: IPERC, TEA) *"
                oninput="this.value=this.value.toUpperCase()" />
-        <input type="number" id="duracion-curso"  placeholder="Duración en horas *" min="1" />
-        <input type="text"   id="url-material"    placeholder="URL del material (PDF, OneDrive)" />
-        <input type="text"   id="url-video"       placeholder="URL del video (YouTube)" />
+        <input type="number" id="duracion-curso"   placeholder="Duración en horas *" min="1" />
+        <input type="number" id="vigencia-curso"   placeholder="Vigencia del certificado (meses, por defecto 12)" min="1" />
+        <input type="text"   id="url-material"     placeholder="URL del material (PDF, OneDrive)" />
+        <input type="text"   id="url-video"        placeholder="URL del video (YouTube)" />
       </div>
       <button onclick="subirCurso()" class="btn-primary" style="margin-top:16px;">Subir curso</button>
     </div>
@@ -807,6 +811,56 @@
     </div>
   </div>
 
+  <!-- ═══ TAB: CUMPLIMIENTO ═══ -->
+  <div id="tab-cumplimiento" class="tab-panel">
+
+    <!-- KPIs -->
+    <div class="panel-card">
+      <h2>✅ Resumen de cumplimiento</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:16px;">
+        Estado actual de certificados de todos los trabajadores de tu empresa.
+      </p>
+      <div id="cumpl-kpis" style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px;"></div>
+    </div>
+
+    <!-- Certificados por vencer / vencidos -->
+    <div class="panel-card">
+      <h2>⚠️ Certificados por vencer o vencidos</h2>
+      <div id="tabla-por-vencer"><p style="color:#888;">Cargando...</p></div>
+    </div>
+
+    <!-- Cumplimiento por curso -->
+    <div class="panel-card">
+      <h2>📋 Cumplimiento por curso</h2>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+        <select id="select-curso-cumpl" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; flex:1; min-width:220px;">
+          <option value="">-- Selecciona un curso --</option>
+        </select>
+        <button onclick="cargarCumplimientoCurso()" class="btn-primary">Ver</button>
+        <button onclick="exportarCumplimientoExcel()" class="btn-secondary" style="background:#198754; color:white; border:none;">⬇️ Exportar matriz Excel</button>
+      </div>
+      <div id="tabla-cumplimiento-curso"></div>
+    </div>
+
+    <!-- Notificaciones -->
+    <div class="panel-card">
+      <h2>📧 Enviar notificaciones por email</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
+        Envía recordatorios automáticos a los trabajadores con cursos pendientes o certificados por vencer.
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px;">
+        <select id="tipo-notif" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+          <option value="ambos">Pendientes + Por vencer</option>
+          <option value="pendientes">Solo pendientes del mes</option>
+          <option value="vencimientos">Solo por vencer / vencidos</option>
+        </select>
+        <button id="btn-enviar-notif" onclick="enviarNotificaciones()" class="btn-primary">📧 Enviar recordatorios</button>
+      </div>
+      <div id="preview-notificaciones"></div>
+    </div>
+
+  </div>
+
   <!-- ═══ TAB: ACCESO ═══ -->
   <div id="tab-acceso" class="tab-panel">
     <div class="panel-card">
@@ -874,6 +928,9 @@
     if (tab === 'stats-sst') {
       initSelectorAnioSST();
       cargarEstadisticasSST();
+    }
+    if (tab === 'cumplimiento') {
+      initCumplimiento();
     }
   }
 </script>

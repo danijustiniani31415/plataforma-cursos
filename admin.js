@@ -230,11 +230,12 @@ window.crearUsuario = async function () {
 // 📚 Subir nuevo curso
 // ═══════════════════════════════
 window.subirCurso = async function () {
-  const titulo       = document.getElementById("titulo-curso").value.trim();
-  const prefijo      = document.getElementById("codigo-prefijo").value.trim().toUpperCase();
-  const duracion     = parseInt(document.getElementById("duracion-curso").value);
-  const url_video    = document.getElementById("url-video").value.trim();
-  const url_material = document.getElementById("url-material").value.trim();
+  const titulo        = document.getElementById("titulo-curso").value.trim();
+  const prefijo       = document.getElementById("codigo-prefijo").value.trim().toUpperCase();
+  const duracion      = parseInt(document.getElementById("duracion-curso").value);
+  const vigencia_meses= parseInt(document.getElementById("vigencia-curso").value) || 12;
+  const url_video     = document.getElementById("url-video").value.trim();
+  const url_material  = document.getElementById("url-material").value.trim();
 
   if (!titulo || !prefijo || !duracion) {
     alert("❌ Completa los campos obligatorios: título, prefijo y duración.");
@@ -256,6 +257,7 @@ window.subirCurso = async function () {
     codigo_prefijo: prefijo,
     codigo,
     duracion,
+    vigencia_meses,
     url_video:    url_video    || null,
     url_material: url_material || null,
     activo:       true
@@ -265,7 +267,7 @@ window.subirCurso = async function () {
     alert("❌ Error al subir curso: " + error.message);
   } else {
     alert(`✅ Curso subido correctamente.\nCódigo: ${codigo}`);
-    ["titulo-curso", "codigo-prefijo", "duracion-curso",
+    ["titulo-curso", "codigo-prefijo", "duracion-curso", "vigencia-curso",
      "url-video", "url-material"].forEach(id => {
       document.getElementById(id).value = '';
     });
@@ -2322,4 +2324,255 @@ window.cargarEstadisticasSST = async function () {
        <ul style="margin:0;padding-left:18px;font-size:0.85rem;color:#555;">
          ${pendientes.map(p => `<li>${p.tipo_curso ? `<strong>[${p.tipo_curso}]</strong> ` : ''}${programa.find(x=>x.id===p.id)?.curso || ''}</li>`).join('')}
        </ul>`;
+};
+
+// ═══════════════════════════════════════════════
+// ✅ CUMPLIMIENTO DE CERTIFICADOS
+// ═══════════════════════════════════════════════
+
+let datosCumplimiento = [];
+
+window.initCumplimiento = async function () {
+  // Poblar selector de cursos
+  const { data: cursos } = await supabase.from('cursos').select('id, titulo').eq('activo', true).order('titulo');
+  const sel = document.getElementById('select-curso-cumpl');
+  if (sel) {
+    sel.innerHTML = '<option value="">-- Selecciona un curso --</option>';
+    (cursos || []).forEach(c => {
+      sel.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.titulo}</option>`);
+    });
+  }
+  await cargarResumenCumplimiento();
+};
+
+async function cargarResumenCumplimiento() {
+  if (!empresaAdminId) return;
+
+  const [{ data: workers }, { data: cursos }] = await Promise.all([
+    supabase.from('profiles').select('id, nombres, apellidos, email, documento_numero, cargo').eq('empresa_id', empresaAdminId).eq('activo', true).order('apellidos'),
+    supabase.from('cursos').select('id, titulo, vigencia_meses').eq('activo', true),
+  ]);
+
+  if (!workers?.length || !cursos?.length) {
+    document.getElementById('cumpl-kpis').innerHTML = '<p style="color:#888;">No hay datos suficientes.</p>';
+    document.getElementById('tabla-por-vencer').innerHTML = '';
+    return;
+  }
+
+  const emails = workers.map(w => w.email);
+  const { data: envios } = await supabase
+    .from('envios_formulario')
+    .select('usuario_email, id_curso, created_at, formularios(tipo)')
+    .in('usuario_email', emails)
+    .eq('aprobado', true);
+
+  // Solo tipo examen, más reciente por worker+curso
+  const lastSub = {};
+  (envios || []).filter(e => e.formularios?.tipo === 'examen').forEach(e => {
+    const key = `${e.usuario_email}__${e.id_curso}`;
+    if (!lastSub[key] || new Date(e.created_at) > new Date(lastSub[key].created_at)) {
+      lastSub[key] = e;
+    }
+  });
+
+  const now   = new Date();
+  const in30  = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  datosCumplimiento = [];
+  workers.forEach(w => {
+    cursos.forEach(c => {
+      const sub = lastSub[`${w.email}__${c.id}`];
+      if (!sub) {
+        datosCumplimiento.push({ worker: w, curso: c, estado: 'Pendiente', fecha_emision: null, fecha_vencimiento: null });
+      } else {
+        const emision     = new Date(sub.created_at);
+        const vencimiento = new Date(emision);
+        vencimiento.setMonth(vencimiento.getMonth() + (c.vigencia_meses || 12));
+        const estado = vencimiento < now ? 'Vencido' : vencimiento < in30 ? 'Por vencer' : 'Vigente';
+        datosCumplimiento.push({ worker: w, curso: c, estado, fecha_emision: emision, fecha_vencimiento: vencimiento });
+      }
+    });
+  });
+
+  // KPIs
+  const vigentes   = datosCumplimiento.filter(d => d.estado === 'Vigente').length;
+  const porVencer  = datosCumplimiento.filter(d => d.estado === 'Por vencer').length;
+  const vencidos   = datosCumplimiento.filter(d => d.estado === 'Vencido').length;
+  const pendientes = datosCumplimiento.filter(d => d.estado === 'Pendiente').length;
+  const total      = datosCumplimiento.length;
+  const pct        = total > 0 ? Math.round((vigentes + porVencer) / total * 100) : 0;
+
+  document.getElementById('cumpl-kpis').innerHTML = [
+    ['Cumplimiento', `${pct}%`,  pct >= 80 ? '#198754' : pct >= 50 ? '#fd7e14' : '#dc3545'],
+    ['Vigentes',     vigentes,   '#198754'],
+    ['Por vencer',   porVencer,  '#fd7e14'],
+    ['Vencidos',     vencidos,   '#dc3545'],
+    ['Pendientes',   pendientes, '#6c757d'],
+  ].map(([label, val, color]) => `
+    <div style="background:#f8f9fa;border-radius:10px;padding:14px 20px;min-width:120px;text-align:center;border-top:4px solid ${color};">
+      <div style="font-size:1.5rem;font-weight:700;color:${color};">${val}</div>
+      <div style="font-size:0.78rem;color:#555;margin-top:4px;">${label}</div>
+    </div>`).join('');
+
+  // Tabla por vencer / vencidos
+  const alertas = datosCumplimiento.filter(d => d.estado === 'Por vencer' || d.estado === 'Vencido')
+    .sort((a, b) => (a.fecha_vencimiento || 0) - (b.fecha_vencimiento || 0));
+
+  if (!alertas.length) {
+    document.getElementById('tabla-por-vencer').innerHTML =
+      '<p style="color:#198754;font-weight:600;">✅ No hay certificados por vencer en los próximos 30 días.</p>';
+    return;
+  }
+
+  const colAlert = { 'Vencido': '#dc3545', 'Por vencer': '#fd7e14' };
+  document.getElementById('tabla-por-vencer').innerHTML = `
+    <div style="overflow-x:auto;">
+      <table style="border-collapse:collapse;width:100%;font-size:0.85rem;">
+        <thead><tr style="background:#002855;color:white;">
+          <th style="padding:8px 10px;text-align:left;">Trabajador</th>
+          <th style="padding:8px 10px;">Documento</th>
+          <th style="padding:8px 10px;">Cargo</th>
+          <th style="padding:8px 10px;text-align:left;">Curso</th>
+          <th style="padding:8px 10px;">Emisión</th>
+          <th style="padding:8px 10px;">Vencimiento</th>
+          <th style="padding:8px 10px;">Estado</th>
+        </tr></thead>
+        <tbody>
+          ${alertas.map(d => `
+            <tr style="border-bottom:1px solid #eee;">
+              <td style="padding:7px 10px;font-weight:500;">${d.worker.apellidos}, ${d.worker.nombres}</td>
+              <td style="padding:7px 10px;">${d.worker.documento_numero}</td>
+              <td style="padding:7px 10px;">${d.worker.cargo || ''}</td>
+              <td style="padding:7px 10px;">${d.curso.titulo}</td>
+              <td style="padding:7px 10px;">${d.fecha_emision?.toLocaleDateString('es-PE') || '—'}</td>
+              <td style="padding:7px 10px;color:${colAlert[d.estado]};font-weight:600;">${d.fecha_vencimiento?.toLocaleDateString('es-PE') || '—'}</td>
+              <td style="padding:7px 10px;"><span style="background:${colAlert[d.estado]};color:white;padding:3px 8px;border-radius:10px;font-size:0.78rem;">${d.estado}</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+window.cargarCumplimientoCurso = async function () {
+  const cursoId = document.getElementById('select-curso-cumpl').value;
+  if (!cursoId) { alert('Selecciona un curso.'); return; }
+  if (!datosCumplimiento.length) { alert('Espera a que carguen los datos.'); return; }
+
+  const datos = datosCumplimiento.filter(d => d.curso.id === cursoId);
+  if (!datos.length) {
+    document.getElementById('tabla-cumplimiento-curso').innerHTML = '<p style="color:#888;">Sin datos.</p>';
+    return;
+  }
+
+  const colores = { 'Vigente': '#198754', 'Por vencer': '#fd7e14', 'Vencido': '#dc3545', 'Pendiente': '#6c757d' };
+  const vigentes = datos.filter(d => d.estado === 'Vigente').length;
+  const pct = Math.round(vigentes / datos.length * 100);
+
+  document.getElementById('tabla-cumplimiento-curso').innerHTML = `
+    <p style="font-size:0.85rem;color:#555;margin-bottom:10px;">
+      <strong>${datos[0].curso.titulo}</strong> — Vigencia: ${datos[0].curso.vigencia_meses || 12} meses —
+      <span style="color:#198754;font-weight:600;">${pct}% vigente</span> (${vigentes}/${datos.length} trabajadores)
+    </p>
+    <div style="overflow-x:auto;">
+      <table style="border-collapse:collapse;width:100%;font-size:0.85rem;">
+        <thead><tr style="background:#002855;color:white;">
+          <th style="padding:8px 10px;text-align:left;">Trabajador</th>
+          <th style="padding:8px 10px;">Documento</th>
+          <th style="padding:8px 10px;">Cargo</th>
+          <th style="padding:8px 10px;">Fecha emisión</th>
+          <th style="padding:8px 10px;">Fecha vencimiento</th>
+          <th style="padding:8px 10px;">Estado</th>
+        </tr></thead>
+        <tbody>
+          ${datos.map(d => `
+            <tr style="border-bottom:1px solid #eee;">
+              <td style="padding:7px 10px;font-weight:500;">${d.worker.apellidos}, ${d.worker.nombres}</td>
+              <td style="padding:7px 10px;">${d.worker.documento_numero}</td>
+              <td style="padding:7px 10px;">${d.worker.cargo || ''}</td>
+              <td style="padding:7px 10px;">${d.fecha_emision?.toLocaleDateString('es-PE') || '—'}</td>
+              <td style="padding:7px 10px;">${d.fecha_vencimiento?.toLocaleDateString('es-PE') || '—'}</td>
+              <td style="padding:7px 10px;"><span style="background:${colores[d.estado]};color:white;padding:3px 8px;border-radius:10px;font-size:0.78rem;">${d.estado}</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+};
+
+window.enviarNotificaciones = async function () {
+  if (!datosCumplimiento.length) { alert('Primero abre la pestaña Cumplimiento para cargar los datos.'); return; }
+
+  const tipo = document.getElementById('tipo-notif').value;
+  const cont = document.getElementById('preview-notificaciones');
+
+  // Agrupar por trabajador según tipo
+  const pendientes = datosCumplimiento.filter(d => d.estado === 'Pendiente');
+  const alertas    = datosCumplimiento.filter(d => d.estado === 'Por vencer' || d.estado === 'Vencido');
+  const seleccion  = tipo === 'pendientes' ? pendientes : tipo === 'vencimientos' ? alertas : [...pendientes, ...alertas];
+
+  const porWorker = {};
+  seleccion.forEach(d => {
+    const key = d.worker.email;
+    if (!porWorker[key]) porWorker[key] = { worker: d.worker, items: [] };
+    porWorker[key].items.push({ curso: d.curso.titulo, estado: d.estado });
+  });
+
+  const lista = Object.values(porWorker);
+  if (!lista.length) {
+    cont.innerHTML = '<p style="color:#198754;">✅ No hay trabajadores que requieran notificación.</p>';
+    return;
+  }
+
+  cont.innerHTML = `
+    <p style="font-size:0.88rem;color:#555;margin-bottom:10px;">
+      Se enviarán notificaciones a <strong>${lista.length}</strong> trabajadores:
+    </p>
+    <ul style="font-size:0.84rem;color:#444;padding-left:18px;margin-bottom:14px;">
+      ${lista.slice(0, 8).map(t => `<li>${t.worker.nombres} ${t.worker.apellidos} — ${t.items.length} curso(s)</li>`).join('')}
+      ${lista.length > 8 ? `<li style="color:#888;">...y ${lista.length - 8} más</li>` : ''}
+    </ul>
+    <span id="progreso-notif" style="font-size:0.88rem;color:#555;">Enviando...</span>`;
+
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const resp = await fetch(
+      'https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/enviar-notificaciones',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ empresa_id: empresaAdminId, tipo, empresa_nombre: empresaAdminNombre }),
+      }
+    );
+    const result = await resp.json();
+    document.getElementById('progreso-notif').textContent =
+      result.ok ? `✅ ${result.enviados} correos enviados correctamente.` : `❌ Error: ${result.error}`;
+  } catch {
+    document.getElementById('progreso-notif').textContent =
+      '❌ Función de notificaciones no desplegada aún. Sigue las instrucciones para activarla.';
+  }
+};
+
+window.exportarCumplimientoExcel = function () {
+  if (!datosCumplimiento.length) { alert('Primero abre la pestaña Cumplimiento para cargar los datos.'); return; }
+  const XLSX = window.XLSX;
+
+  const workers = [...new Map(datosCumplimiento.map(d => [d.worker.email, d.worker])).values()];
+  const cursos  = [...new Map(datosCumplimiento.map(d => [d.curso.id,    d.curso])).values()];
+
+  const header = ['Apellidos', 'Nombres', 'Documento', 'Cargo', ...cursos.map(c => c.titulo)];
+  const rows = workers.map(w => {
+    const celdas = cursos.map(c => {
+      const d = datosCumplimiento.find(x => x.worker.email === w.email && x.curso.id === c.id);
+      return d ? d.estado : 'Pendiente';
+    });
+    return [w.apellidos, w.nombres, w.documento_numero, w.cargo || '', ...celdas];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = [20, 20, 15, 20, ...cursos.map(() => ({ wch: 14 }))].map(w => typeof w === 'number' ? { wch: w } : w);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Cumplimiento');
+  XLSX.writeFile(wb, `Matriz_Cumplimiento_${new Date().getFullYear()}.xlsx`);
 };

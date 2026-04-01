@@ -307,6 +307,9 @@
   <button class="nav-tab" onclick="mostrarTab('programa-sst', this)">
     <span class="tab-icon">🦺</span> Programa SST
   </button>
+  <button class="nav-tab" onclick="mostrarTab('stats-sst', this)">
+    <span class="tab-icon">📊</span> Estadísticas SST
+  </button>
 </nav>
 
 <div class="admin-content">
@@ -767,31 +770,34 @@
       </div>
     </div>
 
-    <!-- Dashboard estadísticas -->
+  </div>
+
+  <!-- ═══ TAB: ESTADÍSTICAS SST ═══ -->
+  <div id="tab-stats-sst" class="tab-panel">
     <div class="panel-card">
-      <h2>📊 Estadísticas SST</h2>
-      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+      <h2>📊 Estadísticas SST — ANTAMINA</h2>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:20px;">
         <select id="stats-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
         <button onclick="cargarEstadisticasSST()" class="btn-primary">Ver estadísticas</button>
       </div>
 
       <!-- KPIs -->
-      <div id="sst-kpis" style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px;"></div>
+      <div id="sst-kpis" style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:28px;"></div>
 
       <!-- Gráfico cumplimiento mensual -->
-      <div style="margin-bottom:24px;">
-        <h3 style="font-size:0.95rem; color:#002855; margin-bottom:10px;">Cumplimiento mensual (%)</h3>
-        <canvas id="chart-sst-mensual" height="100"></canvas>
+      <div style="background:#f8f9fa; border-radius:10px; padding:20px; margin-bottom:20px;">
+        <h3 style="font-size:0.95rem; color:#002855; margin-bottom:14px;">Cumplimiento mensual — Programados vs Ejecutados</h3>
+        <canvas id="chart-sst-mensual" height="90"></canvas>
       </div>
 
-      <!-- Gráfico por tipo -->
-      <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
-        <div style="flex:1; min-width:220px;">
-          <h3 style="font-size:0.95rem; color:#002855; margin-bottom:10px;">Por tipo de curso</h3>
+      <!-- Gráficos por tipo y encargado -->
+      <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px;">
+        <div style="flex:1; min-width:220px; background:#f8f9fa; border-radius:10px; padding:20px;">
+          <h3 style="font-size:0.95rem; color:#002855; margin-bottom:14px;">Distribución por tipo de curso</h3>
           <canvas id="chart-sst-tipo" height="200"></canvas>
         </div>
-        <div style="flex:1; min-width:220px;">
-          <h3 style="font-size:0.95rem; color:#002855; margin-bottom:10px;">Por encargado</h3>
+        <div style="flex:1; min-width:220px; background:#f8f9fa; border-radius:10px; padding:20px;">
+          <h3 style="font-size:0.95rem; color:#002855; margin-bottom:14px;">Distribución por encargado</h3>
           <canvas id="chart-sst-encargado" height="200"></canvas>
         </div>
       </div>
@@ -864,6 +870,10 @@
     }
     if (tab === 'programa-sst') {
       initSelectorAnioSST();
+    }
+    if (tab === 'stats-sst') {
+      initSelectorAnioSST();
+      cargarEstadisticasSST();
     }
   }
 </script>

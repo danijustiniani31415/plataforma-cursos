@@ -1,13 +1,8 @@
-const CACHE_NAME = 'cvglobal-sst-v2';
+const CACHE_NAME = 'cvglobal-sst-v3';
 
-// Recursos estáticos que se cachean inmediatamente al instalar
+// Solo assets estáticos — NUNCA cachear páginas HTML de admin
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/admin.html',
   '/styles.css',
-  '/main.js',
-  '/admin.js',
   '/Logo.png',
   '/manifest.json',
   '/offline.html',
@@ -59,7 +54,12 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Assets locales → Cache first, luego red
+  // HTML → siempre red, nunca cachear
+  if (event.request.destination === 'document' || url.pathname.endsWith('.html')) {
+    return;
+  }
+
+  // Assets locales (CSS, JS, imágenes) → Cache first, luego red
   if (url.origin === self.location.origin) {
     event.respondWith(cacheFirst(event.request));
     return;

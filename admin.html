@@ -325,6 +325,9 @@
   <button class="nav-tab" onclick="mostrarTab('sunafil', this)">
     <span class="tab-icon">🏛️</span> SUNAFIL
   </button>
+  <button class="nav-tab" onclick="mostrarTab('qr-asistencia', this)">
+    <span class="tab-icon">📷</span> QR Asistencia
+  </button>
 </nav>
 
 <div class="admin-content">
@@ -977,6 +980,73 @@
     </div>
   </div>
 
+  <!-- ═══ TAB: QR ASISTENCIA ═══ -->
+  <div id="tab-qr-asistencia" class="tab-panel">
+
+    <!-- Crear sesión presencial -->
+    <div class="panel-card">
+      <h2>📷 Nueva sesión presencial</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:16px;">
+        Crea una sesión para una capacitación presencial. Se generará un QR que los trabajadores escanean para registrar su asistencia.
+      </p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:700px; margin-bottom:14px;">
+        <div style="grid-column:1/-1;">
+          <select id="qr-curso" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+            <option value="">-- Selecciona el curso --</option>
+          </select>
+        </div>
+        <input type="text"     id="qr-lugar"    placeholder="Lugar / sala *" style="padding:10px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;" />
+        <input type="datetime-local" id="qr-fecha" style="padding:10px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;" />
+        <input type="text"     id="qr-expositor" placeholder="Expositor" style="padding:10px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;" />
+        <input type="number"   id="qr-duracion"  placeholder="Duración (hr)" min="1" style="padding:10px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;" />
+      </div>
+      <button onclick="crearSesionQR()" class="btn-primary">🔲 Generar QR</button>
+    </div>
+
+    <!-- QR generado -->
+    <div id="panel-qr-generado" style="display:none;">
+      <div class="panel-card" style="text-align:center;">
+        <h2>✅ QR listo para escanear</h2>
+        <p id="qr-info-sesion" style="font-size:0.88rem; color:#555; margin-bottom:16px;"></p>
+        <div id="qr-canvas-wrap" style="display:inline-block; padding:16px; background:white; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,0.1); margin-bottom:16px;">
+          <canvas id="qr-canvas"></canvas>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <button onclick="imprimirQR()" class="btn-primary">🖨️ Imprimir QR</button>
+          <button onclick="descargarQR()" class="btn-secondary" style="background:#198754;color:white;border:none;">⬇️ Descargar PNG</button>
+          <button onclick="cerrarSesionQR()" class="btn-secondary" style="background:#dc3545;color:white;border:none;">🔒 Cerrar sesión</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Asistentes en tiempo real -->
+    <div id="panel-asistentes-qr" style="display:none;">
+      <div class="panel-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+          <h2 style="margin:0;">👥 Asistentes registrados <span id="qr-count" style="font-size:1rem; color:#198754; font-weight:700;"></span></h2>
+          <div style="display:flex; gap:8px;">
+            <button onclick="refrescarAsistentes()" class="btn-primary" style="font-size:0.82rem; padding:8px 12px;">🔄 Actualizar</button>
+            <button onclick="exportarAsistentesQR()" class="btn-secondary" style="background:#198754;color:white;border:none;font-size:0.82rem;padding:8px 12px;">⬇️ Excel</button>
+          </div>
+        </div>
+        <div id="lista-asistentes-qr"></div>
+      </div>
+    </div>
+
+    <!-- Sesiones anteriores -->
+    <div class="panel-card">
+      <h2>📋 Sesiones anteriores</h2>
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
+        <select id="qr-filtro-curso" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; flex:1; min-width:180px;">
+          <option value="">Todos los cursos</option>
+        </select>
+        <button onclick="cargarSesionesAnteriores()" class="btn-primary">Ver sesiones</button>
+      </div>
+      <div id="lista-sesiones-anteriores"></div>
+    </div>
+
+  </div>
+
   <!-- ═══ TAB: ACCESO ═══ -->
   <div id="tab-acceso" class="tab-panel">
     <div class="panel-card">
@@ -1016,6 +1086,7 @@
 </div>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
   function toggleSinActividad() {
@@ -1053,6 +1124,9 @@
     }
     if (tab === 'sunafil') {
       initSelectorSUNAFIL();
+    }
+    if (tab === 'qr-asistencia') {
+      initQRAsistencia();
     }
   }
 </script>

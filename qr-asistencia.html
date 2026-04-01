@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="theme-color" content="#002855" />
+  <title>Registro de Asistencia · CV Global SST</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 36px 28px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(0,40,85,0.12);
+      text-align: center;
+    }
+    .logo { height: 52px; margin-bottom: 20px; }
+    .estado-icon { font-size: 3.5rem; margin-bottom: 12px; }
+    h1 { color: #002855; font-size: 1.3rem; margin-bottom: 8px; }
+    .subtitulo { color: #666; font-size: 0.88rem; margin-bottom: 24px; line-height: 1.5; }
+    .info-sesion {
+      background: #f0f4f8;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      color: #444;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+    .info-sesion strong { color: #002855; }
+    .form-group { margin-bottom: 14px; text-align: left; }
+    label { display: block; font-size: 0.82rem; color: #555; margin-bottom: 4px; font-weight: 500; }
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1.5px solid #dde3ec;
+      border-radius: 10px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus { border-color: #002855; }
+    .btn {
+      width: 100%;
+      padding: 15px;
+      background: #002855;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 4px;
+    }
+    .btn:hover { background: #152c47; }
+    .btn:disabled { background: #9cb0c8; cursor: not-allowed; }
+    .btn-secondary {
+      background: white;
+      color: #002855;
+      border: 1.5px solid #002855;
+      margin-top: 10px;
+    }
+    .msg {
+      margin-top: 14px;
+      font-size: 0.88rem;
+      padding: 12px;
+      border-radius: 8px;
+    }
+    .msg-error   { background: #fee2e2; color: #991b1b; }
+    .msg-success { background: #d1fae5; color: #065f46; }
+    .spinner {
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #seccion-login, #seccion-exito, #seccion-error { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="/Logo.png" class="logo" alt="CV Global" onerror="this.style.display='none'" />
+
+    <!-- Cargando -->
+    <div id="seccion-cargando">
+      <div class="estado-icon">⏳</div>
+      <h1>Verificando sesión...</h1>
+      <p class="subtitulo">Por favor espera un momento.</p>
+    </div>
+
+    <!-- Login para registrar asistencia -->
+    <div id="seccion-login">
+      <div class="estado-icon">📋</div>
+      <h1>Registro de asistencia</h1>
+      <div class="info-sesion" id="info-sesion-texto"></div>
+      <p class="subtitulo">Ingresa tus credenciales para registrar tu asistencia.</p>
+      <div class="form-group">
+        <label>Correo electrónico</label>
+        <input type="email" id="qr-email" placeholder="tu@correo.com" autocomplete="email" />
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="qr-password" placeholder="Tu contraseña" autocomplete="current-password"
+          onkeydown="if(event.key==='Enter') registrarAsistenciaQR()" />
+      </div>
+      <button class="btn" onclick="registrarAsistenciaQR()" id="btn-registrar">
+        ✅ Registrar asistencia
+      </button>
+      <div id="msg-qr"></div>
+    </div>
+
+    <!-- Éxito -->
+    <div id="seccion-exito">
+      <div class="estado-icon">✅</div>
+      <h1>¡Asistencia registrada!</h1>
+      <p class="subtitulo" id="texto-exito"></p>
+      <div class="info-sesion" id="info-sesion-exito"></div>
+      <p style="font-size:0.8rem; color:#888; margin-top:16px;">Puedes cerrar esta página.</p>
+    </div>
+
+    <!-- Error -->
+    <div id="seccion-error">
+      <div class="estado-icon">❌</div>
+      <h1 id="titulo-error">Sesión no disponible</h1>
+      <p class="subtitulo" id="texto-error"></p>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    const supabaseUrl  = 'https://wrahjlstautwinxyqcfx.supabase.co';
+    const supabaseKey  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
+    const supabase     = createClient(supabaseUrl, supabaseKey);
+
+    const params   = new URLSearchParams(window.location.search);
+    const sesionId = params.get('sesion');
+
+    let sesionData = null;
+
+    function mostrar(id) {
+      ['seccion-cargando','seccion-login','seccion-exito','seccion-error']
+        .forEach(s => document.getElementById(s).style.display = s === id ? 'block' : 'none');
+    }
+
+    function formatFecha(iso) {
+      return new Date(iso).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
+    // Verificar si ya hay sesión activa de Supabase
+    async function init() {
+      if (!sesionId) {
+        mostrar('seccion-error');
+        document.getElementById('texto-error').textContent = 'No se encontró un código de sesión válido.';
+        return;
+      }
+
+      // Cargar datos de la sesión
+      const { data: sesion, error } = await supabase
+        .from('sesiones_presenciales')
+        .select('id, lugar, fecha_hora, activa, expositor, cursos(titulo), empresas(nombre, logo_url, color_primario)')
+        .eq('id', sesionId)
+        .single();
+
+      if (error || !sesion) {
+        mostrar('seccion-error');
+        document.getElementById('texto-error').textContent = 'El código QR no es válido o la sesión no existe.';
+        return;
+      }
+
+      if (!sesion.activa) {
+        mostrar('seccion-error');
+        document.getElementById('titulo-error').textContent = 'Sesión cerrada';
+        document.getElementById('texto-error').textContent = 'Esta sesión ya fue cerrada por el administrador.';
+        return;
+      }
+
+      sesionData = sesion;
+
+      // Aplicar branding
+      if (sesion.empresas?.color_primario) {
+        document.documentElement.style.setProperty('--navy', sesion.empresas.color_primario);
+        document.querySelector('.btn').style.background = sesion.empresas.color_primario;
+        document.querySelector('meta[name="theme-color"]').content = sesion.empresas.color_primario;
+      }
+      if (sesion.empresas?.logo_url) {
+        document.querySelector('.logo').src = sesion.empresas.logo_url;
+      }
+
+      const infoTexto = `
+        <div><strong>Curso:</strong> ${sesion.cursos?.titulo || ''}</div>
+        <div><strong>Lugar:</strong> ${sesion.lugar}</div>
+        <div><strong>Fecha:</strong> ${formatFecha(sesion.fecha_hora)}</div>
+        ${sesion.expositor ? `<div><strong>Expositor:</strong> ${sesion.expositor}</div>` : ''}`;
+
+      document.getElementById('info-sesion-texto').innerHTML  = infoTexto;
+      document.getElementById('info-sesion-exito').innerHTML  = infoTexto;
+
+      // Si ya está logueado, registrar directamente
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await registrar(user);
+        return;
+      }
+
+      mostrar('seccion-login');
+    }
+
+    async function registrar(user) {
+      // Verificar duplicado
+      const { data: existe } = await supabase
+        .from('asistencias_presenciales')
+        .select('id')
+        .eq('sesion_id', sesionId)
+        .eq('usuario_id', user.id)
+        .maybeSingle();
+
+      if (existe) {
+        const { data: perfil } = await supabase.from('profiles').select('nombres, apellidos').eq('id', user.id).single();
+        mostrar('seccion-exito');
+        document.getElementById('texto-exito').textContent =
+          `${perfil?.nombres || ''} ${perfil?.apellidos || ''}, tu asistencia ya estaba registrada.`;
+        return;
+      }
+
+      await supabase.from('asistencias_presenciales').insert({
+        sesion_id:  sesionId,
+        usuario_id: user.id,
+        empresa_id: sesionData?.empresas ? undefined : null,
+      });
+
+      const { data: perfil } = await supabase.from('profiles').select('nombres, apellidos').eq('id', user.id).single();
+      mostrar('seccion-exito');
+      document.getElementById('texto-exito').textContent =
+        `¡Hola ${perfil?.nombres || ''}! Tu asistencia ha sido registrada correctamente.`;
+    }
+
+    window.registrarAsistenciaQR = async function () {
+      const email    = document.getElementById('qr-email').value.trim();
+      const password = document.getElementById('qr-password').value;
+      const btn      = document.getElementById('btn-registrar');
+      const msg      = document.getElementById('msg-qr');
+
+      if (!email || !password) { msg.className = 'msg msg-error'; msg.textContent = 'Ingresa tu correo y contraseña.'; return; }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Registrando...';
+      msg.textContent = '';
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        btn.disabled = false;
+        btn.textContent = '✅ Registrar asistencia';
+        msg.className = 'msg msg-error';
+        msg.textContent = 'Credenciales incorrectas. Verifica tu correo y contraseña.';
+        return;
+      }
+
+      await registrar(data.user);
+    };
+
+    init();
+  </script>
+</body>
+</html>

@@ -2900,3 +2900,248 @@ window.generarReporteSUNAFIL = async function () {
   XLSX.utils.book_append_sheet(wb, ws, `Capacitaciones ${anio}`);
   XLSX.writeFile(wb, `Reporte_SUNAFIL_${emp?.ruc || 'empresa'}_${anio}.xlsx`);
 };
+
+// ═══════════════════════════════════════════════
+// 📷 QR ASISTENCIA PRESENCIAL
+// ═══════════════════════════════════════════════
+
+let sesionQRActual = null;
+let intervalAsistentes = null;
+
+window.initQRAsistencia = async function () {
+  const { data: cursos } = await supabase.from('cursos').select('id, titulo').eq('activo', true).order('titulo');
+  ['qr-curso', 'qr-filtro-curso'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = id === 'qr-filtro-curso'
+      ? '<option value="">Todos los cursos</option>'
+      : '<option value="">-- Selecciona el curso --</option>';
+    (cursos || []).forEach(c => sel.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.titulo}</option>`));
+  });
+
+  // Fecha default = ahora
+  const ahora = new Date();
+  ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+  document.getElementById('qr-fecha').value = ahora.toISOString().slice(0, 16);
+
+  cargarSesionesAnteriores();
+};
+
+window.crearSesionQR = async function () {
+  const curso_id  = document.getElementById('qr-curso').value;
+  const lugar     = document.getElementById('qr-lugar').value.trim();
+  const fecha     = document.getElementById('qr-fecha').value;
+  const expositor = document.getElementById('qr-expositor').value.trim();
+  const duracion  = parseFloat(document.getElementById('qr-duracion').value) || null;
+
+  if (!curso_id || !lugar || !fecha) {
+    alert('Completa: curso, lugar y fecha.');
+    return;
+  }
+
+  const { data: sesion, error } = await supabase.from('sesiones_presenciales').insert({
+    empresa_id: empresaAdminId,
+    curso_id, lugar, fecha_hora: new Date(fecha).toISOString(),
+    expositor: expositor || null,
+    duracion_hr: duracion,
+    activa: true,
+  }).select().single();
+
+  if (error) { alert('❌ ' + error.message); return; }
+
+  sesionQRActual = sesion;
+  mostrarQR(sesion);
+  iniciarPollingAsistentes(sesion.id);
+};
+
+function mostrarQR(sesion) {
+  const url = `${window.location.origin}/qr-asistencia.html?sesion=${sesion.id}`;
+  const canvas = document.getElementById('qr-canvas');
+
+  window.QRCode.toCanvas(canvas, url, {
+    width: 280, margin: 2,
+    color: { dark: '#002855', light: '#ffffff' }
+  });
+
+  const fecha = new Date(sesion.fecha_hora).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+  document.getElementById('qr-info-sesion').textContent =
+    `${sesion.lugar} · ${fecha}${sesion.expositor ? ' · ' + sesion.expositor : ''}`;
+
+  document.getElementById('panel-qr-generado').style.display = 'block';
+  document.getElementById('panel-asistentes-qr').style.display = 'block';
+  window.scrollTo({ top: document.getElementById('panel-qr-generado').offsetTop - 20, behavior: 'smooth' });
+}
+
+function iniciarPollingAsistentes(sesionId) {
+  if (intervalAsistentes) clearInterval(intervalAsistentes);
+  refrescarAsistentes();
+  intervalAsistentes = setInterval(refrescarAsistentes, 8000);
+}
+
+window.refrescarAsistentes = async function () {
+  if (!sesionQRActual) return;
+  const { data } = await supabase
+    .from('asistencias_presenciales')
+    .select('id, created_at, profiles(nombres, apellidos, documento_numero, cargo)')
+    .eq('sesion_id', sesionQRActual.id)
+    .order('created_at');
+
+  const cont  = document.getElementById('lista-asistentes-qr');
+  const count = document.getElementById('qr-count');
+  count.textContent = `(${data?.length || 0})`;
+
+  if (!data?.length) {
+    cont.innerHTML = '<p style="color:#888; font-size:0.88rem;">Aún no hay asistentes. El QR está activo.</p>';
+    return;
+  }
+
+  cont.innerHTML = `
+    <table style="border-collapse:collapse;width:100%;font-size:0.85rem;">
+      <thead><tr style="background:#002855;color:white;">
+        <th style="padding:8px 10px;">#</th>
+        <th style="padding:8px 10px;text-align:left;">Nombre</th>
+        <th style="padding:8px 10px;">Documento</th>
+        <th style="padding:8px 10px;">Cargo</th>
+        <th style="padding:8px 10px;">Hora</th>
+      </tr></thead>
+      <tbody>
+        ${data.map((a, i) => `
+          <tr style="border-bottom:1px solid #eee;">
+            <td style="padding:7px 10px;text-align:center;color:#888;">${i + 1}</td>
+            <td style="padding:7px 10px;font-weight:500;">${a.profiles?.apellidos || ''}, ${a.profiles?.nombres || ''}</td>
+            <td style="padding:7px 10px;text-align:center;">${a.profiles?.documento_numero || ''}</td>
+            <td style="padding:7px 10px;">${a.profiles?.cargo || ''}</td>
+            <td style="padding:7px 10px;text-align:center;font-size:0.8rem;color:#555;">
+              ${new Date(a.created_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  window._asistentesQR = data;
+};
+
+window.cerrarSesionQR = async function () {
+  if (!sesionQRActual) return;
+  if (!confirm('¿Cerrar esta sesión? El QR dejará de funcionar.')) return;
+  await supabase.from('sesiones_presenciales').update({ activa: false }).eq('id', sesionQRActual.id);
+  if (intervalAsistentes) { clearInterval(intervalAsistentes); intervalAsistentes = null; }
+  sesionQRActual = null;
+  document.getElementById('panel-qr-generado').style.display = 'none';
+  document.getElementById('panel-asistentes-qr').style.display = 'none';
+  cargarSesionesAnteriores();
+  alert('✅ Sesión cerrada.');
+};
+
+window.imprimirQR = function () {
+  const canvas = document.getElementById('qr-canvas');
+  const info   = document.getElementById('qr-info-sesion').textContent;
+  const win    = window.open('', '_blank');
+  win.document.write(`
+    <html><body style="text-align:center;font-family:Arial;padding:40px;">
+      <h2 style="color:#002855;">Registro de Asistencia</h2>
+      <p style="font-size:1rem;color:#555;margin-bottom:20px;">${info}</p>
+      <img src="${canvas.toDataURL()}" style="width:280px;height:280px;" />
+      <p style="margin-top:20px;font-size:0.9rem;color:#888;">Escanea con tu celular para registrar tu asistencia</p>
+      <script>window.onload=()=>{window.print();}<\/script>
+    </body></html>`);
+  win.document.close();
+};
+
+window.descargarQR = function () {
+  const canvas = document.getElementById('qr-canvas');
+  const a = document.createElement('a');
+  a.download = `QR_Asistencia_${sesionQRActual?.lugar || 'sesion'}.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+};
+
+window.exportarAsistentesQR = function () {
+  const data = window._asistentesQR;
+  if (!data?.length) { alert('No hay asistentes para exportar.'); return; }
+  const XLSX = window.XLSX;
+  const header = ['#', 'Apellidos', 'Nombres', 'Documento', 'Cargo', 'Hora de registro'];
+  const rows = data.map((a, i) => [
+    i + 1,
+    a.profiles?.apellidos || '',
+    a.profiles?.nombres   || '',
+    a.profiles?.documento_numero || '',
+    a.profiles?.cargo     || '',
+    new Date(a.created_at).toLocaleString('es-PE'),
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = [5,20,20,14,20,18].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Asistentes');
+  XLSX.writeFile(wb, `Asistentes_${sesionQRActual?.lugar || 'sesion'}.xlsx`);
+};
+
+window.cargarSesionesAnteriores = async function () {
+  const cursoId = document.getElementById('qr-filtro-curso')?.value;
+  let query = supabase
+    .from('sesiones_presenciales')
+    .select('id, lugar, fecha_hora, activa, expositor, duracion_hr, cursos(titulo)')
+    .eq('empresa_id', empresaAdminId)
+    .order('fecha_hora', { ascending: false })
+    .limit(20);
+  if (cursoId) query = query.eq('curso_id', cursoId);
+
+  const { data } = await query;
+  const cont = document.getElementById('lista-sesiones-anteriores');
+  if (!data?.length) { cont.innerHTML = '<p style="color:#888;">No hay sesiones registradas.</p>'; return; }
+
+  cont.innerHTML = `
+    <table style="border-collapse:collapse;width:100%;font-size:0.85rem;">
+      <thead><tr style="background:#002855;color:white;">
+        <th style="padding:8px 10px;text-align:left;">Curso</th>
+        <th style="padding:8px 10px;text-align:left;">Lugar</th>
+        <th style="padding:8px 10px;">Fecha</th>
+        <th style="padding:8px 10px;">Estado</th>
+        <th style="padding:8px 10px;">Acción</th>
+      </tr></thead>
+      <tbody>
+        ${data.map(s => `
+          <tr style="border-bottom:1px solid #eee;">
+            <td style="padding:7px 10px;font-weight:500;">${s.cursos?.titulo || ''}</td>
+            <td style="padding:7px 10px;">${s.lugar}</td>
+            <td style="padding:7px 10px;text-align:center;font-size:0.82rem;">
+              ${new Date(s.fecha_hora).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}
+            </td>
+            <td style="padding:7px 10px;text-align:center;">
+              <span style="background:${s.activa ? '#d1fae5' : '#f1f5f9'};color:${s.activa ? '#065f46' : '#475569'};padding:2px 8px;border-radius:10px;font-size:0.78rem;font-weight:600;">
+                ${s.activa ? 'Activa' : 'Cerrada'}
+              </span>
+            </td>
+            <td style="padding:7px 10px;text-align:center;">
+              <button onclick="verAsistentesSesion('${s.id}')" style="background:#002855;color:white;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.8rem;">Ver</button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+};
+
+window.verAsistentesSesion = async function (sesionId) {
+  const { data } = await supabase
+    .from('asistencias_presenciales')
+    .select('created_at, profiles(nombres, apellidos, documento_numero, cargo)')
+    .eq('sesion_id', sesionId)
+    .order('created_at');
+
+  if (!data?.length) { alert('Sin asistentes registrados.'); return; }
+
+  const XLSX = window.XLSX;
+  const header = ['#', 'Apellidos', 'Nombres', 'Documento', 'Cargo', 'Hora'];
+  const rows = data.map((a, i) => [
+    i + 1,
+    a.profiles?.apellidos || '',
+    a.profiles?.nombres   || '',
+    a.profiles?.documento_numero || '',
+    a.profiles?.cargo     || '',
+    new Date(a.created_at).toLocaleString('es-PE'),
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = [5,20,20,14,20,18].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Asistentes');
+  XLSX.writeFile(wb, `Asistentes_sesion.xlsx`);
+};

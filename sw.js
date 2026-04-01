@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cvglobal-sst-v3';
+const CACHE_NAME = 'cvglobal-sst-v4';
 
 // Solo assets estáticos — NUNCA cachear páginas HTML de admin
 const STATIC_ASSETS = [
@@ -68,6 +68,9 @@ self.addEventListener('fetch', event => {
 
 // Estrategia: Cache first → si no hay, busca en red y guarda en cache
 async function cacheFirst(request) {
+  // Solo cachear GET
+  if (request.method !== 'GET') return fetch(request);
+
   const cached = await caches.match(request);
   if (cached) return cached;
 
@@ -79,7 +82,6 @@ async function cacheFirst(request) {
     }
     return response;
   } catch {
-    // Sin red y sin cache → mostrar página offline
     const offline = await caches.match('/offline.html');
     return offline || new Response('Sin conexión', { status: 503 });
   }

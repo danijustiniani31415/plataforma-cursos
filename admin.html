@@ -691,6 +691,7 @@
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
         <select id="sst-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
         <label style="font-size:0.88rem; color:#555;">Año del programa</label>
+        <a href="#" onclick="descargarPlantillaSST(event)" class="btn-primary" style="text-decoration:none;">⬇️ Descargar plantilla</a>
       </div>
 
       <div style="margin-bottom:12px;">
@@ -741,6 +742,62 @@
         <button onclick="eliminarProgramaSST()" class="btn-secondary" style="background:#dc3545; color:white; border:none;">🗑️ Eliminar año</button>
       </div>
       <div id="lista-programa-sst"></div>
+    </div>
+
+    <!-- Seguimiento mensual -->
+    <div class="panel-card">
+      <h2>✏️ Seguimiento mensual</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
+        Registra el estado de ejecución de cada curso programado para el mes.
+      </p>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+        <select id="seg-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
+        <select id="seg-mes" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <button onclick="cargarSeguimientoMes()" class="btn-primary">Cargar cursos del mes</button>
+      </div>
+      <div id="tabla-seguimiento"></div>
+      <div id="btn-guardar-seguimiento" style="display:none; margin-top:14px;">
+        <button onclick="guardarSeguimiento()" class="btn-primary">💾 Guardar seguimiento</button>
+        <span id="progreso-seguimiento" style="margin-left:12px; font-size:0.88rem; color:#555;"></span>
+      </div>
+    </div>
+
+    <!-- Dashboard estadísticas -->
+    <div class="panel-card">
+      <h2>📊 Estadísticas SST</h2>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+        <select id="stats-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
+        <button onclick="cargarEstadisticasSST()" class="btn-primary">Ver estadísticas</button>
+      </div>
+
+      <!-- KPIs -->
+      <div id="sst-kpis" style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px;"></div>
+
+      <!-- Gráfico cumplimiento mensual -->
+      <div style="margin-bottom:24px;">
+        <h3 style="font-size:0.95rem; color:#002855; margin-bottom:10px;">Cumplimiento mensual (%)</h3>
+        <canvas id="chart-sst-mensual" height="100"></canvas>
+      </div>
+
+      <!-- Gráfico por tipo -->
+      <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+        <div style="flex:1; min-width:220px;">
+          <h3 style="font-size:0.95rem; color:#002855; margin-bottom:10px;">Por tipo de curso</h3>
+          <canvas id="chart-sst-tipo" height="200"></canvas>
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <h3 style="font-size:0.95rem; color:#002855; margin-bottom:10px;">Por encargado</h3>
+          <canvas id="chart-sst-encargado" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- Cursos pendientes mes actual -->
+      <div id="sst-pendientes"></div>
     </div>
   </div>
 

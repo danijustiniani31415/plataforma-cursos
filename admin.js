@@ -1810,6 +1810,7 @@ window.eliminarPreguntaEncuesta = async function (preguntaId, formularioId) {
   await supabase.from('opciones_pregunta').delete().eq('id_pregunta', preguntaId);
   await supabase.from('preguntas').delete().eq('id', preguntaId);
   cargarEncuestaGlobal();
+};
 
 // ═══════════════════════════════════════════════
 // 🦺 PROGRAMA ANUAL SST
@@ -1819,7 +1820,8 @@ let filasProgramaSST = [];
 
 window.initSelectorAnioSST = function initSelectorAnioSST() {
   const anioActual = new Date().getFullYear();
-  ['sst-anio', 'ver-sst-anio'].forEach(id => {
+  const mesCurrent = new Date().getMonth() + 1;
+  ['sst-anio', 'ver-sst-anio', 'seg-anio', 'stats-anio'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
     sel.innerHTML = '';
@@ -1831,6 +1833,8 @@ window.initSelectorAnioSST = function initSelectorAnioSST() {
       sel.appendChild(opt);
     }
   });
+  const selMes = document.getElementById('seg-mes');
+  if (selMes) selMes.value = mesCurrent;
 }
 
 window.previsualizarProgramaSST = function () {
@@ -2026,4 +2030,296 @@ window.eliminarProgramaSST = async function () {
   if (error) { alert('❌ ' + error.message); return; }
   document.getElementById('lista-programa-sst').innerHTML = '<p style="color:#888;">Programa eliminado.</p>';
 };
+
+// ─── PLANTILLA EXCEL SST ─────────────────────────────────────────────────────
+window.descargarPlantillaSST = function (e) {
+  e.preventDefault();
+  const XLSX = window.XLSX;
+  const cabecera = [
+    'Requisito', 'N°', 'Curso', 'Sede', 'Encargado Gest. Capacitación',
+    'Puesto', 'Tipo de Curso', 'Expositor', 'Frecuencia', 'Duración (HR)',
+    'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+  ];
+  const ejemplo = [
+    'ANEXO 6 DS 023-2017 EM', 1, 'Trabajos en altura', 'ANTAMINA', 'RRHH/SEMAS',
+    'PROYECTOS - Residente, Supervisores, Técnicos', 'Seguridad', 'Externo', 'Anual', 4,
+    '', '', 'P', '', '', '', 'P', '', '', '', '', ''
+  ];
+  const instrucciones = [
+    ['INSTRUCCIONES:'],
+    ['- En las columnas de meses (Ene-Dic) escribe P = Programado.'],
+    ['- Tipo de Curso: Seguridad / Salud / Medio ambiente'],
+    ['- No modifiques los encabezados de la fila 4.'],
+    [],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['PROGRAMA ANUAL DE CAPACITACIONES SST'],
+    ['Plantilla para carga en el sistema'],
+    [],
+    cabecera,
+    ejemplo,
+  ]);
+  // Ancho de columnas
+  ws['!cols'] = [18,5,35,12,20,30,14,10,10,10,...Array(12).fill(5)].map(w => ({ wch: w }));
+  // Hoja instrucciones
+  const wsInstr = XLSX.utils.aoa_to_sheet(instrucciones);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'ANTAMINA');
+  XLSX.utils.book_append_sheet(wb, wsInstr, 'Instrucciones');
+  XLSX.writeFile(wb, 'plantilla_programa_sst.xlsx');
+};
+
+// ─── SEGUIMIENTO MENSUAL ──────────────────────────────────────────────────────
+let datosSeguimiento = []; // {programa_id, curso, tipo_curso, encargado, seguimiento_id?, estado, n_programados, n_asistentes, observacion}
+
+const MESES_KEY = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MESES_NOM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+window.cargarSeguimientoMes = async function () {
+  const anio = parseInt(document.getElementById('seg-anio').value);
+  const mes  = parseInt(document.getElementById('seg-mes').value);
+  const mesKey = MESES_KEY[mes - 1];
+  const cont = document.getElementById('tabla-seguimiento');
+  cont.innerHTML = '<p style="color:#888;">Cargando...</p>';
+
+  // Cursos programados para ese mes
+  const { data: programados, error } = await supabase
+    .from('programa_capacitaciones')
+    .select('id, curso, tipo_curso, encargado, duracion_hr')
+    .eq('empresa_id', empresaAdminId)
+    .eq('anio', anio)
+    .eq('sede', 'ANTAMINA')
+    .eq(mesKey, true)
+    .order('tipo_curso');
+
+  if (error || !programados?.length) {
+    cont.innerHTML = '<p style="color:#888;">No hay cursos programados para este mes.</p>';
+    document.getElementById('btn-guardar-seguimiento').style.display = 'none';
+    return;
+  }
+
+  // Seguimientos ya guardados
+  const { data: seguimientos } = await supabase
+    .from('seguimiento_sst')
+    .select('*')
+    .eq('empresa_id', empresaAdminId)
+    .eq('anio', anio)
+    .eq('mes', mes);
+
+  const segMap = {};
+  (seguimientos || []).forEach(s => { segMap[s.programa_id] = s; });
+
+  datosSeguimiento = programados.map(p => ({
+    programa_id: p.id,
+    curso: p.curso,
+    tipo_curso: p.tipo_curso,
+    encargado: p.encargado,
+    duracion_hr: p.duracion_hr,
+    seguimiento_id: segMap[p.id]?.id || null,
+    estado: segMap[p.id]?.estado || 'Programado',
+    n_programados: segMap[p.id]?.n_programados || '',
+    n_asistentes: segMap[p.id]?.n_asistentes || '',
+    observacion: segMap[p.id]?.observacion || '',
+  }));
+
+  const colorEstado = { 'Ejecutado': '#198754', 'Reprogramado': '#fd7e14', 'Cancelado': '#dc3545', 'Programado': '#6c757d' };
+
+  const filas = datosSeguimiento.map((d, i) => `
+    <tr style="border-bottom:1px solid #eee;">
+      <td style="padding:7px 8px;font-weight:500;font-size:0.82rem;">${d.curso}</td>
+      <td style="padding:7px 8px;font-size:0.82rem;">${d.tipo_curso || ''}</td>
+      <td style="padding:7px 8px;font-size:0.82rem;">${d.encargado || ''}</td>
+      <td style="padding:7px 8px;">
+        <select data-i="${i}" data-campo="estado" onchange="actualizarCampoSeg(this)"
+          style="padding:5px 8px;border:1px solid #ddd;border-radius:5px;font-size:0.82rem;color:${colorEstado[d.estado]};">
+          <option ${d.estado==='Programado'?'selected':''}>Programado</option>
+          <option ${d.estado==='Ejecutado'?'selected':''}>Ejecutado</option>
+          <option ${d.estado==='Reprogramado'?'selected':''}>Reprogramado</option>
+          <option ${d.estado==='Cancelado'?'selected':''}>Cancelado</option>
+        </select>
+      </td>
+      <td style="padding:7px 8px;">
+        <input type="number" data-i="${i}" data-campo="n_programados" onchange="actualizarCampoSeg(this)"
+          value="${d.n_programados}" min="0" placeholder="Prog."
+          style="width:60px;padding:5px;border:1px solid #ddd;border-radius:5px;font-size:0.82rem;" />
+      </td>
+      <td style="padding:7px 8px;">
+        <input type="number" data-i="${i}" data-campo="n_asistentes" onchange="actualizarCampoSeg(this)"
+          value="${d.n_asistentes}" min="0" placeholder="Asist."
+          style="width:60px;padding:5px;border:1px solid #ddd;border-radius:5px;font-size:0.82rem;" />
+      </td>
+      <td style="padding:7px 8px;">
+        <input type="text" data-i="${i}" data-campo="observacion" onchange="actualizarCampoSeg(this)"
+          value="${d.observacion}" placeholder="Observación"
+          style="width:130px;padding:5px;border:1px solid #ddd;border-radius:5px;font-size:0.82rem;" />
+      </td>
+    </tr>`).join('');
+
+  cont.innerHTML = `
+    <div style="overflow-x:auto;">
+      <table style="border-collapse:collapse;width:100%;font-size:0.82rem;min-width:750px;">
+        <thead><tr style="background:#002855;color:white;">
+          <th style="padding:8px 10px;text-align:left;">Curso</th>
+          <th style="padding:8px 10px;">Tipo</th>
+          <th style="padding:8px 10px;">Encargado</th>
+          <th style="padding:8px 10px;">Estado</th>
+          <th style="padding:8px 10px;">Prog.</th>
+          <th style="padding:8px 10px;">Asist.</th>
+          <th style="padding:8px 10px;">Observación</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>`;
+  document.getElementById('btn-guardar-seguimiento').style.display = 'block';
+  document.getElementById('progreso-seguimiento').textContent = '';
+};
+
+window.actualizarCampoSeg = function (el) {
+  const i = parseInt(el.dataset.i);
+  const campo = el.dataset.campo;
+  datosSeguimiento[i][campo] = el.value;
+};
+
+window.guardarSeguimiento = async function () {
+  const anio = parseInt(document.getElementById('seg-anio').value);
+  const mes  = parseInt(document.getElementById('seg-mes').value);
+  const prog = document.getElementById('progreso-seguimiento');
+  prog.textContent = 'Guardando...';
+
+  const registros = datosSeguimiento.map(d => ({
+    empresa_id: empresaAdminId,
+    programa_id: d.programa_id,
+    anio, mes, sede: 'ANTAMINA',
+    estado: d.estado,
+    n_programados: d.n_programados !== '' ? parseInt(d.n_programados) : null,
+    n_asistentes:  d.n_asistentes  !== '' ? parseInt(d.n_asistentes)  : null,
+    observacion: d.observacion || null,
+  }));
+
+  const { error } = await supabase.from('seguimiento_sst')
+    .upsert(registros, { onConflict: 'empresa_id,programa_id,anio,mes' });
+
+  prog.textContent = error ? '❌ ' + error.message : `✅ ${registros.length} cursos guardados.`;
+};
+
+// ─── ESTADÍSTICAS SST ─────────────────────────────────────────────────────────
+let chartMensual = null, chartTipo = null, chartEncargado = null;
+
+window.cargarEstadisticasSST = async function () {
+  const anio = parseInt(document.getElementById('stats-anio').value);
+
+  const [{ data: programa }, { data: seguimientos }] = await Promise.all([
+    supabase.from('programa_capacitaciones').select('id,tipo_curso,encargado,ene,feb,mar,abr,may,jun,jul,ago,sep,oct,nov,dic')
+      .eq('empresa_id', empresaAdminId).eq('anio', anio).eq('sede', 'ANTAMINA'),
+    supabase.from('seguimiento_sst').select('*')
+      .eq('empresa_id', empresaAdminId).eq('anio', anio),
+  ]);
+
+  if (!programa?.length) {
+    document.getElementById('sst-kpis').innerHTML = '<p style="color:#888;">No hay programa cargado para este año.</p>';
+    return;
+  }
+
+  const segMap = {};
+  (seguimientos || []).forEach(s => {
+    if (!segMap[s.programa_id]) segMap[s.programa_id] = {};
+    segMap[s.programa_id][s.mes] = s;
+  });
+
+  // Calcular cumplimiento por mes
+  const mesData = MESES_KEY.map((key, idx) => {
+    const programadosMes = programa.filter(p => p[key]);
+    const ejecutadosMes  = programadosMes.filter(p => segMap[p.id]?.[idx+1]?.estado === 'Ejecutado');
+    return { programados: programadosMes.length, ejecutados: ejecutadosMes.length };
+  });
+
+  const totalProg = mesData.reduce((s, m) => s + m.programados, 0);
+  const totalEjec = mesData.reduce((s, m) => s + m.ejecutados, 0);
+  const pctAnual  = totalProg > 0 ? Math.round(totalEjec / totalProg * 100) : 0;
+
+  // Mes actual
+  const mesActual = new Date().getMonth(); // 0-based
+  const pctMesActual = mesData[mesActual].programados > 0
+    ? Math.round(mesData[mesActual].ejecutados / mesData[mesActual].programados * 100) : 0;
+
+  // KPIs
+  const kpiColor = pct => pct >= 80 ? '#198754' : pct >= 50 ? '#fd7e14' : '#dc3545';
+  document.getElementById('sst-kpis').innerHTML = [
+    ['Cumplimiento Anual', `${pctAnual}%`, kpiColor(pctAnual)],
+    [`Cumplimiento ${MESES_NOM[mesActual]}`, `${pctMesActual}%`, kpiColor(pctMesActual)],
+    ['Cursos programados (año)', totalProg, '#002855'],
+    ['Cursos ejecutados (año)', totalEjec, '#002855'],
+    ['Pendientes', totalProg - totalEjec, '#6c757d'],
+  ].map(([label, val, color]) => `
+    <div style="background:#f8f9fa;border-radius:10px;padding:14px 20px;min-width:140px;text-align:center;border-top:4px solid ${color};">
+      <div style="font-size:1.6rem;font-weight:700;color:${color};">${val}</div>
+      <div style="font-size:0.78rem;color:#555;margin-top:4px;">${label}</div>
+    </div>`).join('');
+
+  // Gráfico mensual
+  const ctxM = document.getElementById('chart-sst-mensual').getContext('2d');
+  if (chartMensual) chartMensual.destroy();
+  chartMensual = new Chart(ctxM, {
+    type: 'bar',
+    data: {
+      labels: MESES_NOM.map(m => m.substring(0,3)),
+      datasets: [
+        { label: 'Programados', data: mesData.map(m => m.programados), backgroundColor: '#002855aa' },
+        { label: 'Ejecutados',  data: mesData.map(m => m.ejecutados),  backgroundColor: '#198754aa' },
+      ]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  // Agrupación por tipo
+  const tipos = ['Seguridad', 'Salud', 'Medio ambiente'];
+  const tipoData = tipos.map(t => {
+    const cursosTipo = programa.filter(p => p.tipo_curso === t);
+    const progTipo = cursosTipo.reduce((s, p) => s + MESES_KEY.filter(k => p[k]).length, 0);
+    const ejecTipo = cursosTipo.reduce((s, p) => {
+      return s + MESES_KEY.filter((k, idx) => p[k] && segMap[p.id]?.[idx+1]?.estado === 'Ejecutado').length;
+    }, 0);
+    return { prog: progTipo, ejec: ejecTipo };
+  });
+
+  const ctxT = document.getElementById('chart-sst-tipo').getContext('2d');
+  if (chartTipo) chartTipo.destroy();
+  chartTipo = new Chart(ctxT, {
+    type: 'doughnut',
+    data: {
+      labels: tipos,
+      datasets: [{ data: tipoData.map(t => t.prog), backgroundColor: ['#002855','#198754','#0d6efd'] }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  });
+
+  // Agrupación por encargado
+  const encargados = [...new Set(programa.map(p => p.encargado).filter(Boolean))];
+  const encData = encargados.map(enc => {
+    const cursosEnc = programa.filter(p => p.encargado === enc);
+    return cursosEnc.reduce((s, p) => s + MESES_KEY.filter(k => p[k]).length, 0);
+  });
+
+  const ctxE = document.getElementById('chart-sst-encargado').getContext('2d');
+  if (chartEncargado) chartEncargado.destroy();
+  chartEncargado = new Chart(ctxE, {
+    type: 'doughnut',
+    data: {
+      labels: encargados,
+      datasets: [{ data: encData, backgroundColor: ['#002855','#198754','#0d6efd','#fd7e14','#6f42c1'] }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  });
+
+  // Cursos pendientes mes actual
+  const pendientes = programa.filter(p => {
+    const key = MESES_KEY[mesActual];
+    return p[key] && segMap[p.id]?.[mesActual+1]?.estado !== 'Ejecutado';
+  });
+  document.getElementById('sst-pendientes').innerHTML = pendientes.length === 0
+    ? `<p style="color:#198754;font-weight:600;">✅ Todos los cursos de ${MESES_NOM[mesActual]} están ejecutados.</p>`
+    : `<h3 style="font-size:0.95rem;color:#dc3545;margin-bottom:8px;">⚠️ Pendientes en ${MESES_NOM[mesActual]} (${pendientes.length})</h3>
+       <ul style="margin:0;padding-left:18px;font-size:0.85rem;color:#555;">
+         ${pendientes.map(p => `<li>${p.tipo_curso ? `<strong>[${p.tipo_curso}]</strong> ` : ''}${programa.find(x=>x.id===p.id)?.curso || ''}</li>`).join('')}
+       </ul>`;
 };

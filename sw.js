@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cvglobal-sst-v1';
+const CACHE_NAME = 'cvglobal-sst-v2';
 
 // Recursos estáticos que se cachean inmediatamente al instalar
 const STATIC_ASSETS = [

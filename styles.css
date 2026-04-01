@@ -1150,3 +1150,229 @@ a:hover { text-decoration: underline; }
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+
+/* ═══════════════════════════════════════════
+   TARJETAS DE CURSOS — UI MÓVIL MEJORADA
+═══════════════════════════════════════════ */
+.cursos-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+@media (min-width: 640px) {
+  .cursos-grid { display: grid; grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 900px) {
+  .cursos-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.curso-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  text-align: left;
+  width: 100%;
+  min-height: 72px;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: var(--shadow-sm);
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.curso-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(to bottom, var(--navy), var(--gold));
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.curso-card:hover, .curso-card:active {
+  border-color: var(--navy);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.curso-card:hover::before { opacity: 1; }
+.curso-card:active { transform: translateY(0); }
+
+.curso-card-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+  width: 40px;
+  text-align: center;
+}
+
+.curso-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.curso-card-titulo {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--navy);
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.curso-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.curso-card-arrow {
+  font-size: 1.4rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform var(--transition);
+}
+.curso-card:hover .curso-card-arrow { transform: translateX(3px); color: var(--navy); }
+
+/* Estados de curso */
+.curso-estado {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.estado-completado  { background: #d1fae5; color: #065f46; }
+.estado-pendiente   { background: #f1f5f9; color: #475569; }
+.estado-vencido     { background: #fee2e2; color: #991b1b; }
+.estado-por-vencer  { background: #fef3c7; color: #92400e; }
+
+/* ═══════════════════════════════════════════
+   NAVEGACIÓN DE PASOS — STICKY MÓVIL
+═══════════════════════════════════════════ */
+.nav-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0,40,85,0.08);
+  padding: 10px 16px 12px;
+}
+
+.nav-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-nav {
+  min-height: 44px;
+  min-width: 80px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition);
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+
+.btn-nav-prev {
+  background: var(--surface-2);
+  color: var(--navy);
+}
+.btn-nav-prev:hover { background: var(--border); }
+
+.btn-nav-next {
+  background: var(--navy);
+  color: white;
+}
+.btn-nav-next:hover { background: var(--navy-dark); }
+.btn-nav-next:disabled {
+  background: var(--border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.nav-step-info {
+  text-align: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.nav-step-title {
+  font-weight: 600;
+  color: var(--navy);
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 5px;
+}
+
+/* Puntos indicadores de pasos */
+.pasos-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.paso-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: all 0.3s ease;
+}
+.paso-dot-done    { background: var(--success); }
+.paso-dot-current { background: var(--navy); transform: scale(1.4); }
+
+/* ═══════════════════════════════════════════
+   SAFE AREA — iPhone notch/home bar
+═══════════════════════════════════════════ */
+.app-header {
+  padding-top: env(safe-area-inset-top);
+}
+
+body {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ═══════════════════════════════════════════
+   MOBILE — mejoras táctiles generales
+═══════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .container { padding: 14px; border-radius: var(--radius-md); }
+  h2 { font-size: 1.15rem; }
+
+  .curso-card { padding: 12px 14px; gap: 12px; }
+  .curso-card-titulo { font-size: 0.88rem; }
+  .curso-card-icon { font-size: 1.4rem; width: 34px; }
+
+  .btn-nav { min-width: 72px; font-size: 0.82rem; padding: 10px 10px; }
+  .nav-step-title { font-size: 0.82rem; }
+
+  .btn-primary, .btn-success {
+    padding: 15px 16px;
+    font-size: 1rem;
+    min-height: 52px;
+  }
+
+  .step-content-inner { padding: 16px; }
+}

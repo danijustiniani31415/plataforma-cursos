@@ -150,14 +150,78 @@ async function cargarCursos() {
 
   if (error) { alert("❌ Error al cargar cursos: " + error.message); return; }
 
+  // Cargar perfil del trabajador para mostrar bienvenida
+  const { data: perfil } = await supabase
+    .from('profiles')
+    .select('nombres, apellidos, empresa_id, empresas(nombre)')
+    .eq('id', usuarioActual.id)
+    .single();
+
+  // Actualizar header con nombre del trabajador
+  const headerSubtitle = document.querySelector('.header-subtitle');
+  if (headerSubtitle && perfil?.nombres) {
+    headerSubtitle.textContent = `${perfil.nombres} ${perfil.apellidos || ''} · ${perfil.empresas?.nombre || ''}`;
+  }
+
+  // Cargar estados: aprobaciones y asistencias
+  const { data: envios } = await supabase
+    .from('envios_formulario')
+    .select('id_curso, aprobado, created_at, formularios(tipo)')
+    .eq('usuario_email', usuarioActual.email)
+    .eq('estado', 'completado');
+
+  // Por curso: saber si aprobó examen y cuándo
+  const estadoCurso = {};
+  (envios || []).forEach(e => {
+    if (e.formularios?.tipo === 'examen' && e.aprobado) {
+      if (!estadoCurso[e.id_curso] || new Date(e.created_at) > new Date(estadoCurso[e.id_curso].fecha)) {
+        estadoCurso[e.id_curso] = { aprobado: true, fecha: e.created_at };
+      }
+    }
+  });
+
+  const now   = new Date();
+  const in30  = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
   const listaCursos = document.getElementById('lista-cursos');
   listaCursos.innerHTML = '';
 
+  // Contador para el título
+  const completados = cursos.filter(c => estadoCurso[c.id]?.aprobado).length;
+  const secDesc = document.querySelector('#cursos-disponibles .section-desc');
+  if (secDesc) secDesc.textContent = `${completados} de ${cursos.length} cursos completados`;
+
   cursos.forEach(curso => {
+    const est = estadoCurso[curso.id];
+    let estadoLabel = '', estadoClass = '', icono = '📚';
+
+    if (est?.aprobado) {
+      const emision = new Date(est.fecha);
+      const venc    = new Date(emision);
+      venc.setMonth(venc.getMonth() + (curso.vigencia_meses || 12));
+      if (venc < now) {
+        estadoLabel = 'Cert. vencido'; estadoClass = 'estado-vencido'; icono = '⚠️';
+      } else if (venc < in30) {
+        estadoLabel = 'Por vencer'; estadoClass = 'estado-por-vencer'; icono = '🔔';
+      } else {
+        estadoLabel = 'Completado'; estadoClass = 'estado-completado'; icono = '✅';
+      }
+    } else {
+      estadoLabel = 'Pendiente'; estadoClass = 'estado-pendiente'; icono = '📋';
+    }
+
     const btn = document.createElement('button');
+    btn.className = 'curso-card';
     btn.innerHTML = `
-      <div style="font-size:0.88rem; font-weight:600; color:var(--navy); margin-bottom:4px; line-height:1.3;">${curso.titulo}</div>
-      ${curso.duracion ? `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:400;">⏱ ${curso.duracion}h</div>` : ''}
+      <div class="curso-card-icon">${icono}</div>
+      <div class="curso-card-body">
+        <div class="curso-card-titulo">${curso.titulo}</div>
+        <div class="curso-card-meta">
+          ${curso.duracion ? `<span>⏱ ${curso.duracion}h</span>` : ''}
+          <span class="curso-estado ${estadoClass}">${estadoLabel}</span>
+        </div>
+      </div>
+      <div class="curso-card-arrow">›</div>
     `;
     btn.onclick = () => mostrarCurso(curso);
     listaCursos.appendChild(btn);
@@ -484,30 +548,39 @@ async function mostrarPasoActual() {
   const progreso = Math.round(((pasoActual + 1) / pasosCurso.length) * 100);
 
   // ── NAVEGACIÓN — solo arriba ───
+  // Indicadores de pasos
+  const pasosIndicadores = pasosCurso.map((p, i) => {
+    const done    = i < pasoActual;
+    const current = i === pasoActual;
+    return `<div class="paso-dot ${done ? 'paso-dot-done' : current ? 'paso-dot-current' : ''}"></div>`;
+  }).join('');
+
   const navHTML = `
-    <div style="margin-bottom:8px;">
+    <div class="nav-sticky">
       <div class="progress-bar-wrap">
         <div class="progress-bar-fill" style="width:${progreso}%"></div>
       </div>
-    </div>
-    <div class="nav-steps">
-      <button onclick="navegarAtras()" class="btn-nav btn-nav-prev">
-        ← ${pasoActual === 0 ? 'Cursos' : 'Anterior'}
-      </button>
-      <div class="nav-step-info">
-        <div class="nav-step-title">${tituloPaso}</div>
-        <div class="nav-step-counter">Paso ${pasoActual + 1} de ${pasosCurso.length}</div>
+      <div class="nav-steps">
+        <button onclick="navegarAtras()" class="btn-nav btn-nav-prev">
+          ‹ ${pasoActual === 0 ? 'Cursos' : 'Atrás'}
+        </button>
+        <div class="nav-step-info">
+          <div class="nav-step-title">${tituloPaso}</div>
+          <div class="pasos-dots">${pasosIndicadores}</div>
+        </div>
+        <button id="btn-siguiente-paso"
+          onclick="${pasoActual === pasosCurso.length - 1 ? 'volverACursos()' : 'siguientePaso()'}"
+          class="btn-nav btn-nav-next"
+          ${!siguienteHabilitado && pasoActual !== pasosCurso.length - 1 ? 'disabled' : ''}>
+          ${pasoActual === pasosCurso.length - 1 ? '✓ Fin' : 'Siguiente ›'}
+        </button>
       </div>
-      <button id="btn-siguiente-paso" onclick="${pasoActual === pasosCurso.length - 1 ? 'volverACursos()' : 'siguientePaso()'}" class="btn-nav btn-nav-next"
-        ${!siguienteHabilitado && pasoActual !== pasosCurso.length - 1 ? 'disabled' : ''}>
-        ${pasoActual === pasosCurso.length - 1 ? '✓ Fin' : 'Siguiente →'}
-      </button>
     </div>
   `;
 
   videoCurso.innerHTML = `
     <div class="step-content">
-      <div style="padding:16px 20px 0;">${navHTML}</div>
+      ${navHTML}
       <div class="step-content-inner">${contenidoHTML}</div>
     </div>
   `;

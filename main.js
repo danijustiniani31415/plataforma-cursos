@@ -150,17 +150,44 @@ async function cargarCursos() {
 
   if (error) { alert("❌ Error al cargar cursos: " + error.message); return; }
 
-  // Cargar perfil del trabajador para mostrar bienvenida
+  // Cargar perfil + branding de empresa
   const { data: perfil } = await supabase
     .from('profiles')
-    .select('nombres, apellidos, empresa_id, empresas(nombre)')
+    .select('nombres, apellidos, empresa_id, empresas(nombre, logo_url, color_primario, color_secundario)')
     .eq('id', usuarioActual.id)
     .single();
 
-  // Actualizar header con nombre del trabajador
+  // Aplicar branding de la empresa
+  const empresa = perfil?.empresas;
+  if (empresa) {
+    // Colores
+    const colorPrimario   = empresa.color_primario   || '#1e3a5f';
+    const colorSecundario = empresa.color_secundario || '#c9a84c';
+    document.documentElement.style.setProperty('--navy',      colorPrimario);
+    document.documentElement.style.setProperty('--navy-dark', colorPrimario);
+    document.documentElement.style.setProperty('--gold',      colorSecundario);
+    document.documentElement.style.setProperty('--gold-light',colorSecundario);
+    document.documentElement.style.setProperty('--border-focus', colorPrimario);
+
+    // Logo
+    if (empresa.logo_url) {
+      const logoEls = document.querySelectorAll('.header-logo, #splash-logo');
+      logoEls.forEach(el => { el.src = empresa.logo_url; });
+    }
+
+    // Título
+    const headerTitle = document.querySelector('.header-title');
+    if (headerTitle) headerTitle.textContent = empresa.nombre || 'CV Global S.A.C.';
+
+    // Meta theme-color
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.content = colorPrimario;
+  }
+
+  // Nombre del trabajador en el subtitle
   const headerSubtitle = document.querySelector('.header-subtitle');
   if (headerSubtitle && perfil?.nombres) {
-    headerSubtitle.textContent = `${perfil.nombres} ${perfil.apellidos || ''} · ${perfil.empresas?.nombre || ''}`;
+    headerSubtitle.textContent = `${perfil.nombres} ${perfil.apellidos || ''} · ${empresa?.nombre || ''}`;
   }
 
   // Cargar estados: aprobaciones y asistencias

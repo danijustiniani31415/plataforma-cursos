@@ -82,6 +82,49 @@
         </thead>
         <tbody></tbody>
       </table>
+
+      <!-- Branding por empresa -->
+      <h2 style="margin-top:32px;">🎨 Branding por empresa</h2>
+      <p style="color:#666; font-size:0.88rem; margin-bottom:14px;">
+        Personaliza el logo y colores que verán los trabajadores de cada empresa al ingresar.
+      </p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:700px; margin-bottom:14px;">
+        <select id="branding-empresa" style="padding:10px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; grid-column:1/-1;">
+          <option value="">-- Selecciona una empresa --</option>
+        </select>
+        <div>
+          <label style="display:block; font-size:0.82rem; color:#555; margin-bottom:4px;">URL del logo</label>
+          <input type="text" id="branding-logo" placeholder="https://... (PNG/JPG recomendado, fondo transparente)"
+            style="width:100%; padding:10px; border:1px solid #ddd; border-radius:7px; font-size:0.88rem;" />
+        </div>
+        <div>
+          <label style="display:block; font-size:0.82rem; color:#555; margin-bottom:4px;">Vista previa logo</label>
+          <div style="border:1px solid #ddd; border-radius:7px; padding:10px; background:#f8f9fa; height:50px; display:flex; align-items:center;">
+            <img id="branding-logo-preview" src="" alt="" style="max-height:36px; max-width:100%; display:none;" />
+            <span id="branding-logo-placeholder" style="font-size:0.8rem; color:#aaa;">Sin logo</span>
+          </div>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.82rem; color:#555; margin-bottom:4px;">Color primario</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="color" id="branding-color-primario" value="#1e3a5f"
+              style="width:48px; height:40px; border:1px solid #ddd; border-radius:7px; padding:2px; cursor:pointer;" />
+            <input type="text" id="branding-color-primario-hex" placeholder="#1e3a5f"
+              style="flex:1; padding:10px; border:1px solid #ddd; border-radius:7px; font-size:0.88rem;" />
+          </div>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.82rem; color:#555; margin-bottom:4px;">Color secundario / acento</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="color" id="branding-color-secundario" value="#c9a84c"
+              style="width:48px; height:40px; border:1px solid #ddd; border-radius:7px; padding:2px; cursor:pointer;" />
+            <input type="text" id="branding-color-secundario-hex" placeholder="#c9a84c"
+              style="flex:1; padding:10px; border:1px solid #ddd; border-radius:7px; font-size:0.88rem;" />
+          </div>
+        </div>
+      </div>
+      <button onclick="guardarBranding()" class="btn-primary">💾 Guardar branding</button>
+      <span id="msg-branding" style="margin-left:12px; font-size:0.88rem; color:#555;"></span>
     </div>
 
     <!-- TAB ADMINS -->

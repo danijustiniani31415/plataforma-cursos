@@ -24,6 +24,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   await cargarAdmins();
   await cargarTodosUsuarios();
   configurarRENIEC('admin-dni', 'admin-doc-tipo', 'admin-nombres', 'admin-apellidos');
+  initBranding();
 });
 
 // 🪪 RENIEC autocomplete
@@ -391,4 +392,77 @@ window.mostrarTab = function (tab) {
 window.cerrarSesion = async function () {
   await supabase.auth.signOut();
   window.location.href = 'index.html';
+};
+
+// ═══════════════════════════════
+// 🎨 BRANDING POR EMPRESA
+// ═══════════════════════════════
+async function initBranding() {
+  const { data: empresas } = await supabase.from('empresas').select('id, nombre').eq('activo', true).order('nombre');
+  const sel = document.getElementById('branding-empresa');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">-- Selecciona una empresa --</option>';
+  (empresas || []).forEach(e => sel.insertAdjacentHTML('beforeend', `<option value="${e.id}">${e.nombre}</option>`));
+
+  sel.addEventListener('change', async () => {
+    const id = sel.value;
+    if (!id) return;
+    const { data } = await supabase.from('empresas').select('logo_url, color_primario, color_secundario').eq('id', id).single();
+
+    const logo   = data?.logo_url       || '';
+    const color1 = data?.color_primario  || '#1e3a5f';
+    const color2 = data?.color_secundario|| '#c9a84c';
+
+    document.getElementById('branding-logo').value              = logo;
+    document.getElementById('branding-color-primario').value    = color1;
+    document.getElementById('branding-color-primario-hex').value= color1;
+    document.getElementById('branding-color-secundario').value  = color2;
+    document.getElementById('branding-color-secundario-hex').value = color2;
+    actualizarPreviewLogo(logo);
+  });
+
+  // Sincronizar color picker ↔ texto hex
+  ['primario', 'secundario'].forEach(tipo => {
+    const picker = document.getElementById(`branding-color-${tipo}`);
+    const hex    = document.getElementById(`branding-color-${tipo}-hex`);
+    picker.addEventListener('input', () => { hex.value = picker.value; });
+    hex.addEventListener('input',   () => { if (/^#[0-9a-fA-F]{6}$/.test(hex.value)) picker.value = hex.value; });
+  });
+
+  document.getElementById('branding-logo').addEventListener('input', e => actualizarPreviewLogo(e.target.value));
+}
+
+function actualizarPreviewLogo(url) {
+  const img  = document.getElementById('branding-logo-preview');
+  const placeholder = document.getElementById('branding-logo-placeholder');
+  if (url) {
+    img.src     = url;
+    img.style.display = 'block';
+    placeholder.style.display = 'none';
+    img.onerror = () => { img.style.display = 'none'; placeholder.style.display = 'block'; };
+  } else {
+    img.style.display = 'none';
+    placeholder.style.display = 'block';
+  }
+}
+
+window.guardarBranding = async function () {
+  const id      = document.getElementById('branding-empresa').value;
+  const logo    = document.getElementById('branding-logo').value.trim();
+  const color1  = document.getElementById('branding-color-primario-hex').value.trim() ||
+                  document.getElementById('branding-color-primario').value;
+  const color2  = document.getElementById('branding-color-secundario-hex').value.trim() ||
+                  document.getElementById('branding-color-secundario').value;
+  const msg     = document.getElementById('msg-branding');
+
+  if (!id) { alert('Selecciona una empresa.'); return; }
+
+  const { error } = await supabase.from('empresas').update({
+    logo_url:          logo    || null,
+    color_primario:    color1  || null,
+    color_secundario:  color2  || null,
+  }).eq('id', id);
+
+  msg.textContent = error ? '❌ ' + error.message : '✅ Branding guardado correctamente.';
+  msg.style.color = error ? '#dc3545' : '#198754';
 };

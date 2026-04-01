@@ -1810,4 +1810,220 @@ window.eliminarPreguntaEncuesta = async function (preguntaId, formularioId) {
   await supabase.from('opciones_pregunta').delete().eq('id_pregunta', preguntaId);
   await supabase.from('preguntas').delete().eq('id', preguntaId);
   cargarEncuestaGlobal();
+
+// ═══════════════════════════════════════════════
+// 🦺 PROGRAMA ANUAL SST
+// ═══════════════════════════════════════════════
+
+let filasProgramaSST = [];
+
+window.initSelectorAnioSST = function initSelectorAnioSST() {
+  const anioActual = new Date().getFullYear();
+  ['sst-anio', 'ver-sst-anio'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '';
+    for (let a = anioActual - 1; a <= anioActual + 2; a++) {
+      const opt = document.createElement('option');
+      opt.value = a;
+      opt.textContent = a;
+      if (a === anioActual) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  });
+}
+
+window.previsualizarProgramaSST = function () {
+  const archivo = document.getElementById('archivo-sst').files[0];
+  if (!archivo) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const XLSX = window.XLSX;
+    const wb = XLSX.read(e.target.result, { type: 'array' });
+    // Buscar hoja ANTAMINA o la primera hoja
+    const nombreHoja = wb.SheetNames.find(n => n.toUpperCase().includes('ANTAMINA')) || wb.SheetNames[0];
+    const ws = wb.Sheets[nombreHoja];
+    const filas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    // Buscar fila de encabezado (contiene "Curso" y "Ene" o "Enero")
+    let idxHeader = -1;
+    for (let i = 0; i < filas.length; i++) {
+      const fila = filas[i].map(c => String(c).trim().toLowerCase());
+      if (fila.some(c => c === 'curso') && fila.some(c => c.startsWith('ene'))) {
+        idxHeader = i;
+        break;
+      }
+    }
+    if (idxHeader === -1) {
+      alert('❌ No se encontró la fila de encabezados. Asegúrate de que el Excel tenga las columnas: Curso, Ene, Feb...');
+      return;
+    }
+
+    const headers = filas[idxHeader].map(c => String(c).trim().toLowerCase());
+    const col = name => headers.indexOf(name);
+
+    // Mapear columnas
+    const iRequisito = headers.findIndex(h => h.includes('requisito'));
+    const iNum       = headers.findIndex(h => h === 'n°' || h === 'n' || h === 'nro' || h === '#');
+    const iCurso     = col('curso');
+    const iEncargado = headers.findIndex(h => h.includes('encargado'));
+    const iPuesto    = headers.findIndex(h => h.includes('puesto'));
+    const iTipo      = headers.findIndex(h => h.includes('tipo'));
+    const iExpositor = headers.findIndex(h => h.includes('expositor'));
+    const iFrecuencia= headers.findIndex(h => h.includes('frecuencia'));
+    const iDuracion  = headers.findIndex(h => h.includes('duración') || h.includes('duracion') || h.includes('hr'));
+    const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const iMeses = meses.map(m => headers.findIndex(h => h.startsWith(m)));
+
+    filasProgramaSST = [];
+    for (let i = idxHeader + 1; i < filas.length; i++) {
+      const f = filas[i];
+      const curso = String(f[iCurso] || '').trim();
+      if (!curso) continue;
+      const mesesProg = meses.map((_m, idx) => {
+        const v = String(f[iMeses[idx]] || '').trim().toUpperCase();
+        return v === 'P' || v === 'R' || v === 'E';
+      });
+      filasProgramaSST.push({
+        requisito:  iRequisito >= 0 ? String(f[iRequisito] || '').trim() : '',
+        numero:     iNum >= 0 ? (parseInt(f[iNum]) || null) : null,
+        curso,
+        encargado:  iEncargado >= 0 ? String(f[iEncargado] || '').trim() : '',
+        puesto:     iPuesto >= 0 ? String(f[iPuesto] || '').trim() : '',
+        tipo_curso: iTipo >= 0 ? String(f[iTipo] || '').trim() : '',
+        expositor:  iExpositor >= 0 ? String(f[iExpositor] || '').trim() : '',
+        frecuencia: iFrecuencia >= 0 ? String(f[iFrecuencia] || '').trim() : '',
+        duracion_hr:iDuracion >= 0 ? (parseFloat(f[iDuracion]) || null) : null,
+        ene: mesesProg[0], feb: mesesProg[1], mar: mesesProg[2], abr: mesesProg[3],
+        may: mesesProg[4], jun: mesesProg[5], jul: mesesProg[6], ago: mesesProg[7],
+        sep: mesesProg[8], oct: mesesProg[9], nov: mesesProg[10], dic: mesesProg[11],
+      });
+    }
+
+    // Preview
+    const tbody = document.getElementById('tbody-sst');
+    tbody.innerHTML = '';
+    filasProgramaSST.forEach(f => {
+      const mesesCeldas = [f.ene,f.feb,f.mar,f.abr,f.may,f.jun,f.jul,f.ago,f.sep,f.oct,f.nov,f.dic]
+        .map(v => `<td style="text-align:center;padding:6px 8px;">${v ? '✔' : ''}</td>`).join('');
+      tbody.insertAdjacentHTML('beforeend', `
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:6px 8px;">${f.requisito}</td>
+          <td style="padding:6px 8px;">${f.numero ?? ''}</td>
+          <td style="padding:6px 8px;font-weight:500;">${f.curso}</td>
+          <td style="padding:6px 8px;">${f.tipo_curso}</td>
+          <td style="padding:6px 8px;">${f.encargado}</td>
+          <td style="padding:6px 8px;text-align:center;">${f.duracion_hr ?? ''}</td>
+          ${mesesCeldas}
+        </tr>`);
+    });
+
+    document.getElementById('preview-resumen-sst').textContent =
+      `${filasProgramaSST.length} cursos encontrados en hoja "${nombreHoja}". Revisa antes de guardar.`;
+    document.getElementById('preview-sst').style.display = 'block';
+  };
+  reader.readAsArrayBuffer(archivo);
+};
+
+window.importarProgramaSST = async function () {
+  if (!filasProgramaSST.length) return;
+  if (!empresaAdminId) { alert('❌ Sin empresa asignada.'); return; }
+
+  const anio = parseInt(document.getElementById('sst-anio').value);
+  const progreso = document.getElementById('progreso-sst');
+  progreso.textContent = 'Guardando...';
+
+  // Eliminar programa anterior del mismo año para esta empresa
+  await supabase.from('programa_capacitaciones')
+    .delete()
+    .eq('empresa_id', empresaAdminId)
+    .eq('anio', anio)
+    .eq('sede', 'ANTAMINA');
+
+  const registros = filasProgramaSST.map(f => ({
+    ...f,
+    empresa_id: empresaAdminId,
+    sede: 'ANTAMINA',
+    anio,
+  }));
+
+  const { error } = await supabase.from('programa_capacitaciones').insert(registros);
+  if (error) {
+    progreso.textContent = '❌ Error: ' + error.message;
+    return;
+  }
+
+  progreso.textContent = `✅ ${registros.length} cursos guardados correctamente.`;
+  document.getElementById('preview-sst').style.display = 'none';
+  document.getElementById('archivo-sst').value = '';
+  filasProgramaSST = [];
+};
+
+window.verProgramaSST = async function () {
+  const anio = parseInt(document.getElementById('ver-sst-anio').value);
+  const tipo  = document.getElementById('ver-sst-tipo').value;
+  const cont  = document.getElementById('lista-programa-sst');
+  cont.innerHTML = '<p style="color:#888;">Cargando...</p>';
+
+  let query = supabase.from('programa_capacitaciones')
+    .select('*')
+    .eq('empresa_id', empresaAdminId)
+    .eq('anio', anio)
+    .eq('sede', 'ANTAMINA')
+    .order('numero');
+
+  if (tipo) query = query.eq('tipo_curso', tipo);
+
+  const { data, error } = await query;
+  if (error || !data?.length) {
+    cont.innerHTML = '<p style="color:#888;">No hay programa guardado para este año.</p>';
+    return;
+  }
+
+  const mesesNom = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const mesesKey = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+  const filas = data.map(f => {
+    const mesesCeldas = mesesKey.map(m => `<td style="text-align:center;">${f[m] ? '✔' : ''}</td>`).join('');
+    return `<tr style="border-bottom:1px solid #eee;">
+      <td style="padding:7px 10px;">${f.requisito || ''}</td>
+      <td style="padding:7px 10px;">${f.numero ?? ''}</td>
+      <td style="padding:7px 10px;font-weight:500;">${f.curso}</td>
+      <td style="padding:7px 10px;">${f.tipo_curso || ''}</td>
+      <td style="padding:7px 10px;">${f.encargado || ''}</td>
+      <td style="padding:7px 10px;text-align:center;">${f.duracion_hr ?? ''}</td>
+      ${mesesCeldas}
+    </tr>`;
+  }).join('');
+
+  cont.innerHTML = `
+    <p style="font-size:0.85rem;color:#555;margin-bottom:10px;">${data.length} cursos — Año ${anio} · ANTAMINA</p>
+    <div style="overflow-x:auto;">
+      <table style="border-collapse:collapse;width:100%;font-size:0.8rem;min-width:900px;">
+        <thead><tr style="background:#002855;color:white;">
+          <th style="padding:8px 10px;text-align:left;">Requisito</th>
+          <th style="padding:8px 10px;">N°</th>
+          <th style="padding:8px 10px;text-align:left;">Curso</th>
+          <th style="padding:8px 10px;text-align:left;">Tipo</th>
+          <th style="padding:8px 10px;text-align:left;">Encargado</th>
+          <th style="padding:8px 10px;">Hr</th>
+          ${mesesNom.map(m => `<th style="padding:8px 6px;">${m}</th>`).join('')}
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>`;
+};
+
+window.eliminarProgramaSST = async function () {
+  const anio = parseInt(document.getElementById('ver-sst-anio').value);
+  if (!confirm(`¿Eliminar todo el programa SST del año ${anio} para ANTAMINA?`)) return;
+  const { error } = await supabase.from('programa_capacitaciones')
+    .delete()
+    .eq('empresa_id', empresaAdminId)
+    .eq('anio', anio)
+    .eq('sede', 'ANTAMINA');
+  if (error) { alert('❌ ' + error.message); return; }
+  document.getElementById('lista-programa-sst').innerHTML = '<p style="color:#888;">Programa eliminado.</p>';
+};
 };

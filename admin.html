@@ -304,6 +304,9 @@
   <button class="nav-tab" onclick="mostrarTab('acceso', this)">
     <span class="tab-icon">🔐</span> Acceso
   </button>
+  <button class="nav-tab" onclick="mostrarTab('programa-sst', this)">
+    <span class="tab-icon">🦺</span> Programa SST
+  </button>
 </nav>
 
 <div class="admin-content">
@@ -676,6 +679,71 @@
     </div>
   </div>
 
+  <!-- ═══ TAB: PROGRAMA SST ═══ -->
+  <div id="tab-programa-sst" class="tab-panel">
+    <div class="panel-card">
+      <h2>🦺 Subir Programa Anual SST</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:16px;">
+        Sube el Excel del Programa Anual de Capacitaciones SST de ANTAMINA.
+        Los datos se guardarán asociados a tu empresa.
+      </p>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
+        <select id="sst-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
+        <label style="font-size:0.88rem; color:#555;">Año del programa</label>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <input type="file" id="archivo-sst" accept=".xlsx,.xls"
+               style="padding:8px; border:1px solid #ddd; border-radius:7px; font-size:0.88rem;"
+               onchange="previsualizarProgramaSST()" />
+      </div>
+
+      <div id="preview-sst" style="display:none;">
+        <p id="preview-resumen-sst" style="font-size:0.88rem; color:#555; margin-bottom:10px;"></p>
+        <div style="overflow-x:auto; margin-bottom:12px;">
+          <table style="border-collapse:collapse; width:100%; font-size:0.8rem; min-width:900px;">
+            <thead>
+              <tr style="background:#002855; color:white;">
+                <th style="padding:8px 10px; text-align:left;">Requisito</th>
+                <th style="padding:8px 10px; text-align:left;">N°</th>
+                <th style="padding:8px 10px; text-align:left;">Curso</th>
+                <th style="padding:8px 10px; text-align:left;">Tipo</th>
+                <th style="padding:8px 10px; text-align:left;">Encargado</th>
+                <th style="padding:8px 10px; text-align:left;">Duración</th>
+                <th style="padding:8px 10px; text-align:center;">E</th><th style="padding:8px 10px; text-align:center;">F</th>
+                <th style="padding:8px 10px; text-align:center;">M</th><th style="padding:8px 10px; text-align:center;">A</th>
+                <th style="padding:8px 10px; text-align:center;">My</th><th style="padding:8px 10px; text-align:center;">Jn</th>
+                <th style="padding:8px 10px; text-align:center;">Jl</th><th style="padding:8px 10px; text-align:center;">Ag</th>
+                <th style="padding:8px 10px; text-align:center;">S</th><th style="padding:8px 10px; text-align:center;">O</th>
+                <th style="padding:8px 10px; text-align:center;">N</th><th style="padding:8px 10px; text-align:center;">D</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-sst"></tbody>
+          </table>
+        </div>
+        <button onclick="importarProgramaSST()" class="btn-primary">✅ Guardar programa</button>
+        <span id="progreso-sst" style="margin-left:12px; font-size:0.88rem; color:#555;"></span>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h2>📋 Ver programa guardado</h2>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+        <select id="ver-sst-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
+        <select id="ver-sst-tipo" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+          <option value="">-- Todos los tipos --</option>
+          <option value="Seguridad">Seguridad</option>
+          <option value="Salud">Salud</option>
+          <option value="Medio ambiente">Medio ambiente</option>
+        </select>
+        <button onclick="verProgramaSST()" class="btn-primary">Ver programa</button>
+        <button onclick="eliminarProgramaSST()" class="btn-secondary" style="background:#dc3545; color:white; border:none;">🗑️ Eliminar año</button>
+      </div>
+      <div id="lista-programa-sst"></div>
+    </div>
+  </div>
+
   <!-- ═══ TAB: ACCESO ═══ -->
   <div id="tab-acceso" class="tab-panel">
     <div class="panel-card">
@@ -736,6 +804,9 @@
     }
     if (tab === 'cursos') {
       initSelectCursoForm();
+    }
+    if (tab === 'programa-sst') {
+      initSelectorAnioSST();
     }
   }
 </script>

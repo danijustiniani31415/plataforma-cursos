@@ -1,5 +1,5 @@
 import { supabase } from './src/supabaseClient.js';
-import { alertToToast } from './toast.js';
+import { alertToToast, withLoading } from './toast.js';
 const alert = alertToToast;
 
 // ✅ Verificar que sea superadmin
@@ -468,3 +468,17 @@ window.guardarBranding = async function () {
   msg.textContent = error ? '❌ ' + error.message : '✅ Branding guardado correctamente.';
   msg.style.color = error ? '#dc3545' : '#198754';
 };
+
+// ═══════════════════════════════════════════════
+// ⏳ SPINNERS EN BOTONES
+// ═══════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  const wrap = (selector, fn, texto) => {
+    const btn = document.querySelector(selector);
+    if (btn && window[fn]) window[fn] = withLoading(btn, window[fn], texto);
+  };
+  wrap('button[onclick="crearEmpresa()"]', 'crearEmpresa', 'Creando...');
+  wrap('button[onclick="crearAdmin()"]',   'crearAdmin',   'Creando...');
+  wrap('button[onclick="crearCargo()"]',   'crearCargo',   'Creando...');
+  wrap('button[onclick="guardarBranding()"]', 'guardarBranding', 'Guardando...');
+});

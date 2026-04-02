@@ -57,3 +57,26 @@ export function alertToToast(msg) {
 }
 
 window.toast = toast;
+
+// ── Utilidad: envuelve una función async con estado de carga en un botón ──
+export function withLoading(btn, fn, loadingText = 'Procesando...') {
+  return async function (...args) {
+    if (!btn) return fn(...args);
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:7px;">
+      <svg style="animation:spin 0.8s linear infinite" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+      ${loadingText}
+    </span>`;
+    try { await fn(...args); }
+    finally { btn.disabled = false; btn.innerHTML = original; }
+  };
+}
+
+// CSS para spin (inyectar una vez)
+if (!document.getElementById('toast-spin-style')) {
+  const s = document.createElement('style');
+  s.id = 'toast-spin-style';
+  s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+  document.head.appendChild(s);
+}

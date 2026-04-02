@@ -1,5 +1,5 @@
 import { supabase } from './src/supabaseClient.js';
-import { alertToToast } from './toast.js';
+import { alertToToast, withLoading } from './toast.js';
 const alert = alertToToast;
 
 let empresaAdminId = null;
@@ -3147,3 +3147,19 @@ window.verAsistentesSesion = async function (sesionId) {
   XLSX.utils.book_append_sheet(wb, ws, 'Asistentes');
   XLSX.writeFile(wb, `Asistentes_sesion.xlsx`);
 };
+
+// ═══════════════════════════════════════════════
+// ⏳ SPINNERS EN BOTONES — aplicar withLoading
+// ═══════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  const wrap = (selector, fn, texto) => {
+    const btn = document.querySelector(selector);
+    if (btn && window[fn]) window[fn] = withLoading(btn, window[fn], texto);
+  };
+  wrap('button[onclick="crearUsuario()"]',        'crearUsuario',        'Creando...');
+  wrap('button[onclick="subirCurso()"]',           'subirCurso',          'Subiendo...');
+  wrap('button[onclick="guardarSeguimiento()"]',   'guardarSeguimiento',  'Guardando...');
+  wrap('button[onclick="enviarNotificaciones()"]', 'enviarNotificaciones','Enviando...');
+  wrap('button[onclick="crearSesionQR()"]',        'crearSesionQR',       'Generando QR...');
+  wrap('button[onclick="importarProgramaSST()"]',  'importarProgramaSST', 'Importando...');
+});

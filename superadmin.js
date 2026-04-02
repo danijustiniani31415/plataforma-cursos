@@ -1,5 +1,5 @@
 import { supabase } from './src/supabaseClient.js';
-import { alertToToast, withLoading } from './toast.js';
+import { alertToToast, withLoading, showConfirm } from './toast.js';
 const alert = alertToToast;
 
 // ✅ Verificar que sea superadmin
@@ -243,7 +243,7 @@ async function cargarAdmins() {
 }
 
 window.eliminarAdmin = async function (id, nombre) {
-  if (!confirm(`¿Estás seguro de eliminar al administrador "${nombre}"?\nEsta acción no se puede deshacer.`)) return;
+  if (!await showConfirm(`¿Eliminar al administrador "${nombre}"?\nEsta acción no se puede deshacer.`, { confirmText: 'Eliminar' })) return;
 
   const { error } = await supabase.from('profiles').delete().eq('id', id);
   if (error) { alert('❌ Error al eliminar: ' + error.message); return; }

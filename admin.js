@@ -1,5 +1,5 @@
 import { supabase } from './src/supabaseClient.js';
-import { alertToToast, withLoading } from './toast.js';
+import { alertToToast, withLoading, showConfirm } from './toast.js';
 const alert = alertToToast;
 
 let empresaAdminId = null;
@@ -1694,7 +1694,7 @@ async function cargarPreguntas(formularioId, tipo) {
 }
 
 window.eliminarPregunta = async function (preguntaId, formularioId, tipo) {
-  if (!confirm('¿Eliminar esta pregunta y todas sus opciones?')) return;
+  if (!await showConfirm('¿Eliminar esta pregunta y todas sus opciones?', { confirmText: 'Eliminar' })) return;
   await supabase.from('opciones_pregunta').delete().eq('id_pregunta', preguntaId);
   await supabase.from('preguntas').delete().eq('id', preguntaId);
   cargarPreguntas(formularioId, tipo);
@@ -1810,7 +1810,7 @@ window.guardarPreguntaEncuesta = async function (formularioId) {
 };
 
 window.eliminarPreguntaEncuesta = async function (preguntaId, formularioId) {
-  if (!confirm('¿Eliminar esta pregunta?')) return;
+  if (!await showConfirm('¿Eliminar esta pregunta?', { confirmText: 'Eliminar' })) return;
   await supabase.from('opciones_pregunta').delete().eq('id_pregunta', preguntaId);
   await supabase.from('preguntas').delete().eq('id', preguntaId);
   cargarEncuestaGlobal();
@@ -2025,7 +2025,7 @@ window.verProgramaSST = async function () {
 
 window.eliminarProgramaSST = async function () {
   const anio = parseInt(document.getElementById('ver-sst-anio').value);
-  if (!confirm(`¿Eliminar todo el programa SST del año ${anio} para ANTAMINA?`)) return;
+  if (!await showConfirm(`¿Eliminar todo el programa SST del año ${anio} para ANTAMINA?\nEsta acción no se puede deshacer.`, { confirmText: 'Eliminar' })) return;
   const { error } = await supabase.from('programa_capacitaciones')
     .delete()
     .eq('empresa_id', empresaAdminId)
@@ -2683,7 +2683,7 @@ window.agregarCursoRuta = async function () {
 };
 
 window.eliminarCursoRuta = async function (id) {
-  if (!confirm('¿Quitar este curso de la ruta?')) return;
+  if (!await showConfirm('¿Quitar este curso de la ruta?', { confirmText: 'Quitar' })) return;
   await supabase.from('ruta_cursos').delete().eq('id', id);
   cargarRuta();
 };
@@ -3025,7 +3025,7 @@ window.refrescarAsistentes = async function () {
 
 window.cerrarSesionQR = async function () {
   if (!sesionQRActual) return;
-  if (!confirm('¿Cerrar esta sesión? El QR dejará de funcionar.')) return;
+  if (!await showConfirm('¿Cerrar esta sesión?\nEl QR dejará de funcionar y no se podrán registrar más asistentes.', { confirmText: 'Cerrar sesión', danger: true })) return;
   await supabase.from('sesiones_presenciales').update({ activa: false }).eq('id', sesionQRActual.id);
   if (intervalAsistentes) { clearInterval(intervalAsistentes); intervalAsistentes = null; }
   sesionQRActual = null;

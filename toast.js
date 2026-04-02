@@ -58,6 +58,41 @@ export function alertToToast(msg) {
 
 window.toast = toast;
 
+// ── Modal de confirmación — reemplaza confirm() nativo ──
+export function showConfirm(message, { confirmText = 'Confirmar', cancelText = 'Cancelar', danger = true } = {}) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = [
+      'position:fixed','inset:0','background:rgba(0,0,0,0.45)',
+      'z-index:99998','display:flex','align-items:center','justify-content:center',
+      'padding:16px','animation:toastIn 0.2s ease',
+    ].join(';');
+
+    const box = document.createElement('div');
+    box.style.cssText = [
+      'background:white','border-radius:16px','padding:28px 24px','max-width:360px',
+      'width:100%','box-shadow:0 20px 60px rgba(0,0,0,0.25)','text-align:center',
+    ].join(';');
+
+    box.innerHTML = `
+      <div style="font-size:2rem;margin-bottom:12px">${danger ? '⚠️' : 'ℹ️'}</div>
+      <p style="font-size:0.95rem;color:#1a2332;line-height:1.6;margin-bottom:20px;font-weight:500">${message.replace(/\n/g,'<br>')}</p>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button id="confirm-cancel" style="flex:1;padding:11px 16px;border:1.5px solid #dde3ec;background:white;border-radius:10px;font-size:0.9rem;cursor:pointer;font-weight:500">${cancelText}</button>
+        <button id="confirm-ok" style="flex:1;padding:11px 16px;border:none;background:${danger?'#ef4444':'#1e3a5f'};color:white;border-radius:10px;font-size:0.9rem;cursor:pointer;font-weight:600">${confirmText}</button>
+      </div>
+    `;
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    const close = (val) => { overlay.remove(); resolve(val); };
+    box.querySelector('#confirm-ok').onclick     = () => close(true);
+    box.querySelector('#confirm-cancel').onclick = () => close(false);
+    overlay.onclick = (e) => { if (e.target === overlay) close(false); };
+  });
+}
+
 // ── Utilidad: envuelve una función async con estado de carga en un botón ──
 export function withLoading(btn, fn, loadingText = 'Procesando...') {
   return async function (...args) {

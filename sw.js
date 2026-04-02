@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cvglobal-sst-v4';
+const CACHE_NAME = 'cvglobal-sst-v5';
 
 // Solo assets estáticos — NUNCA cachear páginas HTML de admin
 const STATIC_ASSETS = [

@@ -278,7 +278,6 @@ window.crearAdmin = async function () {
   if (existe) { alert('❌ Ese número de documento ya está registrado.'); return; }
 
   // Crear usuario via Edge Function
-  const { data: { session } } = await supabase.auth.getSession();
   const res = await supabase.functions.invoke('crear-usuario', {
     body: {
       email,
@@ -331,6 +330,13 @@ async function cargarTodosUsuarios() {
 function renderizarUsuarios(usuarios) {
   const tbody = document.querySelector('#tabla-usuarios tbody');
   tbody.innerHTML = '';
+
+  if (!usuarios.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#888;">
+      No se encontraron usuarios.</td></tr>`;
+    return;
+  }
+
   usuarios.forEach(u => {
     const rolBadge = u.rol === 'superadmin'
       ? `<span class="badge-superadmin">Superadmin</span>`
@@ -357,21 +363,25 @@ function renderizarUsuarios(usuarios) {
   });
 }
 
+let _filtrarDebounce = null;
 window.filtrarUsuarios = function () {
-  const texto = document.getElementById('buscar-usuario').value.toLowerCase();
-  const empresaId = document.getElementById('filtro-empresa').value;
+  clearTimeout(_filtrarDebounce);
+  _filtrarDebounce = setTimeout(() => {
+    const texto = document.getElementById('buscar-usuario').value.toLowerCase();
+    const empresaId = document.getElementById('filtro-empresa').value;
 
-  const filtrados = todosUsuarios.filter(u => {
-    const coincideTexto =
-      (u.nombres || '').toLowerCase().includes(texto) ||
-      (u.apellidos || '').toLowerCase().includes(texto) ||
-      (u.email || '').toLowerCase().includes(texto) ||
-      (u.documento_numero || '').includes(texto);
-    const coincideEmpresa = !empresaId || u.empresa_id === empresaId;
-    return coincideTexto && coincideEmpresa;
-  });
+    const filtrados = todosUsuarios.filter(u => {
+      const coincideTexto =
+        (u.nombres || '').toLowerCase().includes(texto) ||
+        (u.apellidos || '').toLowerCase().includes(texto) ||
+        (u.email || '').toLowerCase().includes(texto) ||
+        (u.documento_numero || '').includes(texto);
+      const coincideEmpresa = !empresaId || u.empresa_id === empresaId;
+      return coincideTexto && coincideEmpresa;
+    });
 
-  renderizarUsuarios(filtrados);
+    renderizarUsuarios(filtrados);
+  }, 300);
 };
 
 window.toggleUsuario = async function (id, activo) {
@@ -383,11 +393,11 @@ window.toggleUsuario = async function (id, activo) {
 // ═══════════════════════════════
 // 🗂️ TABS
 // ═══════════════════════════════
-window.mostrarTab = function (tab) {
+window.mostrarTab = function (tab, btn) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('activo'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('activo'));
   document.getElementById(`tab-${tab}`).classList.add('activo');
-  event.target.classList.add('activo');
+  if (btn) btn.classList.add('activo');
 };
 
 // 🔓 Cerrar sesión

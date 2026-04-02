@@ -908,23 +908,40 @@ window.descargarReporteExcel = async function () {
 // ═══════════════════════════════
 let cargosDisponibles = [];
 
-window.cargarTrabajadores = async function () {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, nombres, apellidos, email, documento_numero, telefono, cargo_id, cargo, fecha_ingreso, activo')
-    .eq('empresa_id', empresaAdminId)
-    .eq('rol', 'trabajador')
-    .order('apellidos');
+const PAGE_SIZE = 50;
+let _trabTotal = 0;
+
+window.cargarTrabajadores = async function (page = 0) {
+  const desde = page * PAGE_SIZE;
+
+  const [{ data, error, count }, { data: cargos }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, nombres, apellidos, email, documento_numero, telefono, cargo_id, cargo, fecha_ingreso, activo', { count: 'exact' })
+      .eq('empresa_id', empresaAdminId)
+      .eq('rol', 'trabajador')
+      .order('apellidos')
+      .range(desde, desde + PAGE_SIZE - 1),
+    supabase.from('cargos').select('id, nombre').eq('activo', true).order('nombre'),
+  ]);
 
   if (error) { alert('❌ Error: ' + error.message); return; }
 
-  // Cargar cargos para el modal
-  const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true).order('nombre');
+  _trabTotal = count || 0;
   cargosDisponibles = cargos || [];
 
   const tbody = document.getElementById('tbody-trabajadores');
   tbody.innerHTML = '';
-  data?.forEach(u => {
+
+  if (!data || data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#888;">
+      Sin trabajadores registrados en tu empresa.</td></tr>`;
+    document.getElementById('tabla-trabajadores').style.display = 'table';
+    document.getElementById('paginacion-trabajadores')?.remove();
+    return;
+  }
+
+  data.forEach(u => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${u.apellidos || ''} ${u.nombres || ''}</td>
@@ -943,6 +960,23 @@ window.cargarTrabajadores = async function () {
   });
 
   document.getElementById('tabla-trabajadores').style.display = 'table';
+
+  // Paginación
+  let pag = document.getElementById('paginacion-trabajadores');
+  if (!pag) {
+    pag = document.createElement('div');
+    pag.id = 'paginacion-trabajadores';
+    pag.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:12px;font-size:0.85rem;color:#555;';
+    document.getElementById('tabla-trabajadores').after(pag);
+  }
+  const totalPages = Math.ceil(_trabTotal / PAGE_SIZE);
+  pag.innerHTML = totalPages <= 1 ? `<span>${_trabTotal} trabajadores</span>` : `
+    <button onclick="cargarTrabajadores(${page - 1})" ${page === 0 ? 'disabled' : ''}
+      style="padding:5px 12px;border:1px solid #dde3ec;border-radius:6px;cursor:pointer;background:white;">‹</button>
+    <span>Página ${page + 1} de ${totalPages} · ${_trabTotal} trabajadores</span>
+    <button onclick="cargarTrabajadores(${page + 1})" ${page >= totalPages - 1 ? 'disabled' : ''}
+      style="padding:5px 12px;border:1px solid #dde3ec;border-radius:6px;cursor:pointer;background:white;">›</button>
+  `;
 };
 
 window.abrirEditar = async function (id) {

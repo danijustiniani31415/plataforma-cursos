@@ -1,5 +1,5 @@
 import { supabase } from './src/supabaseClient.js';
-import { alertToToast, withLoading, showConfirm } from './toast.js';
+import { alertToToast, withLoading, showConfirm, fieldValidation } from './toast.js';
 const alert = alertToToast;
 
 let empresaAdminId = null;
@@ -3162,4 +3162,27 @@ document.addEventListener('DOMContentLoaded', () => {
   wrap('button[onclick="enviarNotificaciones()"]', 'enviarNotificaciones','Enviando...');
   wrap('button[onclick="crearSesionQR()"]',        'crearSesionQR',       'Generando QR...');
   wrap('button[onclick="importarProgramaSST()"]',  'importarProgramaSST', 'Importando...');
+
+  // Validación en tiempo real — formulario crear usuario
+  fieldValidation([
+    {
+      id: 'nuevo-dni',
+      validate: v => !v ? 'El documento es obligatorio.'
+                  : v.length < 8 ? 'Mínimo 8 caracteres.' : null,
+    },
+    {
+      id: 'nuevo-email',
+      validate: v => v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+                  ? 'Correo no válido.' : null,
+    },
+  ]);
+
+  // Validación en tiempo real — formulario subir curso
+  fieldValidation([
+    { id: 'titulo-curso',    validate: v => !v.trim() ? 'El título es obligatorio.' : null },
+    { id: 'codigo-prefijo',  validate: v => !v.trim() ? 'El prefijo es obligatorio.'
+                                          : v.trim().length > 6 ? 'Máximo 6 caracteres.' : null },
+    { id: 'duracion-curso',  validate: v => !v ? 'La duración es obligatoria.'
+                                          : +v <= 0 ? 'Debe ser mayor a 0.' : null },
+  ]);
 });

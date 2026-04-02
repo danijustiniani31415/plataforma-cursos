@@ -1,5 +1,5 @@
 import { supabase } from './src/supabaseClient.js';
-import { alertToToast, withLoading, showConfirm } from './toast.js';
+import { alertToToast, withLoading, showConfirm, fieldValidation } from './toast.js';
 const alert = alertToToast;
 
 // ✅ Verificar que sea superadmin
@@ -477,8 +477,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = document.querySelector(selector);
     if (btn && window[fn]) window[fn] = withLoading(btn, window[fn], texto);
   };
-  wrap('button[onclick="crearEmpresa()"]', 'crearEmpresa', 'Creando...');
-  wrap('button[onclick="crearAdmin()"]',   'crearAdmin',   'Creando...');
-  wrap('button[onclick="crearCargo()"]',   'crearCargo',   'Creando...');
-  wrap('button[onclick="guardarBranding()"]', 'guardarBranding', 'Guardando...');
+  wrap('button[onclick="crearEmpresa()"]',    'crearEmpresa',    'Creando...');
+  wrap('button[onclick="crearAdmin()"]',       'crearAdmin',      'Creando...');
+  wrap('button[onclick="crearCargo()"]',       'crearCargo',      'Creando...');
+  wrap('button[onclick="guardarBranding()"]',  'guardarBranding', 'Guardando...');
+
+  // Validación en tiempo real — empresa
+  fieldValidation([
+    { id: 'empresa-nombre', validate: v => !v.trim() ? 'El nombre es obligatorio.' : null },
+    {
+      id: 'empresa-ruc',
+      validate: v => !v ? 'El RUC es obligatorio.'
+                  : !/^\d{11}$/.test(v) ? 'El RUC debe tener exactamente 11 dígitos.' : null,
+    },
+  ]);
+
+  // Validación en tiempo real — admin
+  fieldValidation([
+    { id: 'admin-dni',    validate: v => !v ? 'El documento es obligatorio.'
+                                        : v.length < 8 ? 'Mínimo 8 caracteres.' : null },
+    { id: 'admin-email',  validate: v => !v ? 'El correo es obligatorio.'
+                                        : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? 'Correo no válido.' : null },
+    { id: 'cargo-nombre', validate: v => !v.trim() ? 'El nombre del cargo es obligatorio.' : null },
+  ]);
 });

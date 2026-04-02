@@ -39,8 +39,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     document.getElementById('btn-logout').style.display = 'flex';
     loginSection.style.display = 'none';
     cursosDisponiblesSection.style.display = 'block';
-    await cargarCursos();
-    await verificarAdmin(session.user.id);
+    await Promise.all([cargarCursos(), verificarAdmin(session.user.id)]);
   }
 });
 
@@ -78,8 +77,7 @@ async function login() {
   document.getElementById('btn-logout').style.display = 'flex';
   loginSection.style.display = 'none';
   cursosDisponiblesSection.style.display = 'block';
-  await cargarCursos();
-  await verificarAdmin(data.user.id);
+  await Promise.all([cargarCursos(), verificarAdmin(data.user.id)]);
 }
 window.login = login;
 
@@ -157,12 +155,19 @@ async function cargarCursos() {
 
   if (error) { alert("❌ Error al cargar cursos: " + error.message); return; }
 
-  // Cargar perfil + branding de empresa
-  const { data: perfil } = await supabase
-    .from('profiles')
-    .select('nombres, apellidos, empresa_id, xp, empresas(nombre, logo_url, color_primario, color_secundario)')
-    .eq('id', usuarioActual.id)
-    .single();
+  // Perfil + envíos en paralelo
+  const [{ data: perfil }, { data: envios }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('nombres, apellidos, empresa_id, xp, empresas(nombre, logo_url, color_primario, color_secundario)')
+      .eq('id', usuarioActual.id)
+      .single(),
+    supabase
+      .from('envios_formulario')
+      .select('id_curso, aprobado, created_at, formularios(tipo)')
+      .eq('usuario_email', usuarioActual.email)
+      .eq('estado', 'completado'),
+  ]);
 
   // Aplicar branding de la empresa
   const empresa = perfil?.empresas;
@@ -196,13 +201,6 @@ async function cargarCursos() {
   if (headerSubtitle && perfil?.nombres) {
     headerSubtitle.textContent = `${perfil.nombres} ${perfil.apellidos || ''} · ${empresa?.nombre || ''}`;
   }
-
-  // Cargar estados: aprobaciones y asistencias
-  const { data: envios } = await supabase
-    .from('envios_formulario')
-    .select('id_curso, aprobado, created_at, formularios(tipo)')
-    .eq('usuario_email', usuarioActual.email)
-    .eq('estado', 'completado');
 
   // Por curso: saber si aprobó examen y cuándo
   const estadoCurso = {};

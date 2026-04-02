@@ -118,6 +118,48 @@ export function showConfirm(message, { confirmText = 'Confirmar', cancelText = '
   });
 }
 
+// ── Validación en tiempo real de campos ──
+// fieldValidation(rules): array de { id, validate: (val)=>string|null, event='input' }
+// Muestra error rojo bajo el campo; retorna función checkAll() para validar todo antes de submit
+export function fieldValidation(rules) {
+  const getEl  = id => document.getElementById(id);
+  const getMsg = id => {
+    let m = document.getElementById(`_fv_${id}`);
+    if (!m) {
+      m = document.createElement('div');
+      m.id = `_fv_${id}`;
+      m.style.cssText = 'font-size:0.78rem;color:#ef4444;margin-top:3px;min-height:16px;transition:opacity 0.2s';
+      getEl(id)?.parentNode?.appendChild(m);
+    }
+    return m;
+  };
+
+  rules.forEach(({ id, validate, event = 'input' }) => {
+    const el = getEl(id);
+    if (!el) return;
+    el.addEventListener(event, () => {
+      const err = validate(el.value);
+      const msg = getMsg(id);
+      msg.textContent = err || '';
+      el.style.borderColor = err ? '#ef4444' : '';
+    });
+  });
+
+  return function checkAll() {
+    let ok = true;
+    rules.forEach(({ id, validate }) => {
+      const el  = getEl(id);
+      if (!el) return;
+      const err = validate(el.value);
+      const msg = getMsg(id);
+      msg.textContent = err || '';
+      el.style.borderColor = err ? '#ef4444' : '';
+      if (err) ok = false;
+    });
+    return ok;
+  };
+}
+
 // ── Utilidad: envuelve una función async con estado de carga en un botón ──
 export function withLoading(btn, fn, loadingText = 'Procesando...') {
   return async function (...args) {

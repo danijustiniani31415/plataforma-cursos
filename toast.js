@@ -51,12 +51,37 @@ export function alertToToast(msg) {
              : s.startsWith('❌') ? 'error'
              : s.startsWith('⚠️') ? 'warning'
              : 'info';
-  // Limpiar emoji inicial
-  const clean = s.replace(/^[✅❌⚠️ℹ️]\s*/, '');
+  const clean = translateError(s.replace(/^[✅❌⚠️ℹ️]\s*/, ''));
   toast(clean, type);
 }
 
 window.toast = toast;
+
+// ── Diccionario de errores Supabase → español ──
+const ERROR_MAP = [
+  [/invalid login credentials/i,           'Correo o contraseña incorrectos.'],
+  [/email not confirmed/i,                  'Debes confirmar tu correo antes de ingresar.'],
+  [/user already registered/i,             'Este correo ya está registrado.'],
+  [/duplicate key value violates unique/i, 'Ya existe un registro con esos datos.'],
+  [/jwt expired/i,                         'Tu sesión expiró. Vuelve a iniciar sesión.'],
+  [/invalid jwt/i,                         'Sesión inválida. Vuelve a iniciar sesión.'],
+  [/row-level security/i,                  'No tienes permiso para realizar esta acción.'],
+  [/foreign key violation/i,               'No se puede eliminar porque tiene registros relacionados.'],
+  [/not null violation/i,                  'Faltan campos obligatorios.'],
+  [/network|failed to fetch|load failed/i, 'Sin conexión. Verifica tu internet.'],
+  [/timeout/i,                             'La operación tardó demasiado. Intenta de nuevo.'],
+  [/permission denied/i,                   'No tienes permiso para realizar esta acción.'],
+  [/invalid.*email/i,                      'El correo electrónico no es válido.'],
+  [/password.*short|at least.*characters/i,'La contraseña es muy corta.'],
+];
+
+export function translateError(msg) {
+  if (!msg) return 'Ocurrió un error inesperado.';
+  for (const [regex, translation] of ERROR_MAP) {
+    if (regex.test(msg)) return translation;
+  }
+  return msg;
+}
 
 // ── Modal de confirmación — reemplaza confirm() nativo ──
 export function showConfirm(message, { confirmText = 'Confirmar', cancelText = 'Cancelar', danger = true } = {}) {

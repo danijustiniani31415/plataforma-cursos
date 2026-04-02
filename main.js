@@ -160,7 +160,7 @@ async function cargarCursos() {
   // Cargar perfil + branding de empresa
   const { data: perfil } = await supabase
     .from('profiles')
-    .select('nombres, apellidos, empresa_id, empresas(nombre, logo_url, color_primario, color_secundario)')
+    .select('nombres, apellidos, empresa_id, xp, empresas(nombre, logo_url, color_primario, color_secundario)')
     .eq('id', usuarioActual.id)
     .single();
 
@@ -261,7 +261,7 @@ async function cargarCursos() {
     listaCursos.appendChild(btn);
   });
 
-  await cargarGamificacion();
+  await cargarGamificacion(perfil);
 }
 
 // ═══════════════════════════════
@@ -940,23 +940,29 @@ function mostrarNotifBadge(badge) {
   setTimeout(() => notif.remove(), 4100);
 }
 
-async function cargarGamificacion() {
+async function cargarGamificacion(perfilBase) {
   const widget = document.getElementById('gamificacion-widget');
   if (!widget) return;
 
-  const { data: perfil } = await supabase
-    .from('profiles').select('xp, nivel, empresa_id').eq('id', usuarioActual.id).single();
+  // Reusar perfil ya cargado; si no trae xp, hacer fetch mínimo
+  let xp = perfilBase?.xp;
+  let empresa_id = perfilBase?.empresa_id;
+  if (xp == null) {
+    const { data: p } = await supabase
+      .from('profiles').select('xp, empresa_id').eq('id', usuarioActual.id).single();
+    xp = p?.xp || 0;
+    empresa_id = p?.empresa_id;
+  }
 
-  const xp = perfil?.xp || 0;
   const nivelInfo = calcularNivel(xp);
 
   const { data: badges } = await supabase
     .from('badges_usuario').select('badge_code').eq('usuario_id', usuarioActual.id);
 
   let rankingHTML = '';
-  if (perfil?.empresa_id) {
+  if (empresa_id) {
     const { data: ranking } = await supabase
-      .from('profiles').select('id, xp').eq('empresa_id', perfil.empresa_id).order('xp', { ascending: false });
+      .from('profiles').select('id, xp').eq('empresa_id', empresa_id).order('xp', { ascending: false });
     if (ranking) {
       const pos = ranking.findIndex(r => r.id === usuarioActual.id) + 1;
       rankingHTML = `<div class="gami-ranking">🏅 Posición <strong>#${pos}</strong> de ${ranking.length} en tu empresa</div>`;

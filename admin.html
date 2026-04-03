@@ -325,6 +325,9 @@
   <button class="nav-tab" onclick="mostrarTab('sunafil', this)">
     <span class="tab-icon">🏛️</span> SUNAFIL
   </button>
+  <button class="nav-tab" onclick="mostrarTab('import-eval', this)">
+    <span class="tab-icon">📊</span>Importar Evaluaciones
+  </button>
   <button class="nav-tab" onclick="mostrarTab('qr-asistencia', this)">
     <span class="tab-icon">📷</span> QR Asistencia
   </button>
@@ -1045,6 +1048,45 @@
       <div id="lista-sesiones-anteriores"></div>
     </div>
 
+  </div>
+
+  <!-- ═══ TAB: IMPORTAR EVALUACIONES ═══ -->
+  <div id="tab-import-eval" class="tab-panel">
+    <div class="panel-card">
+      <h2>📊 Importar evaluaciones históricas (una sola vez)</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:16px;">
+        Sube un Excel con los resultados de evaluaciones ya rendidas por el personal.
+        Se registrarán la nota, fecha, hora y asistencia. Si el trabajador ya tiene
+        un envío idéntico (mismo DNI + curso + fecha) se omitirá para evitar duplicados.
+      </p>
+
+      <div style="margin-bottom:16px;">
+        <a href="#" onclick="descargarPlantillaEvaluaciones(event)" class="btn-primary" style="text-decoration:none;">⬇️ Descargar plantilla Excel</a>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <input type="file" id="archivo-eval" accept=".xlsx,.xls"
+               style="padding:8px; border:1px solid #ddd; border-radius:7px; font-size:0.88rem;"
+               onchange="previsualizarEvaluaciones()" />
+      </div>
+
+      <div id="preview-eval" style="display:none;">
+        <p id="preview-resumen-eval" style="font-size:0.88rem; color:#555; margin-bottom:10px;"></p>
+        <div style="overflow-x:auto; margin-bottom:12px;">
+          <table class="preview-table">
+            <thead>
+              <tr>
+                <th>DNI</th><th>Trabajador</th><th>Curso</th>
+                <th>Fecha</th><th>Hora</th><th>Nota</th><th>Asistencia</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-eval"></tbody>
+          </table>
+        </div>
+        <button id="btn-confirmar-eval" onclick="importarEvaluaciones()" class="btn-primary">✅ Confirmar importación</button>
+        <span id="progreso-eval" class="progreso"></span>
+      </div>
+    </div>
   </div>
 
   <!-- ═══ TAB: ACCESO ═══ -->

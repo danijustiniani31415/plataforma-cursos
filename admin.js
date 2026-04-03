@@ -3183,6 +3183,236 @@ window.verAsistentesSesion = async function (sesionId) {
 };
 
 // ═══════════════════════════════════════════════
+// 📊 IMPORTAR EVALUACIONES HISTÓRICAS
+// ═══════════════════════════════════════════════
+
+let filasEval = [];
+
+window.descargarPlantillaEvaluaciones = async function (e) {
+  e.preventDefault();
+  const XLSX = window.XLSX;
+
+  const { data: cursos } = await supabase
+    .from('cursos').select('titulo').eq('activo', true).order('titulo');
+  const listaCursos = cursos?.map(c => c.titulo) || [];
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['DNI', 'Nombre del Curso', 'Fecha (DD/MM/AAAA)', 'Hora (HH:MM)', 'Nota (0-20)', 'Asistencia (SI/NO)'],
+    ['', '', '', '', '', ''],
+  ]);
+  ws['!cols'] = [12, 32, 20, 14, 16, 18].map(w => ({ wch: w }));
+
+  if (listaCursos.length > 0) {
+    ws['!dataValidations'] = [{
+      type: 'list', sqref: 'B2:B500',
+      formula1: listaCursos.join(',').length <= 255
+        ? '"' + listaCursos.join(',') + '"'
+        : 'Cursos!$A$1:$A$' + listaCursos.length
+    }, {
+      type: 'list', sqref: 'F2:F500',
+      formula1: '"SI,NO"'
+    }];
+  }
+
+  const wsCursos = XLSX.utils.aoa_to_sheet(listaCursos.map(c => [c]));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Evaluaciones');
+  XLSX.utils.book_append_sheet(wb, wsCursos, 'Cursos');
+  XLSX.writeFile(wb, 'plantilla_evaluaciones_historicas.xlsx');
+};
+
+window.previsualizarEvaluaciones = async function () {
+  const archivo = document.getElementById('archivo-eval').files[0];
+  if (!archivo) return;
+
+  const reader = new FileReader();
+  reader.onload = async function (e) {
+    const XLSX = window.XLSX;
+    const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: false });
+    const hoja = wb.Sheets[wb.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
+
+    filasEval = filas.slice(1).filter(f => f[0] && f[1]);
+
+    const dnis = [...new Set(filasEval.map(f => String(f[0]).trim()))];
+    const { data: perfiles } = await supabase
+      .from('profiles')
+      .select('id, documento_numero, nombres, apellidos, email')
+      .in('documento_numero', dnis)
+      .eq('empresa_id', empresaAdminId);
+
+    const perfilMap = {};
+    perfiles?.forEach(p => { perfilMap[p.documento_numero] = p; });
+
+    const tbody = document.getElementById('tbody-eval');
+    tbody.innerHTML = '';
+
+    filasEval.forEach(f => {
+      const dni    = String(f[0]).trim();
+      const curso  = String(f[1]).trim();
+      const fecha  = String(f[2]).trim();
+      const hora   = String(f[3]).trim() || '08:00';
+      const nota   = parseFloat(String(f[4]).replace(',', '.')) || 0;
+      const asist  = String(f[5]).trim().toUpperCase();
+      const perfil = perfilMap[dni];
+      const tr = document.createElement('tr');
+      let estado = '';
+      if (!perfil) {
+        estado = '<span style="color:red;">❌ DNI no encontrado</span>';
+      } else if (!curso) {
+        estado = '<span style="color:red;">❌ Falta curso</span>';
+      } else {
+        const aprobado = nota >= 16;
+        estado = `<span style="color:${aprobado ? '#198754' : '#dc3545'};">${aprobado ? '✅ Aprobado' : '⚠️ Desaprobado'}</span>`;
+      }
+      tr.innerHTML = `
+        <td>${dni}</td>
+        <td>${perfil ? perfil.apellidos + ' ' + perfil.nombres : '<em style="color:#888;">No encontrado</em>'}</td>
+        <td>${curso}</td><td>${fecha}</td><td>${hora}</td>
+        <td><strong>${nota}</strong>/20</td>
+        <td>${asist === 'SI' ? '✅ SI' : asist === 'NO' ? '❌ NO' : asist}</td>
+        <td class="estado-fila-eval">${estado}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    const validas = filasEval.filter(f => perfilMap[String(f[0]).trim()] && f[1]).length;
+    document.getElementById('preview-resumen-eval').textContent =
+      `${filasEval.length} filas — ${validas} válidas para importar, ${filasEval.length - validas} con errores.`;
+    document.getElementById('preview-eval').style.display = 'block';
+  };
+  reader.readAsArrayBuffer(archivo);
+};
+
+window.importarEvaluaciones = async function () {
+  if (!filasEval.length) return;
+
+  const btn = document.getElementById('btn-confirmar-eval');
+  btn.disabled = true;
+  btn.textContent = '⏳ Importando...';
+  const progreso = document.getElementById('progreso-eval');
+
+  // Cargar datos maestros de una vez
+  const dnis = [...new Set(filasEval.map(f => String(f[0]).trim()))];
+  const { data: perfiles } = await supabase
+    .from('profiles')
+    .select('id, documento_numero, email')
+    .in('documento_numero', dnis)
+    .eq('empresa_id', empresaAdminId);
+
+  const perfilMap = {};
+  perfiles?.forEach(p => { perfilMap[p.documento_numero] = p; });
+
+  const { data: cursos } = await supabase
+    .from('cursos').select('id, titulo').eq('activo', true);
+  const cursoMap = {};
+  cursos?.forEach(c => { cursoMap[c.titulo.toLowerCase()] = c; });
+
+  const { data: formularios } = await supabase
+    .from('formularios').select('id, id_curso, tipo').eq('tipo', 'examen');
+  const formMap = {};
+  formularios?.forEach(f => { formMap[f.id_curso] = f; });
+
+  const filas = document.querySelectorAll('#tbody-eval tr');
+  let ok = 0, errores = 0, omitidos = 0;
+
+  for (let i = 0; i < filasEval.length; i++) {
+    const f      = filasEval[i];
+    const dni    = String(f[0]).trim();
+    const cursoNombre = String(f[1]).trim();
+    const fechaStr    = String(f[2]).trim();   // DD/MM/AAAA
+    const horaStr     = String(f[3]).trim() || '08:00';
+    const nota        = parseFloat(String(f[4]).replace(',', '.')) || 0;
+    const asistencia  = String(f[5]).trim().toUpperCase() === 'SI';
+    const tdEstado    = filas[i]?.querySelector('.estado-fila-eval');
+
+    const perfil = perfilMap[dni];
+    const curso  = cursoMap[cursoNombre.toLowerCase()];
+    const form   = curso ? formMap[curso.id] : null;
+
+    if (!perfil || !curso) {
+      if (tdEstado) { tdEstado.innerHTML = '<span style="color:orange;">⚠️ Omitido (dato faltante)</span>'; }
+      omitidos++;
+      progreso.textContent = `Progreso: ${i+1}/${filasEval.length} — ✅ ${ok}, ⚠️ ${omitidos}, ❌ ${errores}`;
+      continue;
+    }
+
+    // Construir timestamp con fecha y hora indicadas
+    let createdAt = new Date().toISOString();
+    try {
+      const [dia, mes, anio] = fechaStr.split('/');
+      const [hh, mm]         = horaStr.split(':');
+      const d = new Date(
+        parseInt(anio), parseInt(mes) - 1, parseInt(dia),
+        parseInt(hh) || 8, parseInt(mm) || 0, 0
+      );
+      if (!isNaN(d.getTime())) createdAt = d.toISOString();
+    } catch (_) { /* usar fecha actual */ }
+
+    // Verificar duplicado (mismo usuario + curso + misma fecha exacta)
+    const fechaInicio = new Date(createdAt);
+    fechaInicio.setHours(0, 0, 0, 0);
+    const fechaFin = new Date(createdAt);
+    fechaFin.setHours(23, 59, 59, 999);
+
+    const { data: existente } = await supabase
+      .from('envios_formulario')
+      .select('id')
+      .eq('usuario_id', perfil.id)
+      .eq('id_curso', curso.id)
+      .gte('created_at', fechaInicio.toISOString())
+      .lte('created_at', fechaFin.toISOString())
+      .limit(1);
+
+    if (existente?.length > 0) {
+      if (tdEstado) { tdEstado.innerHTML = '<span style="color:#888;">⏭️ Ya existe</span>'; }
+      omitidos++;
+      progreso.textContent = `Progreso: ${i+1}/${filasEval.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
+      continue;
+    }
+
+    const porcentaje = Math.round((nota / 20) * 100 * 10) / 10;
+    const aprobado   = nota >= 16;
+
+    // Insertar en envios_formulario
+    const { error: errEnvio } = await supabase.from('envios_formulario').insert({
+      id_formulario: form?.id || null,
+      usuario_id:    perfil.id,
+      usuario_email: perfil.email,
+      id_curso:      curso.id,
+      estado:        'completado',
+      puntaje:       nota,
+      porcentaje,
+      aprobado,
+      created_at:    createdAt,
+    });
+
+    if (errEnvio) {
+      if (tdEstado) { tdEstado.innerHTML = `<span style="color:red;">❌ ${errEnvio.message}</span>`; }
+      errores++;
+      progreso.textContent = `Progreso: ${i+1}/${filasEval.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
+      continue;
+    }
+
+    // Registrar asistencia si corresponde
+    if (asistencia) {
+      await supabase.from('asistencias')
+        .upsert({ usuario_id: perfil.id, id_curso: curso.id },
+                 { onConflict: 'usuario_id,id_curso', ignoreDuplicates: true });
+    }
+
+    if (tdEstado) {
+      tdEstado.innerHTML = `<span style="color:${aprobado ? '#198754' : '#dc3545'};">✅ ${aprobado ? 'Aprobado' : 'Desaprobado'} importado</span>`;
+    }
+    ok++;
+    progreso.textContent = `Progreso: ${i+1}/${filasEval.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
+  }
+
+  progreso.textContent += ` — ¡Completado! ${ok} registros importados.`;
+  btn.disabled = false;
+  btn.textContent = '✅ Confirmar importación';
+};
+
+// ═══════════════════════════════════════════════
 // ⏳ SPINNERS EN BOTONES — aplicar withLoading
 // ═══════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {

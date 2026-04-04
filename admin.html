@@ -11,6 +11,15 @@
   <link rel="apple-touch-icon" href="/Logo.png" />
   <title>Panel de Administrador · CV Global</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.default.min.css" />
+  <style>
+    .ts-wrapper.single .ts-control { border-radius: 7px; border-color: #ddd; font-size: 0.9rem; padding: 9px 12px; min-height: unset; }
+    .ts-wrapper.single.input-active .ts-control,
+    .ts-wrapper.single .ts-control:focus { border-color: #002855; box-shadow: 0 0 0 2px rgba(0,40,85,0.15); }
+    .ts-dropdown { border-color: #ddd; border-radius: 7px; font-size: 0.88rem; }
+    .ts-dropdown .option.selected { background: #002855; }
+    .ts-dropdown .option:hover, .ts-dropdown .option.active { background: #e8eef5; color: #002855; }
+  </style>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
@@ -1173,6 +1182,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1216,11 +1226,8 @@
     if (tab === 'qr-asistencia') {
       initQRAsistencia();
     }
-    if (tab === 'import-eval') {
-      cargarCursosSelectForms();
-    }
   }
 </script>
-<script type="module" src="admin.js?v=5"></script>
+<script type="module" src="admin.js?v=6"></script>
 </body>
 </html>

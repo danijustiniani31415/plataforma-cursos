@@ -2,6 +2,14 @@ import { supabase } from './src/supabaseClient.js';
 import { alertToToast, withLoading, showConfirm, fieldValidation } from './toast.js';
 const alert = alertToToast;
 
+// Select buscable con Tom Select
+function initSelectBuscable(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.tomselect) { el.tomselect.sync(); return; }
+  new window.TomSelect(el, { allowEmptyOption: true, maxOptions: 300 });
+}
+
 let empresaAdminId = null;
 let empresaAdminNombre = null;
 let empresaAdminRuc = null;
@@ -94,6 +102,7 @@ async function cargarDatosAdmin() {
     (cursosForSelect || []).forEach(c => {
       selFormsCurso.innerHTML += `<option value="${c.id}">${c.titulo}</option>`;
     });
+    initSelectBuscable('forms-curso');
   }
 }
 
@@ -1441,6 +1450,7 @@ async function cargarDatosDashboard() {
   todosCursosDash.forEach(c => {
     sel.innerHTML += `<option value="${c.id}">${c.titulo}</option>`;
   });
+  initSelectBuscable('select-curso-dashboard');
 }
 
 window.buscarTrabajadorDashboard = function () {
@@ -1599,6 +1609,7 @@ window.initSelectCursoForm = async function initSelectCursoForm() {
   if (!sel || sel.options.length > 1) return;
   const { data } = await supabase.from('cursos').select('id, titulo').eq('activo', true).order('titulo');
   data?.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.titulo}</option>`; });
+  initSelectBuscable('select-curso-form');
 }
 
 window.cargarFormulariosCurso = async function () {
@@ -2387,6 +2398,7 @@ window.initCumplimiento = async function () {
     (cursos || []).forEach(c => {
       sel.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.titulo}</option>`);
     });
+    initSelectBuscable('select-curso-cumpl');
   }
   await cargarResumenCumplimiento();
 };
@@ -2645,6 +2657,7 @@ window.initRutas = async function () {
   const selCurso = document.getElementById('ruta-add-curso');
   selCurso.innerHTML = '<option value="">-- Agregar curso --</option>';
   (cursos || []).forEach(c => selCurso.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.titulo}</option>`));
+  initSelectBuscable('ruta-add-curso');
 
   // Selector rutas (ver y progreso)
   const rutaOpts = (rutas || []).map(r => `<option value="${r.id}">${r.nombre} (${r.cargos?.nombre || 'sin cargo'})</option>`).join('');
@@ -2963,6 +2976,7 @@ window.initQRAsistencia = async function () {
       ? '<option value="">Todos los cursos</option>'
       : '<option value="">-- Selecciona el curso --</option>';
     (cursos || []).forEach(c => sel.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.titulo}</option>`));
+    initSelectBuscable(id);
   });
 
   // Fecha default = ahora

@@ -1606,6 +1606,71 @@ window.cargarEstadoCurso = async function () {
 };
 
 // ═══════════════════════════════════════════════
+// 🔛 ACTIVAR / DESACTIVAR CURSOS
+// ═══════════════════════════════════════════════
+
+window.cargarListaCursos = async function () {
+  const contenedor = document.getElementById('lista-toggle-cursos');
+  contenedor.innerHTML = '<p style="color:#888;font-size:0.88rem;">Cargando...</p>';
+
+  const { data: cursos } = await supabase
+    .from('cursos').select('id, titulo, codigo, duracion, activo').order('titulo');
+
+  if (!cursos?.length) {
+    contenedor.innerHTML = '<p style="color:#888;">No hay cursos registrados.</p>';
+    return;
+  }
+
+  const activos   = cursos.filter(c => c.activo);
+  const inactivos = cursos.filter(c => !c.activo);
+
+  const renderFila = c => `
+    <tr>
+      <td style="padding:10px 12px; font-weight:500;">${c.titulo}</td>
+      <td style="padding:10px 12px; color:#888; font-size:0.82rem;">${c.codigo || '—'}</td>
+      <td style="padding:10px 12px; color:#888; font-size:0.82rem;">${c.duracion ? c.duracion + 'h' : '—'}</td>
+      <td style="padding:10px 12px;">
+        <span class="${c.activo ? 'badge-activo' : 'badge-inactivo'}">${c.activo ? '✅ Activo' : '⏸ Inactivo'}</span>
+      </td>
+      <td style="padding:10px 12px;">
+        <button onclick="toggleActivoCurso('${c.id}', ${c.activo})"
+                style="padding:6px 14px; border:none; border-radius:6px; cursor:pointer; font-size:0.82rem;
+                       background:${c.activo ? '#dc3545' : '#198754'}; color:white;">
+          ${c.activo ? 'Desactivar' : 'Activar'}
+        </button>
+      </td>
+    </tr>`;
+
+  contenedor.innerHTML = `
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="background:#f8f9fa; font-size:0.82rem; color:#555; text-transform:uppercase; letter-spacing:0.5px;">
+          <th style="padding:8px 12px; text-align:left;">Curso</th>
+          <th style="padding:8px 12px; text-align:left;">Código</th>
+          <th style="padding:8px 12px; text-align:left;">Duración</th>
+          <th style="padding:8px 12px; text-align:left;">Estado</th>
+          <th style="padding:8px 12px; text-align:left;">Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${activos.map(renderFila).join('')}
+        ${inactivos.length ? `
+          <tr><td colspan="5" style="padding:8px 12px; font-size:0.78rem; color:#888; background:#f8f9fa; border-top:2px solid #eee;">
+            ── Inactivos ──
+          </td></tr>
+          ${inactivos.map(renderFila).join('')}
+        ` : ''}
+      </tbody>
+    </table>`;
+};
+
+window.toggleActivoCurso = async function (id, activo) {
+  const { error } = await supabase.from('cursos').update({ activo: !activo }).eq('id', id);
+  if (error) { alert('❌ ' + error.message); return; }
+  cargarListaCursos();
+};
+
+// ═══════════════════════════════════════════════
 // 📝 GESTIÓN DE FORMULARIOS (EXAMEN / EFICACIA)
 // ═══════════════════════════════════════════════
 

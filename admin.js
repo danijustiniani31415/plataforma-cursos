@@ -3190,35 +3190,41 @@ let filasEval = [];
 
 window.descargarPlantillaEvaluaciones = async function (e) {
   e.preventDefault();
-  const XLSX = window.XLSX;
+  try {
+    const XLSX = window.XLSX;
 
-  const { data: cursos } = await supabase
-    .from('cursos').select('titulo').eq('activo', true).order('titulo');
-  const listaCursos = cursos?.map(c => c.titulo) || [];
+    const { data: cursos } = await supabase
+      .from('cursos').select('titulo').eq('activo', true).order('titulo');
+    const listaCursos = cursos?.map(c => c.titulo) || [];
 
-  const ws = XLSX.utils.aoa_to_sheet([
-    ['DNI', 'Nombre del Curso', 'Fecha (DD/MM/AAAA)', 'Hora (HH:MM)', 'Nota (0-20)', 'Asistencia (SI/NO)'],
-    ['', '', '', '', '', ''],
-  ]);
-  ws['!cols'] = [12, 32, 20, 14, 16, 18].map(w => ({ wch: w }));
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['DNI', 'Nombre del Curso', 'Fecha (DD/MM/AAAA)', 'Hora (HH:MM)', 'Nota (0-20)', 'Asistencia (SI/NO)'],
+      ['', '', '', '', '', ''],
+    ]);
+    ws['!cols'] = [12, 32, 20, 14, 16, 18].map(w => ({ wch: w }));
 
-  if (listaCursos.length > 0) {
-    ws['!dataValidations'] = [{
-      type: 'list', sqref: 'B2:B500',
-      formula1: listaCursos.join(',').length <= 255
-        ? '"' + listaCursos.join(',') + '"'
-        : 'Cursos!$A$1:$A$' + listaCursos.length
-    }, {
+    ws['!dataValidations'] = ws['!dataValidations'] || [];
+    if (listaCursos.length > 0) {
+      ws['!dataValidations'].push({
+        type: 'list', sqref: 'B2:B500',
+        formula1: listaCursos.join(',').length <= 255
+          ? '"' + listaCursos.join(',') + '"'
+          : 'Cursos!$A$1:$A$' + listaCursos.length
+      });
+    }
+    ws['!dataValidations'].push({
       type: 'list', sqref: 'F2:F500',
       formula1: '"SI,NO"'
-    }];
-  }
+    });
 
-  const wsCursos = XLSX.utils.aoa_to_sheet(listaCursos.map(c => [c]));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Evaluaciones');
-  XLSX.utils.book_append_sheet(wb, wsCursos, 'Cursos');
-  XLSX.writeFile(wb, 'plantilla_evaluaciones_historicas.xlsx');
+    const wsCursos = XLSX.utils.aoa_to_sheet(listaCursos.map(c => [c]));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Evaluaciones');
+    if (listaCursos.length > 0) XLSX.utils.book_append_sheet(wb, wsCursos, 'Cursos');
+    XLSX.writeFile(wb, 'plantilla_evaluaciones_historicas.xlsx');
+  } catch (err) {
+    alert('Error al generar plantilla: ' + err.message);
+  }
 };
 
 window.previsualizarEvaluaciones = async function () {

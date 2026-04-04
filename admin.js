@@ -85,6 +85,16 @@ async function cargarDatosAdmin() {
   });
 
   configurarRENIEC('nuevo-dni', 'nuevo-doc-tipo', 'nuevo-nombres', 'nuevo-apellidos');
+
+  // Cargar cursos en el select de importar desde Forms
+  const { data: cursosForSelect } = await supabase
+    .from('cursos').select('id, titulo').eq('activo', true).order('titulo');
+  const selFormsCurso = document.getElementById('forms-curso');
+  if (selFormsCurso) {
+    (cursosForSelect || []).forEach(c => {
+      selFormsCurso.innerHTML += `<option value="${c.id}">${c.titulo}</option>`;
+    });
+  }
 }
 
 // 🪪 RENIEC autocomplete

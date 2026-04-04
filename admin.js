@@ -328,7 +328,7 @@ window.cargarRegistros = async function () {
       <td>${reg.cursos?.titulo || "Curso eliminado"}</td>
       <td>${tipoLabel[tipo] || tipo}</td>
       <td>${esEncuesta ? '—' : (reg.puntaje ?? '—')}</td>
-      <td>${new Date(reg.created_at).toLocaleDateString()}</td>
+      <td>${new Date(reg.created_at).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}</td>
       <td style="color: ${reg.aprobado ? 'green' : esEncuesta ? '#888' : 'red'}">
         ${esEncuesta ? '✅ Completada' : reg.aprobado ? '✅ Aprobado' : '❌ No aprobado'}
       </td>
@@ -915,7 +915,7 @@ window.descargarReporteExcel = async function () {
       esEncuesta ? '—' : (r.puntaje ?? '—'),
       esEncuesta ? '—' : (r.porcentaje != null ? r.porcentaje.toFixed(1) + '%' : '—'),
       esEncuesta ? 'Completada' : (r.aprobado ? 'Aprobado' : 'Desaprobado'),
-      new Date(r.created_at).toLocaleDateString('es-PE')
+      new Date(r.created_at).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })
     ]);
   });
 

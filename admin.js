@@ -3263,7 +3263,7 @@ window.previsualizarEvaluaciones = async function () {
   const reader = new FileReader();
   reader.onload = async function (e) {
     const XLSX = window.XLSX;
-    const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: false });
+    const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: true });
     const hoja = wb.Sheets[wb.SheetNames[0]];
     const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
 
@@ -3492,32 +3492,43 @@ function detectarColumna(headers, textos) {
   return -1;
 }
 
-// Parsea fecha/hora del formato Forms: "3/27/25 9:09:28" o "2025-03-27T09:09:28"
+// Parsea fecha/hora: maneja Date objects de SheetJS, "M/D/YY H:MM:SS" e ISO
 function parsearFechaForms(raw) {
   if (!raw) return { fechaStr: '', horaStr: '', iso: null };
+
+  // SheetJS con cellDates:true entrega Date objects — caso principal
+  if (raw instanceof Date && !isNaN(raw.getTime())) {
+    const dia = String(raw.getDate()).padStart(2, '0');
+    const mes = String(raw.getMonth() + 1).padStart(2, '0');
+    const hh  = String(raw.getHours()).padStart(2, '0');
+    const mm  = String(raw.getMinutes()).padStart(2, '0');
+    return { fechaStr: `${dia}/${mes}/${raw.getFullYear()}`, horaStr: `${hh}:${mm}`, iso: raw.toISOString() };
+  }
+
   const s = String(raw).trim();
-  // Formato M/D/YY H:MM:SS
+  // Formato texto M/D/YY H:MM:SS (Forms exportado como CSV o texto)
   const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})/);
   if (m) {
-    const anio  = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]);
-    const mes   = m[1].padStart(2, '0');
-    const dia   = m[2].padStart(2, '0');
-    const hh    = m[4].padStart(2, '0');
-    const mm    = m[5].padStart(2, '0');
-    const d = new Date(anio, parseInt(mes)-1, parseInt(dia), parseInt(hh), parseInt(mm));
+    const anio = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]);
+    const mes  = m[1].padStart(2, '0');
+    const dia  = m[2].padStart(2, '0');
+    const hh   = m[4].padStart(2, '0');
+    const mm   = m[5].padStart(2, '0');
+    const d = new Date(anio, parseInt(mes) - 1, parseInt(dia), parseInt(hh), parseInt(mm));
     return { fechaStr: `${dia}/${mes}/${anio}`, horaStr: `${hh}:${mm}`, iso: d.toISOString() };
   }
-  // ISO o Date object
+
+  // Fallback: cualquier string parseable
   try {
-    const d = new Date(raw);
+    const d = new Date(s);
     if (!isNaN(d.getTime())) {
-      const dia = String(d.getDate()).padStart(2,'0');
-      const mes = String(d.getMonth()+1).padStart(2,'0');
-      const hh  = String(d.getHours()).padStart(2,'0');
-      const mm  = String(d.getMinutes()).padStart(2,'0');
+      const dia = String(d.getDate()).padStart(2, '0');
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const hh  = String(d.getHours()).padStart(2, '0');
+      const mm  = String(d.getMinutes()).padStart(2, '0');
       return { fechaStr: `${dia}/${mes}/${d.getFullYear()}`, horaStr: `${hh}:${mm}`, iso: d.toISOString() };
     }
-  } catch(_) {}
+  } catch (_) {}
   return { fechaStr: s, horaStr: '', iso: null };
 }
 
@@ -3530,7 +3541,7 @@ window.previsualizarForms = async function () {
   const reader = new FileReader();
   reader.onload = async function (ev) {
     const XLSX = window.XLSX;
-    const wb   = XLSX.read(ev.target.result, { type: 'array', cellDates: false });
+    const wb   = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
     const hoja = wb.Sheets[wb.SheetNames[0]];
     const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
     if (filas.length < 2) { alert('El archivo no tiene datos.'); return; }

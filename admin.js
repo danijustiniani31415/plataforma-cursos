@@ -3448,19 +3448,15 @@ window.importarEvaluaciones = async function () {
       if (!isNaN(d.getTime())) createdAt = d.toISOString();
     } catch (_) { /* usar fecha actual */ }
 
-    // Verificar duplicado (mismo usuario + curso + misma fecha exacta)
-    const fechaInicio = new Date(createdAt);
-    fechaInicio.setHours(0, 0, 0, 0);
-    const fechaFin = new Date(createdAt);
-    fechaFin.setHours(23, 59, 59, 999);
-
+    // Verificar duplicado exacto: timestamp ±2 min (evita doble importación del mismo archivo)
+    const tsEval  = new Date(createdAt).getTime();
     const { data: existente } = await supabase
       .from('envios_formulario')
       .select('id')
       .eq('usuario_id', perfil.id)
       .eq('id_curso', curso.id)
-      .gte('created_at', fechaInicio.toISOString())
-      .lte('created_at', fechaFin.toISOString())
+      .gte('created_at', new Date(tsEval - 2 * 60000).toISOString())
+      .lte('created_at', new Date(tsEval + 2 * 60000).toISOString())
       .limit(1);
 
     if (existente?.length > 0) {
@@ -3715,7 +3711,7 @@ window.importarDesdeforms = async function () {
 
   for (let i = 0; i < filasForms.length; i++) {
     const f      = filasForms[i];
-    const dniRaw = String(f[colsDniForms]).trim().replace(/\n/g,'').replace(/\r/g,'');
+    const dniRaw = normalizarDNI(f[colsDniForms]);
     const notaRaw = parseFloat(String(f[colNotaForms]).replace(',','.')) || 0;
     const nota20  = maxPuntaje === 20 ? notaRaw : Math.round((notaRaw / maxPuntaje) * 20 * 10) / 10;
     const { iso: createdAt } = parsearFechaForms(f[colFechaForms]);
@@ -3728,13 +3724,15 @@ window.importarDesdeforms = async function () {
       continue;
     }
 
-    // Verificar duplicado (mismo usuario + curso + misma fecha)
+    // Verificar duplicado exacto: mismo usuario + curso + timestamp ±2 min
+    // (solo bloquea si se importa el mismo archivo dos veces)
     if (createdAt) {
-      const inicio = new Date(createdAt); inicio.setHours(0,0,0,0);
-      const fin    = new Date(createdAt); fin.setHours(23,59,59,999);
+      const ts    = new Date(createdAt).getTime();
+      const desde = new Date(ts - 2 * 60000).toISOString();
+      const hasta = new Date(ts + 2 * 60000).toISOString();
       const { data: dup } = await supabase.from('envios_formulario')
         .select('id').eq('usuario_id', perfil.id).eq('id_curso', cursoId)
-        .gte('created_at', inicio.toISOString()).lte('created_at', fin.toISOString()).limit(1);
+        .gte('created_at', desde).lte('created_at', hasta).limit(1);
       if (dup?.length > 0) {
         if (tdEstado) tdEstado.innerHTML = '<span style="color:#888;">⏭️ Ya existe</span>';
         omitidos++;

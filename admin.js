@@ -3565,24 +3565,35 @@ window.previsualizarForms = async function () {
 
     const tbody = document.getElementById('tbody-forms');
     tbody.innerHTML = '';
-    let validas = 0, invalidas = 0;
+    let validas = 0, invalidas = 0, desaprobados = 0;
 
-    filasForms.forEach(f => {
-      const dniRaw   = normalizarDNI(f[colsDniForms]);
-      const notaRaw  = parseFloat(String(f[colNotaForms]).replace(',', '.')) || 0;
-      const nota20   = maxPuntaje === 20 ? notaRaw : Math.round((notaRaw / maxPuntaje) * 20 * 10) / 10;
+    // Preparar filas con orden calculado
+    const filasOrdenadas = filasForms.map(f => {
+      const dniRaw     = normalizarDNI(f[colsDniForms]);
+      const notaRaw    = parseFloat(String(f[colNotaForms]).replace(',', '.')) || 0;
+      const nota20     = maxPuntaje === 20 ? notaRaw : Math.round((notaRaw / maxPuntaje) * 20 * 10) / 10;
+      const perfil     = perfilMap[dniRaw];
+      const aprobado   = nota20 >= 16;
+      // orden: 0 = aprobado, 1 = desaprobado, 2 = no encontrado
+      const orden = !perfil ? 2 : aprobado ? 0 : 1;
+      return { f, dniRaw, notaRaw, nota20, perfil, aprobado, orden };
+    }).sort((a, b) => a.orden - b.orden);
+
+    filasOrdenadas.forEach(({ f, dniRaw, notaRaw, nota20, perfil, aprobado }) => {
       const { fechaStr, horaStr } = parsearFechaForms(f[colFechaForms]);
       const nombreForms = colNombreForms !== -1 ? String(f[colNombreForms]).trim() : '';
-      const perfil   = perfilMap[dniRaw];
-      const aprobado = nota20 >= 16;
       const tr = document.createElement('tr');
       let estado;
       if (!perfil) {
         estado = `<span style="color:red;">❌ DNI ${dniRaw} no encontrado</span>`;
         invalidas++;
-      } else {
-        estado = `<span style="color:${aprobado ? '#198754':'#dc3545'};">${aprobado ? '✅ Aprobado':'⚠️ Desaprobado'}</span>`;
+      } else if (aprobado) {
+        estado = `<span style="color:#198754;">✅ Aprobado</span>`;
         validas++;
+      } else {
+        estado = `<span style="color:#dc3545;">⚠️ Desaprobado</span>`;
+        validas++;
+        desaprobados++;
       }
       tr.innerHTML = `
         <td>${dniRaw}</td>
@@ -3595,7 +3606,7 @@ window.previsualizarForms = async function () {
     });
 
     document.getElementById('preview-resumen-forms').textContent =
-      `${filasForms.length} respuestas — ✅ ${validas} con DNI reconocido, ❌ ${invalidas} no encontrados (se omitirán).`;
+      `${filasForms.length} respuestas — ✅ ${validas - desaprobados} aprobados, ⚠️ ${desaprobados} desaprobados, ❌ ${invalidas} DNI no encontrados (se omitirán).`;
     document.getElementById('preview-forms').style.display = 'block';
   };
   reader.readAsArrayBuffer(archivo);

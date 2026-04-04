@@ -3395,9 +3395,19 @@ window.importarEvaluaciones = async function () {
 
     // Registrar asistencia si corresponde
     if (asistencia) {
-      await supabase.from('asistencias')
-        .upsert({ usuario_id: perfil.id, id_curso: curso.id },
-                 { onConflict: 'usuario_id,id_curso', ignoreDuplicates: true });
+      const { data: yaAsiste } = await supabase
+        .from('asistencias')
+        .select('usuario_id')
+        .eq('usuario_id', perfil.id)
+        .eq('curso_id', curso.id)
+        .maybeSingle();
+      if (!yaAsiste) {
+        await supabase.from('asistencias').insert({
+          usuario_id: perfil.id,
+          email:      perfil.email,
+          curso_id:   curso.id,
+        });
+      }
     }
 
     if (tdEstado) {

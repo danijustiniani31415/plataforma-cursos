@@ -3448,24 +3448,6 @@ window.importarEvaluaciones = async function () {
       if (!isNaN(d.getTime())) createdAt = d.toISOString();
     } catch (_) { /* usar fecha actual */ }
 
-    // Verificar duplicado exacto: timestamp ±2 min (evita doble importación del mismo archivo)
-    const tsEval  = new Date(createdAt).getTime();
-    const { data: existente } = await supabase
-      .from('envios_formulario')
-      .select('id')
-      .eq('usuario_id', perfil.id)
-      .eq('id_curso', curso.id)
-      .gte('created_at', new Date(tsEval - 2 * 60000).toISOString())
-      .lte('created_at', new Date(tsEval + 2 * 60000).toISOString())
-      .limit(1);
-
-    if (existente?.length > 0) {
-      if (tdEstado) { tdEstado.innerHTML = '<span style="color:#888;">⏭️ Ya existe</span>'; }
-      omitidos++;
-      progreso.textContent = `Progreso: ${i+1}/${filasEval.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
-      continue;
-    }
-
     const porcentaje = Math.round((nota / 20) * 100 * 10) / 10;
     const aprobado   = nota >= 16;
 
@@ -3724,22 +3706,6 @@ window.importarDesdeforms = async function () {
       continue;
     }
 
-    // Verificar duplicado exacto: mismo usuario + curso + timestamp ±2 min
-    // (solo bloquea si se importa el mismo archivo dos veces)
-    if (createdAt) {
-      const ts    = new Date(createdAt).getTime();
-      const desde = new Date(ts - 2 * 60000).toISOString();
-      const hasta = new Date(ts + 2 * 60000).toISOString();
-      const { data: dup } = await supabase.from('envios_formulario')
-        .select('id').eq('usuario_id', perfil.id).eq('id_curso', cursoId)
-        .gte('created_at', desde).lte('created_at', hasta).limit(1);
-      if (dup?.length > 0) {
-        if (tdEstado) tdEstado.innerHTML = '<span style="color:#888;">⏭️ Ya existe</span>';
-        omitidos++;
-        progreso.textContent = `Progreso: ${i+1}/${filasForms.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
-        continue;
-      }
-    }
 
     const porcentaje = Math.round((nota20 / 20) * 100 * 10) / 10;
     const aprobado   = nota20 >= 16;

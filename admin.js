@@ -3505,6 +3505,7 @@ window.importarEvaluaciones = async function () {
 // ═══════════════════════════════════════════════
 
 let filasForms = [];
+let filasFormsOrdenadas = [];
 let colsDniForms = -1, colFechaForms = -1, colNotaForms = -1, colNombreForms = -1;
 
 window.cargarCursosSelectForms = async function () {
@@ -3621,8 +3622,8 @@ window.previsualizarForms = async function () {
     tbody.innerHTML = '';
     let validas = 0, invalidas = 0, desaprobados = 0;
 
-    // Preparar filas con orden calculado
-    const filasOrdenadas = filasForms.map(f => {
+    // Preparar filas con orden calculado — guardar en variable global para el import
+    filasFormsOrdenadas = filasForms.map(f => {
       const dniRaw     = normalizarDNI(f[colsDniForms]);
       const notaRaw    = parseFloat(String(f[colNotaForms]).replace(',', '.')) || 0;
       const nota20     = maxPuntaje === 20 ? notaRaw : Math.round((notaRaw / maxPuntaje) * 20 * 10) / 10;
@@ -3633,7 +3634,7 @@ window.previsualizarForms = async function () {
       return { f, dniRaw, notaRaw, nota20, perfil, aprobado, orden };
     }).sort((a, b) => a.orden - b.orden);
 
-    filasOrdenadas.forEach(({ f, dniRaw, notaRaw, nota20, perfil, aprobado }) => {
+    filasFormsOrdenadas.forEach(({ f, dniRaw, notaRaw, nota20, perfil, aprobado }) => {
       const { fechaStr, horaStr } = parsearFechaForms(f[colFechaForms]);
       const nombreForms = colNombreForms !== -1 ? String(f[colNombreForms]).trim() : '';
       const tr = document.createElement('tr');
@@ -3691,18 +3692,15 @@ window.importarDesdeforms = async function () {
   const filas = document.querySelectorAll('#tbody-forms tr');
   let ok = 0, omitidos = 0, errores = 0;
 
-  for (let i = 0; i < filasForms.length; i++) {
-    const f      = filasForms[i];
-    const dniRaw = normalizarDNI(f[colsDniForms]);
-    const notaRaw = parseFloat(String(f[colNotaForms]).replace(',','.')) || 0;
-    const nota20  = maxPuntaje === 20 ? notaRaw : Math.round((notaRaw / maxPuntaje) * 20 * 10) / 10;
+  for (let i = 0; i < filasFormsOrdenadas.length; i++) {
+    const { f, dniRaw, nota20, perfil } = filasFormsOrdenadas[i];
+    const notaRaw  = parseFloat(String(f[colNotaForms]).replace(',', '.')) || 0;
     const { iso: createdAt } = parsearFechaForms(f[colFechaForms]);
     const tdEstado = filas[i]?.querySelector('.estado-fila-forms');
-    const perfil   = perfilMap[dniRaw];
 
     if (!perfil) {
       omitidos++;
-      progreso.textContent = `Progreso: ${i+1}/${filasForms.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
+      progreso.textContent = `Progreso: ${i+1}/${filasFormsOrdenadas.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
       continue;
     }
 

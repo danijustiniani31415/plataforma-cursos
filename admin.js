@@ -2,6 +2,11 @@ import { supabase } from './src/supabaseClient.js';
 import { alertToToast, withLoading, showConfirm, fieldValidation } from './toast.js';
 const alert = alertToToast;
 
+// Normaliza DNI: elimina espacios/saltos y padea a 8 dígitos con 0 a la izquierda
+function normalizarDNI(raw) {
+  return String(raw).trim().replace(/[\n\r]/g, '').padStart(8, '0');
+}
+
 // Select buscable con Tom Select
 function initSelectBuscable(id) {
   const el = document.getElementById(id);
@@ -476,7 +481,7 @@ window.importarDesdeExcel = async function () {
 
   for (let i = 0; i < filasExcel.length; i++) {
     const f = filasExcel[i];
-    const dni          = String(f[0]).trim();
+    const dni          = normalizarDNI(f[0]);
     const apellidos    = String(f[1]).trim();
     const nombres      = String(f[2]).trim();
     const emailRaw     = String(f[3]).trim();
@@ -649,7 +654,7 @@ window.previsualizarAsignacion = async function () {
 
     filasAsignacion = filas.slice(1).filter(f => f[0]);
 
-    const dnis = filasAsignacion.map(f => String(f[0]).trim());
+    const dnis = filasAsignacion.map(f => normalizarDNI(f[0]));
 
     const { data: perfiles } = await supabase
       .from('profiles')
@@ -665,7 +670,7 @@ window.previsualizarAsignacion = async function () {
     let existentes = 0, nuevos = 0;
 
     filasAsignacion.forEach(f => {
-      const dni      = String(f[0]).trim();
+      const dni      = normalizarDNI(f[0]);
       const apellidos = String(f[1]).trim();
       const nombres   = String(f[2]).trim();
       const cargo     = String(f[4]).trim();
@@ -712,7 +717,7 @@ window.importarAsignacion = async function () {
   const { data: perfilesExistentes } = await supabase
     .from('profiles')
     .select('id, documento_numero, email')
-    .in('documento_numero', filasAsignacion.map(f => String(f[0]).trim()))
+    .in('documento_numero', filasAsignacion.map(f => normalizarDNI(f[0])))
     .eq('empresa_id', empresaAdminId);
 
   const perfilMap = {};
@@ -3264,7 +3269,7 @@ window.previsualizarEvaluaciones = async function () {
 
     filasEval = filas.slice(1).filter(f => f[0] && f[1]);
 
-    const dnis = [...new Set(filasEval.map(f => String(f[0]).trim()))];
+    const dnis = [...new Set(filasEval.map(f => normalizarDNI(f[0])))];
     const { data: perfiles } = await supabase
       .from('profiles')
       .select('id, documento_numero, nombres, apellidos, email')
@@ -3278,7 +3283,7 @@ window.previsualizarEvaluaciones = async function () {
     tbody.innerHTML = '';
 
     filasEval.forEach(f => {
-      const dni    = String(f[0]).trim();
+      const dni    = normalizarDNI(f[0]);
       const curso  = String(f[1]).trim();
       const fecha  = String(f[2]).trim();
       const hora   = String(f[3]).trim() || '08:00';
@@ -3322,7 +3327,7 @@ window.importarEvaluaciones = async function () {
   const progreso = document.getElementById('progreso-eval');
 
   // Cargar datos maestros de una vez
-  const dnis = [...new Set(filasEval.map(f => String(f[0]).trim()))];
+  const dnis = [...new Set(filasEval.map(f => normalizarDNI(f[0])))];
   const { data: perfiles } = await supabase
     .from('profiles')
     .select('id, documento_numero, email')
@@ -3347,7 +3352,7 @@ window.importarEvaluaciones = async function () {
 
   for (let i = 0; i < filasEval.length; i++) {
     const f      = filasEval[i];
-    const dni    = String(f[0]).trim();
+    const dni    = normalizarDNI(f[0]);
     const cursoNombre = String(f[1]).trim();
     const fechaStr    = String(f[2]).trim();   // DD/MM/AAAA
     const horaStr     = String(f[3]).trim() || '08:00';
@@ -3549,7 +3554,7 @@ window.previsualizarForms = async function () {
     filasForms = filas.slice(1).filter(f => f[colsDniForms] && String(f[colsDniForms]).trim());
 
     // Cargar perfiles para previsualizar estado
-    const dnis = [...new Set(filasForms.map(f => String(f[colsDniForms]).trim().replace(/\n/g, '')))];
+    const dnis = [...new Set(filasForms.map(f => normalizarDNI(f[colsDniForms])))];
     const { data: perfiles } = await supabase
       .from('profiles')
       .select('id, documento_numero, nombres, apellidos, email')
@@ -3563,7 +3568,7 @@ window.previsualizarForms = async function () {
     let validas = 0, invalidas = 0;
 
     filasForms.forEach(f => {
-      const dniRaw   = String(f[colsDniForms]).trim().replace(/\n/g, '').replace(/\r/g, '');
+      const dniRaw   = normalizarDNI(f[colsDniForms]);
       const notaRaw  = parseFloat(String(f[colNotaForms]).replace(',', '.')) || 0;
       const nota20   = maxPuntaje === 20 ? notaRaw : Math.round((notaRaw / maxPuntaje) * 20 * 10) / 10;
       const { fechaStr, horaStr } = parsearFechaForms(f[colFechaForms]);

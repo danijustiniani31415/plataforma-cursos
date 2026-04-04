@@ -1087,6 +1087,52 @@
         <span id="progreso-eval" class="progreso"></span>
       </div>
     </div>
+
+    <!-- Importar desde Microsoft Forms -->
+    <div class="panel-card">
+      <h2>📋 Importar desde Microsoft Forms / Google Forms</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:16px;">
+        Sube el Excel exportado directamente desde Forms. El sistema detecta automáticamente
+        las columnas de DNI, nota total, fecha y hora. Solo selecciona el curso correspondiente.
+      </p>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:600px; margin-bottom:16px;">
+        <div>
+          <label style="font-size:0.82rem; color:#555; display:block; margin-bottom:4px;">Curso al que corresponde *</label>
+          <select id="forms-curso" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+            <option value="">-- Selecciona el curso --</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.82rem; color:#555; display:block; margin-bottom:4px;">Puntaje máximo del formulario *</label>
+          <input type="number" id="forms-max-puntaje" value="20" min="1"
+                 style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;" />
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <input type="file" id="archivo-forms" accept=".xlsx,.xls,.csv"
+               style="padding:8px; border:1px solid #ddd; border-radius:7px; font-size:0.88rem;"
+               onchange="previsualizarForms()" />
+      </div>
+
+      <div id="preview-forms" style="display:none;">
+        <p id="preview-resumen-forms" style="font-size:0.88rem; color:#555; margin-bottom:10px;"></p>
+        <div style="overflow-x:auto; margin-bottom:12px;">
+          <table class="preview-table">
+            <thead>
+              <tr>
+                <th>DNI</th><th>Nombre (Forms)</th><th>Fecha</th><th>Hora</th>
+                <th>Nota</th><th>Aprobado</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-forms"></tbody>
+          </table>
+        </div>
+        <button id="btn-confirmar-forms" onclick="importarDesdeforms()" class="btn-primary">✅ Confirmar importación</button>
+        <span id="progreso-forms" class="progreso"></span>
+      </div>
+    </div>
   </div>
 
   <!-- ═══ TAB: ACCESO ═══ -->
@@ -1169,6 +1215,9 @@
     }
     if (tab === 'qr-asistencia') {
       initQRAsistencia();
+    }
+    if (tab === 'import-eval') {
+      cargarCursosSelectForms();
     }
   }
 </script>

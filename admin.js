@@ -3429,6 +3429,241 @@ window.importarEvaluaciones = async function () {
 };
 
 // ═══════════════════════════════════════════════
+// 📋 IMPORTAR DESDE MICROSOFT FORMS / GOOGLE FORMS
+// ═══════════════════════════════════════════════
+
+let filasForms = [];
+let colsDniForms = -1, colFechaForms = -1, colNotaForms = -1, colNombreForms = -1;
+
+window.cargarCursosSelectForms = async function () {
+  const sel = document.getElementById('forms-curso');
+  if (!sel || sel.options.length > 1) return; // ya cargado
+  const { data: cursos } = await supabase
+    .from('cursos').select('id, titulo').eq('activo', true).order('titulo');
+  (cursos || []).forEach(c => {
+    sel.innerHTML += `<option value="${c.id}">${c.titulo}</option>`;
+  });
+};
+
+// Detecta qué columna del header coincide con un texto (exacto o parcial)
+function detectarColumna(headers, textos) {
+  for (const texto of textos) {
+    const idx = headers.findIndex(h =>
+      String(h).trim().toLowerCase() === texto.toLowerCase()
+    );
+    if (idx !== -1) return idx;
+  }
+  // búsqueda parcial como fallback
+  for (const texto of textos) {
+    const idx = headers.findIndex(h =>
+      String(h).trim().toLowerCase().includes(texto.toLowerCase())
+    );
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+// Parsea fecha/hora del formato Forms: "3/27/25 9:09:28" o "2025-03-27T09:09:28"
+function parsearFechaForms(raw) {
+  if (!raw) return { fechaStr: '', horaStr: '', iso: null };
+  const s = String(raw).trim();
+  // Formato M/D/YY H:MM:SS
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})/);
+  if (m) {
+    const anio  = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]);
+    const mes   = m[1].padStart(2, '0');
+    const dia   = m[2].padStart(2, '0');
+    const hh    = m[4].padStart(2, '0');
+    const mm    = m[5].padStart(2, '0');
+    const d = new Date(anio, parseInt(mes)-1, parseInt(dia), parseInt(hh), parseInt(mm));
+    return { fechaStr: `${dia}/${mes}/${anio}`, horaStr: `${hh}:${mm}`, iso: d.toISOString() };
+  }
+  // ISO o Date object
+  try {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      const dia = String(d.getDate()).padStart(2,'0');
+      const mes = String(d.getMonth()+1).padStart(2,'0');
+      const hh  = String(d.getHours()).padStart(2,'0');
+      const mm  = String(d.getMinutes()).padStart(2,'0');
+      return { fechaStr: `${dia}/${mes}/${d.getFullYear()}`, horaStr: `${hh}:${mm}`, iso: d.toISOString() };
+    }
+  } catch(_) {}
+  return { fechaStr: s, horaStr: '', iso: null };
+}
+
+window.previsualizarForms = async function () {
+  const archivo = document.getElementById('archivo-forms').files[0];
+  if (!archivo) return;
+  const cursoId = document.getElementById('forms-curso').value;
+  if (!cursoId) { alert('Selecciona primero el curso correspondiente.'); return; }
+
+  const reader = new FileReader();
+  reader.onload = async function (ev) {
+    const XLSX = window.XLSX;
+    const wb   = XLSX.read(ev.target.result, { type: 'array', cellDates: false });
+    const hoja = wb.Sheets[wb.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
+    if (filas.length < 2) { alert('El archivo no tiene datos.'); return; }
+
+    const headers = filas[0].map(h => String(h).trim());
+
+    // Detectar columnas clave
+    colFechaForms  = detectarColumna(headers, ['Hora de finalización', 'End time', 'Hora de inicio', 'Start time']);
+    colNotaForms   = detectarColumna(headers, ['Total de puntos', 'Total points', 'Score', 'Puntuación']);
+    colNombreForms = detectarColumna(headers, ['Nombre', 'Name']);
+    // DNI: buscar columna cuyo header sea exactamente "DNI" (no "Puntos: DNI")
+    colsDniForms   = headers.findIndex(h => /^dni$/i.test(h.trim()));
+
+    if (colsDniForms === -1 || colNotaForms === -1) {
+      alert(`No se encontraron las columnas necesarias.\nDetectado: DNI en col ${colsDniForms}, Nota en col ${colNotaForms}.\nVerifica que el archivo sea una exportación de Microsoft Forms.`);
+      return;
+    }
+
+    const maxPuntaje = parseFloat(document.getElementById('forms-max-puntaje').value) || 20;
+
+    filasForms = filas.slice(1).filter(f => f[colsDniForms] && String(f[colsDniForms]).trim());
+
+    // Cargar perfiles para previsualizar estado
+    const dnis = [...new Set(filasForms.map(f => String(f[colsDniForms]).trim().replace(/\n/g, '')))];
+    const { data: perfiles } = await supabase
+      .from('profiles')
+      .select('id, documento_numero, nombres, apellidos, email')
+      .in('documento_numero', dnis)
+      .eq('empresa_id', empresaAdminId);
+    const perfilMap = {};
+    (perfiles || []).forEach(p => { perfilMap[p.documento_numero] = p; });
+
+    const tbody = document.getElementById('tbody-forms');
+    tbody.innerHTML = '';
+    let validas = 0, invalidas = 0;
+
+    filasForms.forEach(f => {
+      const dniRaw   = String(f[colsDniForms]).trim().replace(/\n/g, '').replace(/\r/g, '');
+      const notaRaw  = parseFloat(String(f[colNotaForms]).replace(',', '.')) || 0;
+      const nota20   = maxPuntaje === 20 ? notaRaw : Math.round((notaRaw / maxPuntaje) * 20 * 10) / 10;
+      const { fechaStr, horaStr } = parsearFechaForms(f[colFechaForms]);
+      const nombreForms = colNombreForms !== -1 ? String(f[colNombreForms]).trim() : '';
+      const perfil   = perfilMap[dniRaw];
+      const aprobado = nota20 >= 16;
+      const tr = document.createElement('tr');
+      let estado;
+      if (!perfil) {
+        estado = `<span style="color:red;">❌ DNI ${dniRaw} no encontrado</span>`;
+        invalidas++;
+      } else {
+        estado = `<span style="color:${aprobado ? '#198754':'#dc3545'};">${aprobado ? '✅ Aprobado':'⚠️ Desaprobado'}</span>`;
+        validas++;
+      }
+      tr.innerHTML = `
+        <td>${dniRaw}</td>
+        <td style="font-size:0.82rem;">${perfil ? perfil.apellidos+' '+perfil.nombres : (nombreForms || '<em style="color:#888;">—</em>')}</td>
+        <td>${fechaStr}</td><td>${horaStr}</td>
+        <td><strong>${nota20}</strong>/20${maxPuntaje !== 20 ? ` <span style="color:#888;font-size:0.78rem;">(${notaRaw}/${maxPuntaje})</span>` : ''}</td>
+        <td>${aprobado ? '✅' : '❌'}</td>
+        <td class="estado-fila-forms">${estado}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('preview-resumen-forms').textContent =
+      `${filasForms.length} respuestas — ✅ ${validas} con DNI reconocido, ❌ ${invalidas} no encontrados (se omitirán).`;
+    document.getElementById('preview-forms').style.display = 'block';
+  };
+  reader.readAsArrayBuffer(archivo);
+};
+
+window.importarDesdeforms = async function () {
+  if (!filasForms.length) return;
+  const cursoId    = document.getElementById('forms-curso').value;
+  const maxPuntaje = parseFloat(document.getElementById('forms-max-puntaje').value) || 20;
+  if (!cursoId) { alert('Selecciona el curso.'); return; }
+
+  const btn = document.getElementById('btn-confirmar-forms');
+  btn.disabled = true; btn.textContent = '⏳ Importando...';
+  const progreso = document.getElementById('progreso-forms');
+
+  // Datos maestros
+  const dnis = [...new Set(filasForms.map(f => String(f[colsDniForms]).trim().replace(/\n/g,'').replace(/\r/g,'')))];
+  const { data: perfiles } = await supabase
+    .from('profiles').select('id, documento_numero, email')
+    .in('documento_numero', dnis).eq('empresa_id', empresaAdminId);
+  const perfilMap = {};
+  (perfiles || []).forEach(p => { perfilMap[p.documento_numero] = p; });
+
+  const { data: formRows } = await supabase
+    .from('formularios').select('id, id_curso').eq('id_curso', cursoId).eq('tipo', 'examen');
+  const formId = formRows?.[0]?.id || null;
+
+  const filas = document.querySelectorAll('#tbody-forms tr');
+  let ok = 0, omitidos = 0, errores = 0;
+
+  for (let i = 0; i < filasForms.length; i++) {
+    const f      = filasForms[i];
+    const dniRaw = String(f[colsDniForms]).trim().replace(/\n/g,'').replace(/\r/g,'');
+    const notaRaw = parseFloat(String(f[colNotaForms]).replace(',','.')) || 0;
+    const nota20  = maxPuntaje === 20 ? notaRaw : Math.round((notaRaw / maxPuntaje) * 20 * 10) / 10;
+    const { iso: createdAt } = parsearFechaForms(f[colFechaForms]);
+    const tdEstado = filas[i]?.querySelector('.estado-fila-forms');
+    const perfil   = perfilMap[dniRaw];
+
+    if (!perfil) {
+      omitidos++;
+      progreso.textContent = `Progreso: ${i+1}/${filasForms.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
+      continue;
+    }
+
+    // Verificar duplicado (mismo usuario + curso + misma fecha)
+    if (createdAt) {
+      const inicio = new Date(createdAt); inicio.setHours(0,0,0,0);
+      const fin    = new Date(createdAt); fin.setHours(23,59,59,999);
+      const { data: dup } = await supabase.from('envios_formulario')
+        .select('id').eq('usuario_id', perfil.id).eq('id_curso', cursoId)
+        .gte('created_at', inicio.toISOString()).lte('created_at', fin.toISOString()).limit(1);
+      if (dup?.length > 0) {
+        if (tdEstado) tdEstado.innerHTML = '<span style="color:#888;">⏭️ Ya existe</span>';
+        omitidos++;
+        progreso.textContent = `Progreso: ${i+1}/${filasForms.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
+        continue;
+      }
+    }
+
+    const porcentaje = Math.round((nota20 / 20) * 100 * 10) / 10;
+    const aprobado   = nota20 >= 16;
+
+    const envioData = {
+      id_formulario: formId,
+      usuario_id:    perfil.id,
+      usuario_email: perfil.email,
+      id_curso:      cursoId,
+      estado:        'completado',
+      puntaje:       nota20,
+      porcentaje,
+      aprobado,
+    };
+    if (createdAt) envioData.created_at = createdAt;
+
+    const { error: errEnvio } = await supabase.from('envios_formulario').insert(envioData);
+    if (errEnvio) {
+      if (tdEstado) tdEstado.innerHTML = `<span style="color:red;">❌ ${errEnvio.message}</span>`;
+      errores++;
+    } else {
+      // Registrar asistencia
+      const { data: yaAsiste } = await supabase.from('asistencias')
+        .select('usuario_id').eq('usuario_id', perfil.id).eq('curso_id', cursoId).maybeSingle();
+      if (!yaAsiste) {
+        await supabase.from('asistencias').insert({ usuario_id: perfil.id, email: perfil.email, curso_id: cursoId });
+      }
+      if (tdEstado) tdEstado.innerHTML = `<span style="color:${aprobado?'#198754':'#dc3545'};">✅ ${aprobado?'Aprobado':'Desaprobado'} importado</span>`;
+      ok++;
+    }
+    progreso.textContent = `Progreso: ${i+1}/${filasForms.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
+  }
+
+  progreso.textContent += ` — ¡Completado! ${ok} registros importados.`;
+  btn.disabled = false; btn.textContent = '✅ Confirmar importación';
+};
+
+// ═══════════════════════════════════════════════
 // ⏳ SPINNERS EN BOTONES — aplicar withLoading
 // ═══════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {

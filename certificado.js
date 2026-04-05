@@ -27,9 +27,9 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
     .esquina.bl { bottom: 5mm; left: 5mm; border-width: 0 0 2px 2px; }
     .esquina.br { bottom: 5mm; right: 5mm; border-width: 0 2px 2px 0; }
     .logo { position: absolute; top: 10mm; left: 14mm; height: 16mm; z-index: 3; }
-    .firma-img { position: absolute; bottom: 26mm; right: 20mm; height: 14mm; z-index: 3; }
-    .contenido { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 0 25mm; }
-    .titulo { margin-top: 18mm; font-family: 'Cinzel', Georgia, serif; font-size: 28pt; font-weight: 700; color: #002855; letter-spacing: 4px; text-transform: uppercase; text-align: center; line-height: 1.1; }
+    .firma-img { position: absolute; bottom: 58mm; right: 18mm; height: 72mm; z-index: 3; }
+    .contenido { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 0 25mm; transform: translateY(50mm); }
+    .titulo { margin-top: 38mm; font-family: 'Cinzel', Georgia, serif; font-size: 28pt; font-weight: 700; color: #002855; letter-spacing: 4px; text-transform: uppercase; text-align: center; line-height: 1.1; }
     .subtitulo { margin-top: 2mm; font-family: 'Cinzel', serif; font-size: 8.5pt; font-weight: 400; color: #555; letter-spacing: 3px; text-transform: uppercase; text-align: center; }
     .linea-decorativa { width: 180mm; margin: 4mm auto; display: flex; align-items: center; gap: 3mm; }
     .linea-decorativa::before, .linea-decorativa::after { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, transparent, #c9a84c, transparent); }
@@ -43,13 +43,10 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
     .empresa-texto { margin-top: 3mm; font-family: 'Crimson Text', serif; font-size: 9.5pt; color: #666; text-align: center; }
     .duracion-fecha { margin-top: 1.5mm; font-family: 'Crimson Text', serif; font-size: 9.5pt; color: #555; text-align: center; }
     .pie-datos { position: absolute; bottom: 10mm; right: 18mm; text-align: right; font-family: 'Crimson Text', serif; font-size: 8pt; color: #666; line-height: 1.7; z-index: 3; }
-    .firma-bloque { position: absolute; bottom: 8mm; right: 15mm; text-align: center; width: 65mm; z-index: 3; }
-    .firma-linea { border-top: 1px solid #002855; margin-bottom: 2mm; }
-    .firma-nombre { font-family: 'Cinzel', serif; font-size: 7.5pt; font-weight: 600; color: #002855; letter-spacing: 0.5px; text-transform: uppercase; }
-    .firma-titulo { font-family: 'Crimson Text', serif; font-size: 7.5pt; color: #555; margin-top: 1mm; }
-    .sello { position: absolute; bottom: 12mm; left: 50%; transform: translateX(-50%); width: 28mm; height: 28mm; border-radius: 50%; border: 2px solid #c9a84c; display: flex; align-items: center; justify-content: center; z-index: 3; background: rgba(201,168,76,0.05); }
-    .sello-inner { border-radius: 50%; border: 1px dashed #c9a84c; width: 24mm; height: 24mm; display: flex; align-items: center; justify-content: center; }
-    .sello-texto { font-family: 'Cinzel', serif; font-size: 5.5pt; color: #002855; text-align: center; line-height: 1.4; text-transform: uppercase; letter-spacing: 0.5px; }
+    .firma-bloque { position: absolute; bottom: 78mm; right: 10mm; text-align: center; width: 92mm; z-index: 3; }
+    .firma-linea { border-top: 1.5px solid #002855; margin-bottom: 2.5mm; }
+    .firma-nombre { font-family: 'Cinzel', serif; font-size: 11pt; font-weight: 600; color: #002855; letter-spacing: 0.7px; text-transform: uppercase; }
+    .firma-titulo { font-family: 'Crimson Text', serif; font-size: 10pt; color: #555; margin-top: 1.2mm; }
     @media print { body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { size: A4 landscape; margin: 0; } }
   </style>
 </head>
@@ -83,11 +80,6 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
       <div class="firma-nombre">Samuel Daniel Justiniani Aranda</div>
       <div class="firma-titulo">Especialista SSOMA</div>
       <div class="firma-titulo">Ingeniero Metalurgista CIP-181200</div>
-    </div>
-    <div class="sello">
-      <div class="sello-inner">
-        <div class="sello-texto">CV GLOBAL<br>S.A.C.<br>✦<br>SSOMA</div>
-      </div>
     </div>
   </div>
 </body>

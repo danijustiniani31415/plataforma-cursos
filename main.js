@@ -768,9 +768,10 @@ window.enviarFormulario = async function (tipoPaso) {
     const btn = document.getElementById('btn-siguiente-paso');
     if (btn) { btn.disabled = false; }
 
-    if (pasoActual === pasosCurso.length - 1 && tipoPaso === 'eficacia') {
-      certificadoSection.style.display = 'block';
-    }
+    // TODO: restaurar condicion original cuando se termine de probar
+    // if (pasoActual === pasosCurso.length - 1 && tipoPaso === 'eficacia') {
+    certificadoSection.style.display = 'block';
+    // }
   }
 };
 

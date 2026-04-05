@@ -600,8 +600,8 @@ async function mostrarPasoActual() {
       <div class="step-content-inner">${contenidoHTML}</div>
     </div>
   `;
-
-  certificadoSection.style.display = 'none';
+  // TODO: restaurar a 'none' cuando terminen las pruebas
+  certificadoSection.style.display = 'block';
 }
 
 // ═══════════════════════════════

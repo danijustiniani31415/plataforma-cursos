@@ -552,6 +552,29 @@
     </div>
 
     <div class="panel-card">
+      <h2>📥 Descargar certificados (masivo)</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
+        Descarga los certificados de todos los trabajadores que aprobaron un curso. Se genera un ZIP con un PDF por persona.
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
+        <div>
+          <label style="display:block; font-size:0.82rem; color:#555; margin-bottom:5px;">Curso</label>
+          <select id="cert-bulk-curso" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; min-width:220px;">
+            <option value="">— Seleccione curso —</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.82rem; color:#555; margin-bottom:5px;">Mes / Año (opcional)</label>
+          <input type="month" id="cert-bulk-mes" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;" />
+        </div>
+        <button onclick="descargarCertificadosMasivo()" class="btn-primary" style="height:38px;">
+          📦 Generar ZIP
+        </button>
+      </div>
+      <div id="cert-bulk-status" style="font-size:0.85rem; color:#555;"></div>
+    </div>
+
+    <div class="panel-card">
       <h2>🔛 Activar / Desactivar cursos</h2>
       <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
         Los cursos inactivos no aparecen para los trabajadores. Actívalos o desactívalos según la necesidad del mes.
@@ -1193,6 +1216,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
@@ -1237,6 +1262,6 @@
     }
   }
 </script>
-<script type="module" src="admin.js?v=16"></script>
+<script type="module" src="admin.js?v=17"></script>
 </body>
 </html>

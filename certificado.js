@@ -6,41 +6,9 @@ const FONDO_URL = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/si
 const FIRMA_URL = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/sign/certificados/Firma.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MjRkNDBhNC1jZTI0LTQwYzItYTc3NC1lMmUwNzBjNGMzMzUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjZXJ0aWZpY2Fkb3MvRmlybWEucG5nIiwiaWF0IjoxNzc0MTkxNDYyLCJleHAiOjE5MzE4NzE0NjJ9.SdrIBlz2EWYzDVY35YYfCJMJO3LypxQ5JIE8oHvegTM';
 const LOGO_URL  = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/sign/certificados/Logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MjRkNDBhNC1jZTI0LTQwYzItYTc3NC1lMmUwNzBjNGMzMzUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjZXJ0aWZpY2Fkb3MvTG9nby5wbmciLCJpYXQiOjE3NzQxOTE4MjksImV4cCI6MTkzMTg3MTgyOX0.rzYxlgmM8bq-3Bmk8rTNgVfvsUu7ex3LVQyrI1oCIHk';
 
-export async function generarCertificadoPDF(curso, nota) {
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // Verificar si ya tiene certificado
-  const { data: certExistente } = await supabase
-    .from('certificados')
-    .select('id, codigo')
-    .eq('usuario_id', user.id)
-    .eq('curso_id', curso.id)
-    .maybeSingle();
-
-  if (certExistente) {
-    alert('⚠️ Ya generaste el certificado para este curso. Fue enviado a tu correo cuando lo generaste.');
-    return;
-  }
-
-  const { data: perfil } = await supabase
-    .from('profiles')
-    .select('nombres, apellidos, documento_numero, documento_tipo, cargo_id, empresa_id, cargos(nombre), empresas(nombre)')
-    .eq('id', user.id)
-    .single();
-
-  const nombreCompleto = `${perfil?.apellidos || ''} ${perfil?.nombres || ''}`.trim().toUpperCase();
-  const dni            = perfil?.documento_numero || '';
-  const cargo          = perfil?.cargos?.nombre || '';
-  const empresa        = perfil?.empresas?.nombre || '';
-  const fechaHoy       = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
-  const duracion       = curso.duracion ? `${curso.duracion} hora${curso.duracion > 1 ? 's' : ''}` : '';
-  const notaTexto      = nota?.toFixed ? nota.toFixed(1) : nota;
-
-  // Llamar Edge Function para guardar y enviar correo
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
-
-  const htmlCertificado = `<!DOCTYPE html>
+// ─── Genera el HTML del certificado (reutilizable desde admin también) ───────
+export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo, cursotitulo, duracion, notaTexto, fechaHoy, codigo }) {
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -77,23 +45,23 @@ export async function generarCertificadoPDF(curso, nota) {
 </head>
 <body>
   <div class="certificado">
-    <img class="fondo" src="${FONDO_URL}" />
-    <img class="logo" src="${LOGO_URL}" />
-    <img class="firma-img" src="${FIRMA_URL}" />
+    <img class="fondo" src="${FONDO_URL}" crossorigin="anonymous" />
+    <img class="logo" src="${LOGO_URL}" crossorigin="anonymous" />
+    <img class="firma-img" src="${FIRMA_URL}" crossorigin="anonymous" />
     <div class="contenido">
       <div class="titulo">Certificado de Capacitación</div>
       <div class="subtitulo">Seguridad · Salud · Medio Ambiente</div>
       <div class="linea-decorativa"><span class="linea-decorativa-icono">✦</span></div>
       <div class="certifica-texto">La empresa CV GLOBAL S.A.C. certifica que:</div>
       <div class="nombre">${nombreCompleto}</div>
-      <div class="dni-cargo">Con ${perfil?.documento_tipo || 'DNI'} N°: <strong>${dni}</strong> &nbsp;&nbsp;·&nbsp;&nbsp; Puesto de trabajo: <strong>${cargo}</strong></div>
+      <div class="dni-cargo">Con ${documentoTipo || 'DNI'} N°: <strong>${dni}</strong> &nbsp;&nbsp;·&nbsp;&nbsp; Puesto de trabajo: <strong>${cargo}</strong></div>
       <div class="separador"></div>
       <div class="participacion-texto">Ha PARTICIPADO y APROBADO satisfactoriamente el curso:</div>
-      <div class="curso-nombre">${curso.titulo}</div>
+      <div class="curso-nombre">${cursotitulo}</div>
       <div class="empresa-texto">Dictado por CV GLOBAL S.A.C. &nbsp;·&nbsp; Duración: <strong>${duracion}</strong></div>
       <div class="duracion-fecha">Lima, ${fechaHoy}</div>
     </div>
-    <div class="pie-datos"><div><strong>Nota:</strong> ${notaTexto}/20 &nbsp;&nbsp; <strong>Código:</strong> CODIGO_PLACEHOLDER</div></div>
+    <div class="pie-datos"><div><strong>Nota:</strong> ${notaTexto}/20 &nbsp;&nbsp; <strong>Código:</strong> ${codigo}</div></div>
     <div class="firma-bloque">
       <div class="firma-linea"></div>
       <div class="firma-nombre">Samuel Daniel Justiniani Aranda</div>
@@ -101,31 +69,81 @@ export async function generarCertificadoPDF(curso, nota) {
       <div class="firma-titulo">Ingeniero Metalurgista CIP-181200</div>
     </div>
   </div>
-  <script>window.onload = function() { setTimeout(() => window.print(), 1200); };</script>
 </body>
 </html>`;
+}
+
+// ─── Descarga el HTML como PDF usando html2pdf.js ────────────────────────────
+export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
+  const contenedor = document.createElement('div');
+  contenedor.style.cssText = 'position:fixed;left:-9999px;top:0;width:297mm;height:210mm;overflow:hidden;background:white;';
+  contenedor.innerHTML = htmlContent;
+  document.body.appendChild(contenedor);
+
+  // Esperar a que carguen las imágenes
+  await Promise.all(
+    Array.from(contenedor.querySelectorAll('img')).map(img =>
+      new Promise(resolve => {
+        if (img.complete) return resolve(null);
+        img.onload = img.onerror = resolve;
+      })
+    )
+  );
+  // Pequeño margen extra para las fuentes
+  await new Promise(r => setTimeout(r, 800));
+
+  await window.html2pdf().set({
+    margin:      0,
+    filename:    nombreArchivo,
+    image:       { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794 },
+    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
+  }).from(contenedor.querySelector('.certificado') || contenedor).save();
+
+  document.body.removeChild(contenedor);
+}
+
+// ─── Flujo principal del trabajador ──────────────────────────────────────────
+export async function generarCertificadoPDF(curso, nota) {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: perfil } = await supabase
+    .from('profiles')
+    .select('nombres, apellidos, documento_numero, documento_tipo, cargo_id, empresa_id, cargos(nombre), empresas(nombre)')
+    .eq('id', user.id)
+    .single();
+
+  const nombreCompleto = `${perfil?.apellidos || ''} ${perfil?.nombres || ''}`.trim().toUpperCase();
+  const dni            = perfil?.documento_numero || '';
+  const cargo          = perfil?.cargos?.nombre || '';
+  const duracion       = curso.duracion ? `${curso.duracion} hora${curso.duracion > 1 ? 's' : ''}` : '';
+  const notaTexto      = nota?.toFixed ? nota.toFixed(1) : String(nota);
+  const fechaHoy       = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  // Llamar Edge Function: guarda en BD + envía email → devuelve código
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
 
   const response = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/enviar-certificado', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type':  'application/json',
       'Authorization': `Bearer ${token}`,
-      'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s'
+      'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s',
     },
     body: JSON.stringify({
-      usuario_id:       user.id,
-      usuario_email:    user.email,
-      nombres:          perfil?.nombres || '',
-      apellidos:        perfil?.apellidos || '',
+      usuario_id:    user.id,
+      usuario_email: user.email,
+      nombres:       perfil?.nombres || '',
+      apellidos:     perfil?.apellidos || '',
       dni,
       cargo,
-      empresa,
-      id_curso:         curso.id,
-      curso_titulo:     curso.titulo,
-      curso_prefijo:    curso.codigo_prefijo || 'CERT',
-      nota:             notaTexto,
-      html_certificado: htmlCertificado
-    })
+      empresa:       perfil?.empresas?.nombre || '',
+      id_curso:      curso.id,
+      curso_titulo:  curso.titulo,
+      curso_prefijo: curso.codigo_prefijo || 'CERT',
+      nota:          notaTexto,
+    }),
   });
 
   const result = await response.json();
@@ -137,11 +155,24 @@ export async function generarCertificadoPDF(curso, nota) {
 
   const codigo = result.codigo;
 
-  alert(`✅ ¡Certificado generado!\nCódigo: ${codigo}`);
+  if (result.yaExistia) {
+    alert('⚠️ Ya generaste el certificado para este curso anteriormente. Descargando PDF...');
+  } else {
+    alert(`✅ ¡Certificado generado! Código: ${codigo}\nSe envió una notificación a tu correo.`);
+  }
 
-  // Abrir certificado para imprimir (con código real)
-  const htmlFinal = htmlCertificado.replace('CODIGO_PLACEHOLDER', codigo);
-  const blob = new Blob([htmlFinal], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
+  // Generar y descargar el PDF cliente
+  const html = buildHtmlCertificado({
+    nombreCompleto,
+    dni,
+    documentoTipo: perfil?.documento_tipo,
+    cargo,
+    cursotitulo:   curso.titulo,
+    duracion,
+    notaTexto,
+    fechaHoy,
+    codigo,
+  });
+
+  await descargarCertificadoPDF(html, `Certificado_${nombreCompleto}_${curso.titulo}.pdf`);
 }

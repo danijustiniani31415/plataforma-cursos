@@ -96,30 +96,42 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
 
 // ─── Descarga el HTML como PDF usando html2pdf.js ────────────────────────────
 export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
-  // Crear iframe oculto para renderizado aislado y correcto
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;border:none;opacity:0;pointer-events:none;z-index:-1;';
-  document.body.appendChild(iframe);
+  // Overlay de carga mientras se genera el PDF
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99998;display:flex;align-items:center;justify-content:center;color:white;font-size:1.1rem;font-family:sans-serif;';
+  overlay.textContent = '⏳ Generando certificado PDF...';
+  document.body.appendChild(overlay);
 
-  const doc = iframe.contentDocument || iframe.contentWindow.document;
-  doc.open();
-  doc.write(htmlContent);
-  doc.close();
+  // Contenedor del certificado visible para que html2canvas lo capture correctamente
+  const contenedor = document.createElement('div');
+  contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;';
+  contenedor.innerHTML = htmlContent;
+  document.body.appendChild(contenedor);
 
-  // Esperar imágenes y fuentes
-  await new Promise(r => setTimeout(r, 2000));
+  // Esperar imágenes
+  await Promise.all(
+    Array.from(contenedor.querySelectorAll('img')).map(img =>
+      new Promise(resolve => {
+        if (img.complete) return resolve(null);
+        img.onload = img.onerror = resolve;
+      })
+    )
+  );
+  // Esperar fuentes
+  await new Promise(r => setTimeout(r, 1500));
 
-  const el = doc.querySelector('.certificado');
+  const el = contenedor.querySelector('.certificado') || contenedor;
 
   await window.html2pdf().set({
     margin:      0,
     filename:    nombreArchivo,
     image:       { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794 },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, scrollX: 0, scrollY: 0 },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
   }).from(el).save();
 
-  document.body.removeChild(iframe);
+  document.body.removeChild(contenedor);
+  document.body.removeChild(overlay);
 }
 
 // ─── Flujo principal del trabajador ──────────────────────────────────────────

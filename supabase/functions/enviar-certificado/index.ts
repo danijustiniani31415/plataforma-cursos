@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
-const PLATAFORMA_URL = 'https://cursossstcvglobal.netlify.app'
+const PLATAFORMA_URL = 'https://plataforma-cursos.sdjustiniani-a.workers.dev'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
     }])
 
     // Enviar email de notificación con Resend
+    console.log('RESEND_API_KEY presente:', !!RESEND_API_KEY, '| email destino:', usuario_email)
     if (RESEND_API_KEY && usuario_email) {
       const nombreCompleto = `${apellidos || ''} ${nombres || ''}`.trim()
       const notaDisplay    = typeof nota === 'number' ? nota.toFixed(1) : nota
@@ -112,19 +113,21 @@ Deno.serve(async (req) => {
           </div>
         </div>`
 
-      await fetch('https://api.resend.com/emails', {
+      const resendResp = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${RESEND_API_KEY}`,
           'Content-Type':  'application/json',
         },
         body: JSON.stringify({
-          from:    'Capacitaciones <notificaciones@cvglobal.com>',
+          from:    'Capacitaciones <notificaciones@cvglobal-group.com>',
           to:      [usuario_email],
           subject: `🎓 Certificado aprobado: ${curso_titulo}`,
           html:    htmlEmail,
         }),
       })
+      const resendText = await resendResp.text()
+      console.log('Resend status:', resendResp.status, '| respuesta:', resendText)
     }
 
     return new Response(JSON.stringify({ success: true, codigo }), {

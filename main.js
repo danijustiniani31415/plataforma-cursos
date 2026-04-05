@@ -324,7 +324,7 @@ async function mostrarCurso(curso) {
   tituloCurso.textContent = curso.titulo;
   cursoSection.style.display = 'block';
   cursosDisponiblesSection.style.display = 'none';
-  certificadoSection.style.display = 'none';
+  certificadoSection.style.display = 'block'; // TODO: revertir a 'none' cuando terminen las pruebas
 
   await construirPasos(curso);
   await mostrarPasoActual();

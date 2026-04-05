@@ -169,39 +169,13 @@ async function cargarCursos() {
       .eq('estado', 'completado'),
   ]);
 
-  // Branding opcional (columnas que pueden no existir en todos los proyectos)
-  let empresa = perfil?.empresas;
-  const { data: empresaBranding } = await supabase
-    .from('empresas')
-    .select('nombre, logo_url, color_primario, color_secundario')
-    .eq('id', perfil?.empresa_id)
-    .maybeSingle()
-    .then(r => r.error ? { data: null } : r);
-  if (empresaBranding) empresa = { ...empresa, ...empresaBranding };
+  const empresa = perfil?.empresas;
 
   if (empresa) {
-    // Colores
-    const colorPrimario   = empresa.color_primario   || '#1e3a5f';
-    const colorSecundario = empresa.color_secundario || '#c9a84c';
-    document.documentElement.style.setProperty('--navy',      colorPrimario);
-    document.documentElement.style.setProperty('--navy-dark', colorPrimario);
-    document.documentElement.style.setProperty('--gold',      colorSecundario);
-    document.documentElement.style.setProperty('--gold-light',colorSecundario);
-    document.documentElement.style.setProperty('--border-focus', colorPrimario);
-
-    // Logo
-    if (empresa.logo_url) {
-      const logoEls = document.querySelectorAll('.header-logo, #splash-logo');
-      logoEls.forEach(el => { el.src = empresa.logo_url; });
-    }
-
     // Título
     const headerTitle = document.querySelector('.header-title');
     if (headerTitle) headerTitle.textContent = empresa.nombre || 'CV Global S.A.C.';
 
-    // Meta theme-color
-    const metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) metaTheme.content = colorPrimario;
   }
 
   // Nombre del trabajador en el subtitle

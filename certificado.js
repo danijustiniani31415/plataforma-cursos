@@ -17,35 +17,51 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { width: 297mm; height: 210mm; overflow: hidden; background: white; }
-    .certificado { width: 297mm; height: 210mm; position: relative; font-family: 'Crimson Text', 'Georgia', serif; }
+    .certificado { width: 297mm; height: 210mm; position: relative; font-family: 'Crimson Text', Georgia, serif; overflow: hidden; }
     .fondo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
-    .logo { position: absolute; top: 8mm; left: 12mm; height: 18mm; z-index: 2; }
-    .firma-img { position: absolute; bottom: 22mm; right: 22mm; height: 22mm; z-index: 2; }
-    .contenido { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: flex; flex-direction: column; align-items: center; padding: 0 25mm; }
-    .titulo { margin-top: 22mm; font-family: 'Cinzel', 'Georgia', serif; font-size: 30pt; font-weight: 700; color: #002855; letter-spacing: 4px; text-transform: uppercase; text-align: center; line-height: 1.1; }
-    .subtitulo { margin-top: 2mm; font-family: 'Cinzel', serif; font-size: 9pt; font-weight: 400; color: #555; letter-spacing: 3px; text-transform: uppercase; text-align: center; }
-    .linea-decorativa { width: 200mm; margin: 5mm auto; display: flex; align-items: center; gap: 3mm; }
+    .borde-ext { position: absolute; inset: 6mm; border: 2.5px solid #c9a84c; z-index: 1; pointer-events: none; }
+    .borde-int { position: absolute; inset: 9mm; border: 0.8px solid #c9a84c; opacity: 0.5; z-index: 1; pointer-events: none; }
+    .esquina { position: absolute; width: 12mm; height: 12mm; border-color: #002855; border-style: solid; z-index: 2; }
+    .esquina.tl { top: 5mm; left: 5mm; border-width: 2px 0 0 2px; }
+    .esquina.tr { top: 5mm; right: 5mm; border-width: 2px 2px 0 0; }
+    .esquina.bl { bottom: 5mm; left: 5mm; border-width: 0 0 2px 2px; }
+    .esquina.br { bottom: 5mm; right: 5mm; border-width: 0 2px 2px 0; }
+    .logo { position: absolute; top: 10mm; left: 14mm; height: 16mm; z-index: 3; }
+    .firma-img { position: absolute; bottom: 26mm; right: 20mm; height: 14mm; z-index: 3; }
+    .contenido { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 0 25mm; }
+    .titulo { margin-top: 50mm; font-family: 'Cinzel', Georgia, serif; font-size: 28pt; font-weight: 700; color: #002855; letter-spacing: 4px; text-transform: uppercase; text-align: center; line-height: 1.1; }
+    .subtitulo { margin-top: 2mm; font-family: 'Cinzel', serif; font-size: 8.5pt; font-weight: 400; color: #555; letter-spacing: 3px; text-transform: uppercase; text-align: center; }
+    .linea-decorativa { width: 180mm; margin: 4mm auto; display: flex; align-items: center; gap: 3mm; }
     .linea-decorativa::before, .linea-decorativa::after { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, transparent, #c9a84c, transparent); }
     .linea-decorativa-icono { color: #c9a84c; font-size: 10pt; }
-    .certifica-texto { margin-top: 4mm; font-family: 'Crimson Text', serif; font-size: 11pt; font-style: italic; color: #555; text-align: center; letter-spacing: 1px; }
-    .nombre { margin-top: 3mm; font-family: 'Cinzel', 'Georgia', serif; font-size: 24pt; font-weight: 700; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 2px; line-height: 1.15; }
-    .dni-cargo { margin-top: 2.5mm; font-family: 'Crimson Text', serif; font-size: 10.5pt; color: #444; text-align: center; letter-spacing: 0.5px; }
+    .certifica-texto { font-family: 'Crimson Text', serif; font-size: 11pt; font-style: italic; color: #555; text-align: center; letter-spacing: 1px; }
+    .nombre { margin-top: 3mm; font-family: 'Cinzel', Georgia, serif; font-size: 22pt; font-weight: 700; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 2px; line-height: 1.15; }
+    .dni-cargo { margin-top: 2mm; font-family: 'Crimson Text', serif; font-size: 10pt; color: #444; text-align: center; letter-spacing: 0.5px; }
     .separador { width: 120mm; margin: 4mm auto; border-top: 0.5px solid #c9a84c; opacity: 0.6; }
-    .participacion-texto { margin-top: 3mm; font-family: 'Crimson Text', serif; font-size: 10.5pt; color: #555; text-align: center; font-style: italic; }
-    .curso-nombre { margin-top: 2mm; font-family: 'Cinzel', 'Georgia', serif; font-size: 15pt; font-weight: 600; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.2; }
+    .participacion-texto { font-family: 'Crimson Text', serif; font-size: 10pt; color: #555; text-align: center; font-style: italic; }
+    .curso-nombre { margin-top: 2mm; font-family: 'Cinzel', Georgia, serif; font-size: 14pt; font-weight: 600; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.2; }
     .empresa-texto { margin-top: 3mm; font-family: 'Crimson Text', serif; font-size: 9.5pt; color: #666; text-align: center; }
-    .duracion-fecha { margin-top: 2mm; font-family: 'Crimson Text', serif; font-size: 9.5pt; color: #555; text-align: center; }
-    .pie-datos { position: absolute; bottom: 7mm; right: 22mm; text-align: right; font-family: 'Crimson Text', serif; font-size: 8pt; color: #666; line-height: 1.7; z-index: 2; }
-    .firma-bloque { position: absolute; bottom: 6mm; right: 15mm; text-align: center; width: 65mm; z-index: 2; }
-    .firma-linea { border-top: 1px solid #002855; margin-bottom: 2.5mm; }
+    .duracion-fecha { margin-top: 1.5mm; font-family: 'Crimson Text', serif; font-size: 9.5pt; color: #555; text-align: center; }
+    .pie-datos { position: absolute; bottom: 10mm; right: 18mm; text-align: right; font-family: 'Crimson Text', serif; font-size: 8pt; color: #666; line-height: 1.7; z-index: 3; }
+    .firma-bloque { position: absolute; bottom: 8mm; right: 15mm; text-align: center; width: 65mm; z-index: 3; }
+    .firma-linea { border-top: 1px solid #002855; margin-bottom: 2mm; }
     .firma-nombre { font-family: 'Cinzel', serif; font-size: 7.5pt; font-weight: 600; color: #002855; letter-spacing: 0.5px; text-transform: uppercase; }
     .firma-titulo { font-family: 'Crimson Text', serif; font-size: 7.5pt; color: #555; margin-top: 1mm; }
+    .sello { position: absolute; bottom: 12mm; left: 50%; transform: translateX(-50%); width: 28mm; height: 28mm; border-radius: 50%; border: 2px solid #c9a84c; display: flex; align-items: center; justify-content: center; z-index: 3; background: rgba(201,168,76,0.05); }
+    .sello-inner { border-radius: 50%; border: 1px dashed #c9a84c; width: 24mm; height: 24mm; display: flex; align-items: center; justify-content: center; }
+    .sello-texto { font-family: 'Cinzel', serif; font-size: 5.5pt; color: #002855; text-align: center; line-height: 1.4; text-transform: uppercase; letter-spacing: 0.5px; }
     @media print { body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { size: A4 landscape; margin: 0; } }
   </style>
 </head>
 <body>
   <div class="certificado">
     <img class="fondo" src="${FONDO_URL}" crossorigin="anonymous" />
+    <div class="borde-ext"></div>
+    <div class="borde-int"></div>
+    <div class="esquina tl"></div>
+    <div class="esquina tr"></div>
+    <div class="esquina bl"></div>
+    <div class="esquina br"></div>
     <img class="logo" src="${LOGO_URL}" crossorigin="anonymous" />
     <img class="firma-img" src="${FIRMA_URL}" crossorigin="anonymous" />
     <div class="contenido">
@@ -61,12 +77,17 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
       <div class="empresa-texto">Dictado por CV GLOBAL S.A.C. &nbsp;·&nbsp; Duración: <strong>${duracion}</strong></div>
       <div class="duracion-fecha">Lima, ${fechaHoy}</div>
     </div>
-    <div class="pie-datos"><div><strong>Nota:</strong> ${notaTexto}/20 &nbsp;&nbsp; <strong>Código:</strong> ${codigo}</div></div>
+    <div class="pie-datos"><strong>Nota:</strong> ${notaTexto}/20 &nbsp;&nbsp; <strong>Código:</strong> ${codigo}</div>
     <div class="firma-bloque">
       <div class="firma-linea"></div>
       <div class="firma-nombre">Samuel Daniel Justiniani Aranda</div>
       <div class="firma-titulo">Especialista SSOMA</div>
       <div class="firma-titulo">Ingeniero Metalurgista CIP-181200</div>
+    </div>
+    <div class="sello">
+      <div class="sello-inner">
+        <div class="sello-texto">CV GLOBAL<br>S.A.C.<br>✦<br>SSOMA</div>
+      </div>
     </div>
   </div>
 </body>

@@ -29,7 +29,7 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
     .logo { position: absolute; top: 10mm; left: 14mm; height: 16mm; z-index: 3; }
     .firma-img { position: absolute; bottom: 26mm; right: 20mm; height: 14mm; z-index: 3; }
     .contenido { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 0 25mm; }
-    .titulo { margin-top: 50mm; font-family: 'Cinzel', Georgia, serif; font-size: 28pt; font-weight: 700; color: #002855; letter-spacing: 4px; text-transform: uppercase; text-align: center; line-height: 1.1; }
+    .titulo { margin-top: 18mm; font-family: 'Cinzel', Georgia, serif; font-size: 28pt; font-weight: 700; color: #002855; letter-spacing: 4px; text-transform: uppercase; text-align: center; line-height: 1.1; }
     .subtitulo { margin-top: 2mm; font-family: 'Cinzel', serif; font-size: 8.5pt; font-weight: 400; color: #555; letter-spacing: 3px; text-transform: uppercase; text-align: center; }
     .linea-decorativa { width: 180mm; margin: 4mm auto; display: flex; align-items: center; gap: 3mm; }
     .linea-decorativa::before, .linea-decorativa::after { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, transparent, #c9a84c, transparent); }

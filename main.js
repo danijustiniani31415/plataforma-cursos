@@ -16,6 +16,7 @@ let pasoActual        = 0;
 let pasosCurso        = [];
 let formularios       = {};
 let materialVisto     = false;
+let cursosAprobados   = {}; // { [curso_id]: true }
 
 // ═══════════════════════════════
 // 🚀 INIT
@@ -193,6 +194,7 @@ async function cargarCursos() {
       }
     }
   });
+  cursosAprobados = estadoCurso;
 
   const now   = new Date();
   const in30  = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -306,7 +308,8 @@ async function mostrarCurso(curso) {
   tituloCurso.textContent = curso.titulo;
   cursoSection.style.display = 'block';
   cursosDisponiblesSection.style.display = 'none';
-  certificadoSection.style.display = 'block'; // TODO: revertir a 'none' cuando terminen las pruebas
+  // Mostrar certificado si ya aprobó este curso anteriormente
+  certificadoSection.style.display = cursosAprobados[curso.id]?.aprobado ? 'block' : 'none';
 
   await construirPasos(curso);
   await mostrarPasoActual();
@@ -605,8 +608,7 @@ async function mostrarPasoActual() {
   if (iframeMaterial) iframeMaterial.addEventListener('load', () => marcarMaterialVisto());
   const linkMaterial = document.getElementById('link-material-externo');
   if (linkMaterial) linkMaterial.addEventListener('click', () => marcarMaterialVisto());
-  // TODO: restaurar a 'none' cuando terminen las pruebas
-  certificadoSection.style.display = 'block';
+  certificadoSection.style.display = cursosAprobados[cursoSeleccionado?.id]?.aprobado ? 'block' : 'none';
 }
 
 // ═══════════════════════════════
@@ -755,10 +757,10 @@ window.enviarFormulario = async function (tipoPaso) {
     const btn = document.getElementById('btn-siguiente-paso');
     if (btn) { btn.disabled = false; }
 
-    // TODO: restaurar condicion original cuando se termine de probar
-    // if (pasoActual === pasosCurso.length - 1 && tipoPaso === 'eficacia') {
-    certificadoSection.style.display = 'block';
-    // }
+    if (pasoActual === pasosCurso.length - 1 && tipoPaso === 'eficacia') {
+      cursosAprobados[cursoSeleccionado.id] = { aprobado: true };
+      certificadoSection.style.display = 'block';
+    }
   }
 };
 

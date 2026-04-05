@@ -1614,7 +1614,7 @@ window.cargarListaCursos = async function () {
   contenedor.innerHTML = '<p style="color:#888;font-size:0.88rem;">Cargando...</p>';
 
   const { data: cursos, error: errCursos } = await supabase
-    .from('cursos').select('id, titulo, codigo, duracion, activo').order('titulo');
+    .from('cursos').select('id, titulo, duracion, activo').order('titulo');
 
   if (errCursos) {
     contenedor.innerHTML = `<p style="color:red;">❌ Error: ${errCursos.message}</p>`;
@@ -1631,7 +1631,6 @@ window.cargarListaCursos = async function () {
   const renderFila = c => `
     <tr>
       <td style="padding:10px 12px; font-weight:500;">${c.titulo}</td>
-      <td style="padding:10px 12px; color:#888; font-size:0.82rem;">${c.codigo || '—'}</td>
       <td style="padding:10px 12px; color:#888; font-size:0.82rem;">${c.duracion ? c.duracion + 'h' : '—'}</td>
       <td style="padding:10px 12px;">
         <span class="${c.activo ? 'badge-activo' : 'badge-inactivo'}">${c.activo ? '✅ Activo' : '⏸ Inactivo'}</span>
@@ -1650,7 +1649,6 @@ window.cargarListaCursos = async function () {
       <thead>
         <tr style="background:#f8f9fa; font-size:0.82rem; color:#555; text-transform:uppercase; letter-spacing:0.5px;">
           <th style="padding:8px 12px; text-align:left;">Curso</th>
-          <th style="padding:8px 12px; text-align:left;">Código</th>
           <th style="padding:8px 12px; text-align:left;">Duración</th>
           <th style="padding:8px 12px; text-align:left;">Estado</th>
           <th style="padding:8px 12px; text-align:left;">Acción</th>

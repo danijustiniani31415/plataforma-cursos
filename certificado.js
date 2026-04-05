@@ -27,7 +27,7 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
     .esquina.bl { bottom: 5mm; left: 5mm; border-width: 0 0 2px 2px; }
     .esquina.br { bottom: 5mm; right: 5mm; border-width: 0 2px 2px 0; }
     .logo { position: absolute; top: 10mm; left: 14mm; height: 16mm; z-index: 3; }
-    .firma-img { position: absolute; bottom: 58mm; right: 18mm; height: 72mm; z-index: 3; }
+    .firma-img { position: absolute; bottom: 70mm; right: 4mm; height: 48mm; z-index: 3; opacity: 0.9; }
     .contenido { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 0 25mm; transform: translateY(50mm); }
     .titulo { margin-top: 38mm; font-family: 'Cinzel', Georgia, serif; font-size: 28pt; font-weight: 700; color: #002855; letter-spacing: 4px; text-transform: uppercase; text-align: center; line-height: 1.1; }
     .subtitulo { margin-top: 2mm; font-family: 'Cinzel', serif; font-size: 8.5pt; font-weight: 400; color: #555; letter-spacing: 3px; text-transform: uppercase; text-align: center; }
@@ -43,7 +43,7 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
     .empresa-texto { margin-top: 3mm; font-family: 'Crimson Text', serif; font-size: 9.5pt; color: #666; text-align: center; }
     .duracion-fecha { margin-top: 1.5mm; font-family: 'Crimson Text', serif; font-size: 9.5pt; color: #555; text-align: center; }
     .pie-datos { position: absolute; bottom: 10mm; right: 18mm; text-align: right; font-family: 'Crimson Text', serif; font-size: 8pt; color: #666; line-height: 1.7; z-index: 3; }
-    .firma-bloque { position: absolute; bottom: 78mm; right: 10mm; text-align: center; width: 92mm; z-index: 3; }
+    .firma-bloque { position: absolute; bottom: 58mm; right: 12mm; text-align: center; width: 82mm; z-index: 3; }
     .firma-linea { border-top: 1.5px solid #002855; margin-bottom: 2.5mm; }
     .firma-nombre { font-family: 'Cinzel', serif; font-size: 11pt; font-weight: 600; color: #002855; letter-spacing: 0.7px; text-transform: uppercase; }
     .firma-titulo { font-family: 'Crimson Text', serif; font-size: 10pt; color: #555; margin-top: 1.2mm; }

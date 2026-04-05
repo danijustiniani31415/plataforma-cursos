@@ -155,11 +155,11 @@ async function cargarCursos() {
 
   if (error) { alert("❌ Error al cargar cursos: " + error.message); return; }
 
-  // Perfil + envíos en paralelo
+  // Perfil + envíos en paralelo (sin columnas opcionales que pueden no existir)
   const [{ data: perfil }, { data: envios }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('nombres, apellidos, empresa_id, xp, empresas(nombre, logo_url, color_primario, color_secundario)')
+      .select('nombres, apellidos, empresa_id, empresas(nombre)')
       .eq('id', usuarioActual.id)
       .single(),
     supabase
@@ -169,8 +169,16 @@ async function cargarCursos() {
       .eq('estado', 'completado'),
   ]);
 
-  // Aplicar branding de la empresa
-  const empresa = perfil?.empresas;
+  // Branding opcional (columnas que pueden no existir en todos los proyectos)
+  let empresa = perfil?.empresas;
+  const { data: empresaBranding } = await supabase
+    .from('empresas')
+    .select('nombre, logo_url, color_primario, color_secundario')
+    .eq('id', perfil?.empresa_id)
+    .maybeSingle()
+    .then(r => r.error ? { data: null } : r);
+  if (empresaBranding) empresa = { ...empresa, ...empresaBranding };
+
   if (empresa) {
     // Colores
     const colorPrimario   = empresa.color_primario   || '#1e3a5f';

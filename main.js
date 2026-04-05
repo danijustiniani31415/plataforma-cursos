@@ -333,15 +333,15 @@ async function mostrarPasoActual() {
 
       contenidoHTML = `
         <div class="material-cta">
-          <a href="${url}" target="_blank" onclick="marcarMaterialVisto()">
+          <a href="${url}" target="_blank" id="link-material-externo">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             Abrir material
           </a>
           <span class="material-cta-text">Abre el documento para continuar</span>
         </div>
-        <iframe src="${srcVisor}" width="100%" height="500px"
+        <iframe id="iframe-material" src="${srcVisor}" width="100%" height="500px"
           style="border:1px solid var(--border); border-radius:var(--radius-md);"
-          frameborder="0" allowfullscreen onload="marcarMaterialVisto()">
+          frameborder="0" allowfullscreen>
         </iframe>
         ${!materialVisto ? `<div class="material-hint">⚠️ Visualiza el material para habilitar el siguiente paso</div>` : ''}
       `;
@@ -600,6 +600,11 @@ async function mostrarPasoActual() {
       <div class="step-content-inner">${contenidoHTML}</div>
     </div>
   `;
+  // Adjuntar onload del iframe por JS para evitar error de módulo ES
+  const iframeMaterial = document.getElementById('iframe-material');
+  if (iframeMaterial) iframeMaterial.addEventListener('load', () => marcarMaterialVisto());
+  const linkMaterial = document.getElementById('link-material-externo');
+  if (linkMaterial) linkMaterial.addEventListener('click', () => marcarMaterialVisto());
   // TODO: restaurar a 'none' cuando terminen las pruebas
   certificadoSection.style.display = 'block';
 }

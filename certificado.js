@@ -96,32 +96,30 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
 
 // ─── Descarga el HTML como PDF usando html2pdf.js ────────────────────────────
 export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
-  const contenedor = document.createElement('div');
-  contenedor.style.cssText = 'position:fixed;left:-9999px;top:0;width:297mm;height:210mm;overflow:hidden;background:white;';
-  contenedor.innerHTML = htmlContent;
-  document.body.appendChild(contenedor);
+  // Crear iframe oculto para renderizado aislado y correcto
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;border:none;opacity:0;pointer-events:none;z-index:-1;';
+  document.body.appendChild(iframe);
 
-  // Esperar a que carguen las imágenes
-  await Promise.all(
-    Array.from(contenedor.querySelectorAll('img')).map(img =>
-      new Promise(resolve => {
-        if (img.complete) return resolve(null);
-        img.onload = img.onerror = resolve;
-      })
-    )
-  );
-  // Pequeño margen extra para las fuentes
-  await new Promise(r => setTimeout(r, 800));
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(htmlContent);
+  doc.close();
+
+  // Esperar imágenes y fuentes
+  await new Promise(r => setTimeout(r, 2000));
+
+  const el = doc.querySelector('.certificado');
 
   await window.html2pdf().set({
     margin:      0,
     filename:    nombreArchivo,
     image:       { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794 },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794 },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
-  }).from(contenedor.querySelector('.certificado') || contenedor).save();
+  }).from(el).save();
 
-  document.body.removeChild(contenedor);
+  document.body.removeChild(iframe);
 }
 
 // ─── Flujo principal del trabajador ──────────────────────────────────────────

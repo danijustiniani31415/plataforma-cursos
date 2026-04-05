@@ -332,7 +332,13 @@ async function mostrarPasoActual() {
       siguienteHabilitado = materialVisto;
       const url = cursoSeleccionado.url_material;
       const esOneDrive = url.includes('1drv.ms') || url.includes('onedrive.live.com');
-      const srcVisor = esOneDrive ? url : "https://view.officeapps.live.com/op/embed.aspx?src=" + encodeURIComponent(url);
+      const esSupabase = url.includes('supabase.co');
+      // PDFs y archivos de Supabase se embeben directo; Office/OneDrive usan el visor de Microsoft
+      const srcVisor = (esSupabase || url.toLowerCase().endsWith('.pdf'))
+        ? url
+        : esOneDrive
+          ? url
+          : "https://view.officeapps.live.com/op/embed.aspx?src=" + encodeURIComponent(url);
 
       contenidoHTML = `
         <div class="material-cta">

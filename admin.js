@@ -1613,9 +1613,13 @@ window.cargarListaCursos = async function () {
   const contenedor = document.getElementById('lista-toggle-cursos');
   contenedor.innerHTML = '<p style="color:#888;font-size:0.88rem;">Cargando...</p>';
 
-  const { data: cursos } = await supabase
+  const { data: cursos, error: errCursos } = await supabase
     .from('cursos').select('id, titulo, codigo, duracion, activo').order('titulo');
 
+  if (errCursos) {
+    contenedor.innerHTML = `<p style="color:red;">❌ Error: ${errCursos.message}</p>`;
+    return;
+  }
   if (!cursos?.length) {
     contenedor.innerHTML = '<p style="color:#888;">No hay cursos registrados.</p>';
     return;

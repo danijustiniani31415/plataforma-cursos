@@ -87,31 +87,29 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
 
 // ─── Descarga el HTML como PDF usando html2pdf.js ────────────────────────────
 export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
-  // Overlay de carga mientras se genera el PDF
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99998;display:flex;align-items:center;justify-content:center;color:white;font-size:1.1rem;font-family:sans-serif;';
   overlay.textContent = '⏳ Generando certificado PDF...';
   document.body.appendChild(overlay);
 
-  // Contenedor del certificado visible para que html2canvas lo capture correctamente
-  const contenedor = document.createElement('div');
-  contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;';
-  contenedor.innerHTML = htmlContent;
-  document.body.appendChild(contenedor);
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;border:none;z-index:99999;opacity:0;pointer-events:none;';
+  iframe.srcdoc = htmlContent;
+  document.body.appendChild(iframe);
 
-  // Esperar imágenes
+  await new Promise(resolve => { iframe.onload = resolve; });
+
   await Promise.all(
-    Array.from(contenedor.querySelectorAll('img')).map(img =>
+    Array.from(iframe.contentDocument.querySelectorAll('img')).map(img =>
       new Promise(resolve => {
         if (img.complete) return resolve(null);
         img.onload = img.onerror = resolve;
       })
     )
   );
-  // Esperar fuentes
   await new Promise(r => setTimeout(r, 1500));
 
-  const el = contenedor.querySelector('.certificado') || contenedor;
+  const el = iframe.contentDocument.querySelector('.certificado');
 
   await window.html2pdf().set({
     margin:      0,
@@ -121,20 +119,22 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
   }).from(el).save();
 
-  document.body.removeChild(contenedor);
+  document.body.removeChild(iframe);
   document.body.removeChild(overlay);
 }
 
 // ─── Flujo principal del trabajador ──────────────────────────────────────────
 export async function generarCertificadoPDFBlob(htmlContent) {
-  const contenedor = document.createElement('div');
-  contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
-  contenedor.innerHTML = htmlContent;
-  document.body.appendChild(contenedor);
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;border:none;z-index:99999;opacity:0.01;pointer-events:none;';
+  iframe.srcdoc = htmlContent;
+  document.body.appendChild(iframe);
 
   try {
+    await new Promise(resolve => { iframe.onload = resolve; });
+
     await Promise.all(
-      Array.from(contenedor.querySelectorAll('img')).map(img =>
+      Array.from(iframe.contentDocument.querySelectorAll('img')).map(img =>
         new Promise(resolve => {
           if (img.complete) return resolve(null);
           img.onload = img.onerror = resolve;
@@ -143,7 +143,7 @@ export async function generarCertificadoPDFBlob(htmlContent) {
     );
     await new Promise(r => setTimeout(r, 1500));
 
-    const el = contenedor.querySelector('.certificado') || contenedor;
+    const el = iframe.contentDocument.querySelector('.certificado');
 
     const pdfBlob = await window.html2pdf().set({
       margin:      0,
@@ -154,7 +154,7 @@ export async function generarCertificadoPDFBlob(htmlContent) {
 
     return pdfBlob;
   } finally {
-    document.body.removeChild(contenedor);
+    document.body.removeChild(iframe);
   }
 }
 

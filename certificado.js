@@ -89,8 +89,8 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
 async function crearContenedor(htmlContent, visible) {
   const contenedor = document.createElement('div');
   contenedor.style.cssText = visible
-    ? 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;'
-    : 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
+    ? 'position:fixed;top:0;left:50%;transform:translateX(-50%);width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;'
+    : 'position:fixed;top:0;left:50%;transform:translateX(-50%);width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
   contenedor.innerHTML = htmlContent;
   document.body.appendChild(contenedor);
   await Promise.all(

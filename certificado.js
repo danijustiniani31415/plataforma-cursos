@@ -119,14 +119,19 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
   );
   await new Promise(r => setTimeout(r, 1500));
 
+  const metaViewport = document.querySelector('meta[name=viewport]');
+  const valorOriginal = metaViewport?.content;
+  if (metaViewport) metaViewport.content = 'width=1122';
+
   await window.html2pdf().set({
     margin:      0,
     filename:    nombreArchivo,
     image:       { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
-    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, hotfixes: false, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
+    jsPDF:       { unit: 'mm', format: [297, 210], orientation: 'landscape' },
   }).from(certDiv).save();
 
+  if (metaViewport) metaViewport.content = valorOriginal;
   document.body.removeChild(contenedor);
   injectedStyles.forEach(s => document.head.removeChild(s));
   document.body.removeChild(overlay);
@@ -162,13 +167,18 @@ export async function generarCertificadoPDFBlob(htmlContent) {
     );
     await new Promise(r => setTimeout(r, 1500));
 
+    const metaViewport = document.querySelector('meta[name=viewport]');
+    const valorOriginal = metaViewport?.content;
+    if (metaViewport) metaViewport.content = 'width=1122';
+
     const pdfBlob = await window.html2pdf().set({
       margin:      0,
       image:       { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
-      jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
+      html2canvas: { scale: 2, useCORS: true, allowTaint: true, hotfixes: false, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
+      jsPDF:       { unit: 'mm', format: [297, 210], orientation: 'landscape' },
     }).from(certDiv).outputPdf('blob');
 
+    if (metaViewport) metaViewport.content = valorOriginal;
     return pdfBlob;
   } finally {
     document.body.removeChild(contenedor);

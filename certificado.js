@@ -118,7 +118,7 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
     margin:      0,
     filename:    nombreArchivo,
     image:       { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, scrollX: 0, scrollY: 0 },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
   }).from(el).save();
 
@@ -130,21 +130,7 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
 export async function generarCertificadoPDFBlob(htmlContent) {
   const contenedor = document.createElement('div');
   contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
-  const parsed = new DOMParser().parseFromString(htmlContent, 'text/html');
-
-  parsed.head.querySelectorAll('style, link[rel="stylesheet"]').forEach(node => {
-    contenedor.appendChild(node.cloneNode(true));
-  });
-
-  const bodyContent = parsed.body.firstElementChild
-    ? parsed.body.firstElementChild.cloneNode(true)
-    : document.createElement('div');
-
-  if (bodyContent instanceof HTMLElement) {
-    bodyContent.style.transform = 'none';
-  }
-
-  contenedor.appendChild(bodyContent);
+  contenedor.innerHTML = htmlContent;
   document.body.appendChild(contenedor);
 
   try {
@@ -159,50 +145,15 @@ export async function generarCertificadoPDFBlob(htmlContent) {
     await new Promise(r => setTimeout(r, 1500));
 
     const el = contenedor.querySelector('.certificado') || contenedor;
-    const worker = window.html2pdf().set({
+
+    const pdfBlob = await window.html2pdf().set({
       margin:      0,
       image:       { type: 'jpeg', quality: 0.98 },
-      pagebreak:   { mode: ['avoid-all'] },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        width: 1122,
-        height: 794,
-        windowWidth: 1122,
-        windowHeight: 794,
-        scrollX: 0,
-        scrollY: 0,
-        backgroundColor: '#ffffff',
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-    }).from(el).toCanvas();
+      html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
+      jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    }).from(el).outputPdf('blob');
 
-    const canvas = await worker.get('canvas');
-    const JsPdfCtor = window.jspdf?.jsPDF || window.jsPDF;
-    if (!JsPdfCtor) {
-      throw new Error('jsPDF no estÃ¡ disponible en esta pÃ¡gina.');
-    }
-
-    const pdf = new JsPdfCtor({
-      unit: 'mm',
-      format: 'a4',
-      orientation: 'landscape',
-      compress: true,
-    });
-
-    pdf.addImage(
-      canvas.toDataURL('image/jpeg', 0.98),
-      'JPEG',
-      0,
-      0,
-      297,
-      210,
-      undefined,
-      'FAST'
-    );
-
-    return pdf.output('blob');
+    return pdfBlob;
   } finally {
     document.body.removeChild(contenedor);
   }

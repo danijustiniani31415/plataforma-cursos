@@ -177,16 +177,31 @@ export async function generarCertificadoPDFBlob(htmlContent) {
         backgroundColor: '#ffffff',
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-    }).from(el).toCanvas().toPdf();
+    }).from(el).toCanvas();
 
-    const pdf = await worker.get('pdf');
-    const totalPages = typeof pdf.getNumberOfPages === 'function' ? pdf.getNumberOfPages() : 1;
-
-    for (let page = totalPages; page >= 2; page -= 1) {
-      if (typeof pdf.deletePage === 'function') {
-        pdf.deletePage(page);
-      }
+    const canvas = await worker.get('canvas');
+    const JsPdfCtor = window.jspdf?.jsPDF || window.jsPDF;
+    if (!JsPdfCtor) {
+      throw new Error('jsPDF no estÃ¡ disponible en esta pÃ¡gina.');
     }
+
+    const pdf = new JsPdfCtor({
+      unit: 'mm',
+      format: 'a4',
+      orientation: 'landscape',
+      compress: true,
+    });
+
+    pdf.addImage(
+      canvas.toDataURL('image/jpeg', 0.98),
+      'JPEG',
+      4,
+      0,
+      293,
+      210,
+      undefined,
+      'FAST'
+    );
 
     return pdf.output('blob');
   } finally {

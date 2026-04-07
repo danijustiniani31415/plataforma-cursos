@@ -12,11 +12,11 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1122">
-  <title>Certificado - ${nombreCompleto}</title>
+  <title>Certificado</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 1122px; height: 794px; overflow: hidden; }
+    html, body { width: 1122px; height: 794px; overflow: hidden; background: white; }
     .certificado { width: 1122px; height: 794px; position: relative; font-family: 'Crimson Text', Georgia, serif; overflow: hidden; background: white; }
     .fondo { position: absolute; top: 0; left: 0; width: 1122px; height: 794px; object-fit: cover; z-index: 0; }
     .borde-ext { position: absolute; top: 23px; left: 23px; right: 23px; bottom: 23px; border: 2.5px solid #c9a84c; z-index: 1; pointer-events: none; }
@@ -26,20 +26,20 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
     .esquina.tr { top: 19px; right: 19px; border-width: 2px 2px 0 0; }
     .esquina.bl { bottom: 19px; left: 19px; border-width: 0 0 2px 2px; }
     .esquina.br { bottom: 19px; right: 19px; border-width: 0 2px 2px 0; }
-    .logo { position: absolute; top: 38px; left: 53px; height: 60px; z-index: 3; font-size: 0; }
+    .logo { position: absolute; top: 38px; left: 40px; height: 60px; z-index: 3; }
     .firma-img { position: absolute; bottom: 113px; right: 91px; height: 145px; z-index: 3; opacity: 0.9; }
-    .contenido { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 0 30px; }
-    .titulo { margin-top: 144px; font-family: 'Cinzel', Georgia, serif; font-size: 37px; font-weight: 700; color: #002855; letter-spacing: 3px; text-transform: uppercase; text-align: center; line-height: 1.1; }
+    .contenido { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 0 80px; }
+    .titulo { margin-top: 144px; font-family: 'Cinzel', Georgia, serif; font-size: 37px; font-weight: 700; color: #002855; letter-spacing: 3px; text-transform: uppercase; text-align: center; line-height: 1.1; width: 100%; }
     .subtitulo { margin-top: 7px; font-family: 'Cinzel', serif; font-size: 11px; font-weight: 400; color: #555; letter-spacing: 3px; text-transform: uppercase; text-align: center; }
-    .linea-decorativa { width: 680px; margin: 15px auto; display: flex; align-items: center; gap: 11px; }
+    .linea-decorativa { width: 560px; margin: 15px auto; display: flex; align-items: center; gap: 11px; }
     .linea-decorativa::before, .linea-decorativa::after { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, transparent, #c9a84c, transparent); }
     .linea-decorativa-icono { color: #c9a84c; font-size: 13px; }
-    .certifica-texto { font-family: 'Crimson Text', serif; font-size: 15px; font-style: italic; color: #555; text-align: center; letter-spacing: 1px; }
-    .nombre { margin-top: 11px; font-family: 'Cinzel', Georgia, serif; font-size: 29px; font-weight: 700; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 2px; line-height: 1.15; }
-    .dni-cargo { margin-top: 7px; font-family: 'Crimson Text', serif; font-size: 13px; color: #444; text-align: center; letter-spacing: 0.5px; }
+    .certifica-texto { font-family: 'Crimson Text', serif; font-size: 15px; font-style: italic; color: #555; text-align: center; }
+    .nombre { margin-top: 11px; font-family: 'Cinzel', Georgia, serif; font-size: 29px; font-weight: 700; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 2px; line-height: 1.15; width: 100%; }
+    .dni-cargo { margin-top: 7px; font-family: 'Crimson Text', serif; font-size: 13px; color: #444; text-align: center; }
     .separador { width: 453px; margin: 15px auto; border-top: 0.5px solid #c9a84c; opacity: 0.6; }
     .participacion-texto { font-family: 'Crimson Text', serif; font-size: 13px; color: #555; text-align: center; font-style: italic; }
-    .curso-nombre { margin-top: 7px; font-family: 'Cinzel', Georgia, serif; font-size: 18px; font-weight: 600; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.2; }
+    .curso-nombre { margin-top: 7px; font-family: 'Cinzel', Georgia, serif; font-size: 18px; font-weight: 600; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.2; width: 100%; }
     .empresa-texto { margin-top: 11px; font-family: 'Crimson Text', serif; font-size: 13px; color: #666; text-align: center; }
     .duracion-fecha { margin-top: 6px; font-family: 'Crimson Text', serif; font-size: 13px; color: #555; text-align: center; }
     .pie-datos { position: absolute; bottom: 38px; right: 68px; text-align: right; font-family: 'Crimson Text', serif; font-size: 11px; color: #666; line-height: 1.7; z-index: 3; }
@@ -85,24 +85,36 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
 </html>`;
 }
 
-// ─── Helper compartido ───────────────────────────────────────────────────────
-async function crearContenedor(htmlContent, visible) {
-  const contenedor = document.createElement('div');
-  contenedor.style.cssText = visible
-    ? 'position:fixed;top:0;left:50%;transform:translateX(-50%);width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;'
-    : 'position:fixed;top:0;left:50%;transform:translateX(-50%);width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
-  contenedor.innerHTML = htmlContent;
-  document.body.appendChild(contenedor);
-  await Promise.all(
-    Array.from(contenedor.querySelectorAll('img')).map(img =>
-      new Promise(r => { if (img.complete) return r(); img.onload = img.onerror = r; })
-    )
-  );
-  await new Promise(r => setTimeout(r, 1500));
-  return contenedor;
+// ─── Helper: renderiza el HTML en un iframe aislado y retorna el elemento .certificado ───
+function renderEnIframe(htmlContent) {
+  return new Promise((resolve, reject) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;border:none;z-index:99999;opacity:0.01;pointer-events:none;';
+    iframe.setAttribute('scrolling', 'no');
+    document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      const doc = iframe.contentDocument;
+      const el = doc.querySelector('.certificado');
+      if (!el) {
+        document.body.removeChild(iframe);
+        return reject(new Error('No se encontró .certificado en el iframe'));
+      }
+
+      // Esperar imágenes dentro del iframe
+      Promise.all(
+        Array.from(doc.querySelectorAll('img')).map(img =>
+          new Promise(r => { if (img.complete) return r(); img.onload = img.onerror = r; })
+        )
+      ).then(() => new Promise(r => setTimeout(r, 1500)))
+       .then(() => resolve({ iframe, el }));
+    };
+
+    iframe.srcdoc = htmlContent;
+  });
 }
 
-// Opciones fijas en px para que jsPDF no genere segunda hoja
+// Opciones fijas — el iframe garantiza que el DOM esté aislado
 const PDF_OPTS = {
   margin: 0,
   image: { type: 'jpeg', quality: 0.98 },
@@ -133,25 +145,29 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
   overlay.textContent = '⏳ Generando certificado PDF...';
   document.body.appendChild(overlay);
 
-  const contenedor = await crearContenedor(htmlContent, true);
-  const el = contenedor.querySelector('.certificado') || contenedor;
+  const { iframe, el } = await renderEnIframe(htmlContent);
 
   try {
-    await window.html2pdf().set({ ...PDF_OPTS, filename: nombreArchivo }).from(el).save();
+    await window.html2pdf()
+      .set({ ...PDF_OPTS, filename: nombreArchivo })
+      .from(el)
+      .save();
   } finally {
-    document.body.removeChild(contenedor);
+    document.body.removeChild(iframe);
     document.body.removeChild(overlay);
   }
 }
 
 // ─── Genera blob ──────────────────────────────────────────────────────────────
 export async function generarCertificadoPDFBlob(htmlContent) {
-  const contenedor = await crearContenedor(htmlContent, false);
-  const el = contenedor.querySelector('.certificado') || contenedor;
+  const { iframe, el } = await renderEnIframe(htmlContent);
   try {
-    return await window.html2pdf().set(PDF_OPTS).from(el).outputPdf('blob');
+    return await window.html2pdf()
+      .set(PDF_OPTS)
+      .from(el)
+      .outputPdf('blob');
   } finally {
-    document.body.removeChild(contenedor);
+    document.body.removeChild(iframe);
   }
 }
 

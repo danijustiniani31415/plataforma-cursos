@@ -145,13 +145,39 @@ export async function generarCertificadoPDFBlob(htmlContent) {
     await new Promise(r => setTimeout(r, 1500));
 
     const el = contenedor.querySelector('.certificado') || contenedor;
+    const canvas = await window.html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      width: 1122,
+      height: 794,
+      windowWidth: 1122,
+      windowHeight: 794,
+      scrollX: 0,
+      scrollY: 0,
+      backgroundColor: '#ffffff',
+    });
 
-    return await window.html2pdf().set({
-      margin:      0,
-      image:       { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, scrollX: 0, scrollY: 0 },
-      jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
-    }).from(el).outputPdf('blob');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      unit: 'mm',
+      format: 'a4',
+      orientation: 'landscape',
+      compress: true,
+    });
+
+    pdf.addImage(
+      canvas.toDataURL('image/jpeg', 0.98),
+      'JPEG',
+      0,
+      0,
+      297,
+      210,
+      undefined,
+      'FAST'
+    );
+
+    return pdf.output('blob');
   } finally {
     document.body.removeChild(contenedor);
   }

@@ -127,7 +127,7 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
     margin:      0,
     filename:    nombreArchivo,
     image:       { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, hotfixes: false, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
+    html2canvas: { scale: 2, useCORS: true, allowTaint: true, hotfixes: false, imageTimeout: 0, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
     jsPDF:       { unit: 'mm', format: [297, 210], orientation: 'landscape' },
   }).from(certDiv).save();
 
@@ -174,7 +174,7 @@ export async function generarCertificadoPDFBlob(htmlContent) {
     const pdfBlob = await window.html2pdf().set({
       margin:      0,
       image:       { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, allowTaint: true, hotfixes: false, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
+      html2canvas: { scale: 2, useCORS: true, allowTaint: true, hotfixes: false, imageTimeout: 0, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
       jsPDF:       { unit: 'mm', format: [297, 210], orientation: 'landscape' },
     }).from(certDiv).outputPdf('blob');
 

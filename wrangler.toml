@@ -4,3 +4,8 @@ compatibility_date = "2025-09-27"
 [assets]
 directory = "."
 not_found_handling = "single-page-application"
+
+[[headers]]
+for = "/*.js"
+[headers.values]
+Cache-Control = "no-cache, must-revalidate"

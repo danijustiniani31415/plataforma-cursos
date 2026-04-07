@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cvglobal-sst-v8';
+const CACHE_NAME = 'cvglobal-sst-v9';
 
 // Solo assets estáticos — NUNCA cachear páginas HTML de admin
 const STATIC_ASSETS = [
@@ -59,12 +59,30 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Assets locales (CSS, JS, imágenes) → Cache first, luego red
+  // Assets locales (CSS, JS, imágenes) → Network first, cache como fallback
   if (url.origin === self.location.origin) {
-    event.respondWith(cacheFirst(event.request));
+    event.respondWith(networkFirst(event.request));
     return;
   }
 });
+
+// Estrategia: Network first → si falla la red, usa cache como fallback
+async function networkFirst(request) {
+  if (request.method !== 'GET') return fetch(request);
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    const offline = await caches.match('/offline.html');
+    return offline || new Response('Sin conexión', { status: 503 });
+  }
+}
 
 // Estrategia: Cache first → si no hay, busca en red y guarda en cache
 async function cacheFirst(request) {

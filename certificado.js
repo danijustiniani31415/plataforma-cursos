@@ -162,28 +162,16 @@ export async function generarCertificadoPDFBlob(htmlContent) {
         backgroundColor: '#ffffff',
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-    }).from(el).toCanvas();
+    }).from(el).toCanvas().toPdf();
 
-    const canvas = await worker.get('canvas');
+    const pdf = await worker.get('pdf');
+    const totalPages = typeof pdf.getNumberOfPages === 'function' ? pdf.getNumberOfPages() : 1;
 
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({
-      unit: 'mm',
-      format: 'a4',
-      orientation: 'landscape',
-      compress: true,
-    });
-
-    pdf.addImage(
-      canvas.toDataURL('image/jpeg', 0.98),
-      'JPEG',
-      0,
-      0,
-      297,
-      210,
-      undefined,
-      'FAST'
-    );
+    for (let page = totalPages; page >= 2; page -= 1) {
+      if (typeof pdf.deletePage === 'function') {
+        pdf.deletePage(page);
+      }
+    }
 
     return pdf.output('blob');
   } finally {

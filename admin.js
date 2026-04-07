@@ -1758,6 +1758,235 @@ window.descargarCertificadosMasivo = async function () {
 // 🔛 ACTIVAR / DESACTIVAR CURSOS
 // ═══════════════════════════════════════════════
 
+window.descargarCertificadosMasivo = async function () {
+  const cursoId = document.getElementById('cert-bulk-curso').value;
+  const mesVal  = document.getElementById('cert-bulk-mes').value;
+  const status  = document.getElementById('cert-bulk-status');
+
+  if (!cursoId) { alert('âŒ Selecciona un curso'); return; }
+
+  try {
+    status.textContent = 'ðŸ”„ Consultando aprobados...';
+
+    let q = supabase
+      .from('envios_formulario')
+      .select(`
+        usuario_id, usuario_email, puntaje, created_at,
+        formularios(tipo)
+      `)
+      .eq('id_curso', cursoId)
+      .eq('aprobado', true);
+
+    if (mesVal) {
+      const [y, m] = mesVal.split('-').map(Number);
+      const desde  = new Date(y, m - 1, 1).toISOString();
+      const hasta  = new Date(y, m, 1).toISOString();
+      q = q.gte('created_at', desde).lt('created_at', hasta);
+    }
+
+    const { data: envios, error } = await q;
+    if (error) throw error;
+
+    const usuarioIds = [...new Set((envios || []).map(e => e.usuario_id).filter(Boolean))];
+    const { data: perfiles, error: perfilesError } = await supabase
+      .from('profiles')
+      .select('id, email, nombres, apellidos, documento_numero, documento_tipo, cargos(nombre), empresas(nombre)')
+      .in('id', usuarioIds);
+    if (perfilesError) throw perfilesError;
+
+    const mapaPerfiles = {};
+    for (const perfil of (perfiles || [])) {
+      mapaPerfiles[perfil.id] = perfil;
+    }
+
+    const mapaMejor = {};
+    for (const e of (envios || [])) {
+      if (e.formularios?.tipo !== 'examen') continue;
+
+      const perfil = mapaPerfiles[e.usuario_id] || {};
+      const uid = e.usuario_id || perfil.id || perfil.documento_numero || e.usuario_email;
+      if (!uid) continue;
+
+      const puntajeActual = Number(e.puntaje || 0);
+      const previo = mapaMejor[uid];
+      const puntajePrevio = Number(previo?.puntaje || 0);
+      const fechaActual = new Date(e.created_at || 0).getTime();
+      const fechaPrevia = new Date(previo?.created_at || 0).getTime();
+
+      if (!previo || puntajeActual > puntajePrevio || (puntajeActual === puntajePrevio && fechaActual > fechaPrevia)) {
+        mapaMejor[uid] = { ...e, profileData: perfil };
+      }
+    }
+
+    const aprobados = Object.values(mapaMejor);
+    if (!aprobados.length) {
+      status.textContent = 'âš ï¸ No se encontraron trabajadores aprobados con esos filtros.';
+      return;
+    }
+
+    const { data: curso, error: cursoError } = await supabase
+      .from('cursos')
+      .select('id, titulo, duracion, codigo_prefijo, correlativo')
+      .eq('id', cursoId)
+      .single();
+    if (cursoError) throw cursoError;
+
+    const { data: certs, error: certsError } = await supabase
+      .from('certificados')
+      .select('usuario_id, usuario_email, codigo, nota, nombres, apellidos, dni, cargo, empresa')
+      .eq('curso_id', cursoId);
+    if (certsError) throw certsError;
+
+    const mapaCertificados = {};
+    let correlativoActual = Number(curso?.correlativo || 0);
+    for (const c of (certs || [])) {
+      mapaCertificados[c.usuario_id] = c;
+
+      const partes = String(c.codigo || '').split('-');
+      const numeroCodigo = Number(partes[partes.length - 1]);
+      if (!Number.isNaN(numeroCodigo)) {
+        correlativoActual = Math.max(correlativoActual, numeroCodigo);
+      }
+    }
+
+    const faltantes = aprobados
+      .filter(e => {
+        const perfil = e.profileData || {};
+        return perfil.id && !mapaCertificados[perfil.id];
+      })
+      .sort((a, b) => {
+        const nombreA = `${a.profileData?.apellidos || ''} ${a.profileData?.nombres || ''} ${a.profileData?.documento_numero || ''}`.trim();
+        const nombreB = `${b.profileData?.apellidos || ''} ${b.profileData?.nombres || ''} ${b.profileData?.documento_numero || ''}`.trim();
+        return nombreA.localeCompare(nombreB, 'es');
+      });
+
+    if (faltantes.length) {
+      status.textContent = `ðŸ”„ Regularizando ${faltantes.length} certificados faltantes...`;
+
+      const anio = new Date().getFullYear().toString().slice(-2);
+      const prefijo = curso?.codigo_prefijo || 'CERT';
+      const nuevosCertificados = [];
+
+      for (const e of faltantes) {
+        const perfil = e.profileData || {};
+        correlativoActual += 1;
+
+        nuevosCertificados.push({
+          usuario_id: perfil.id,
+          usuario_email: perfil.email || e.usuario_email || '',
+          curso_id: cursoId,
+          codigo: `${prefijo}-${anio}-${String(correlativoActual).padStart(4, '0')}`,
+          nota: Number(e.puntaje || 0),
+          nombres: perfil.nombres || '',
+          apellidos: perfil.apellidos || '',
+          dni: perfil.documento_numero || '',
+          cargo: perfil.cargos?.nombre || '',
+          empresa: perfil.empresas?.nombre || '',
+        });
+      }
+
+      const { data: insertados, error: insertError } = await supabase
+        .from('certificados')
+        .insert(nuevosCertificados)
+        .select('usuario_id, usuario_email, codigo, nota, nombres, apellidos, dni, cargo, empresa');
+      if (insertError) throw insertError;
+
+      const { error: updateCursoError } = await supabase
+        .from('cursos')
+        .update({ correlativo: correlativoActual })
+        .eq('id', cursoId);
+      if (updateCursoError) throw updateCursoError;
+
+      for (const c of (insertados || [])) {
+        mapaCertificados[c.usuario_id] = c;
+      }
+    }
+
+    if (!window.JSZip || !window.html2pdf) {
+      throw new Error('No se cargaron las librerÃ­as para generar PDFs o ZIP.');
+    }
+
+    const zip = new window.JSZip();
+    const folder = zip.folder('Certificados');
+    const duracion = curso?.duracion ? `${curso.duracion} hora${curso.duracion > 1 ? 's' : ''}` : '';
+
+    status.textContent = `ðŸ“„ Generando 0 / ${aprobados.length} PDFs...`;
+
+    for (let i = 0; i < aprobados.length; i++) {
+      const e = aprobados[i];
+      const perfil = e.profileData || {};
+      const certInfo = mapaCertificados[perfil.id];
+
+      if (!certInfo) {
+        throw new Error(`No se pudo regularizar el certificado de ${perfil.apellidos || ''} ${perfil.nombres || ''}`.trim());
+      }
+
+      const nombreCompleto = `${certInfo.apellidos || perfil.apellidos || ''} ${certInfo.nombres || perfil.nombres || ''}`.trim().toUpperCase();
+      const dni = certInfo.dni || perfil.documento_numero || '';
+      const cargo = certInfo.cargo || perfil.cargos?.nombre || '';
+      const notaNumerica = certInfo.nota ?? Number(e.puntaje || 0);
+      const notaTexto = Number.isFinite(Number(notaNumerica)) ? Number(notaNumerica).toFixed(1) : String(notaNumerica || '');
+      const codigo = certInfo.codigo || 'â€”';
+      const fechaHoy = new Date(e.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+
+      const html = buildHtmlCertificado({
+        nombreCompleto,
+        dni,
+        documentoTipo: perfil.documento_tipo,
+        cargo,
+        cursotitulo:   curso?.titulo || '',
+        duracion,
+        notaTexto,
+        fechaHoy,
+        codigo,
+      });
+
+      const contenedor = document.createElement('div');
+      contenedor.style.cssText = 'position:fixed;left:-9999px;top:0;width:297mm;height:210mm;overflow:hidden;background:white;';
+      contenedor.innerHTML = html;
+      document.body.appendChild(contenedor);
+
+      try {
+        await Promise.all(
+          Array.from(contenedor.querySelectorAll('img')).map(img =>
+            new Promise(r => { if (img.complete) return r(null); img.onload = img.onerror = r; })
+          )
+        );
+        await new Promise(r => setTimeout(r, 700));
+
+        const pdfBlob = await window.html2pdf().set({
+          margin:      0,
+          image:       { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794 },
+          jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
+        }).from(contenedor.querySelector('.certificado') || contenedor).outputPdf('blob');
+
+        const nombreSeguro = nombreCompleto.replace(/[\\/:*?\"<>|]+/g, '').replace(/\s+/g, '_');
+        const nombreArchivo = `${dni || 'sin_dni'}_${nombreSeguro}.pdf`;
+        folder.file(nombreArchivo, pdfBlob);
+      } finally {
+        document.body.removeChild(contenedor);
+      }
+
+      status.textContent = `ðŸ“„ Generando ${i + 1} / ${aprobados.length} PDFs...`;
+    }
+
+    status.textContent = 'ðŸ“¦ Empaquetando ZIP...';
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url     = URL.createObjectURL(zipBlob);
+    const a       = document.createElement('a');
+    a.href        = url;
+    a.download    = `Certificados_${curso?.titulo || cursoId}_${mesVal || 'todos'}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    status.textContent = `âœ… Descargado ZIP con ${aprobados.length} certificados. ${faltantes.length ? `Se regularizaron ${faltantes.length} faltantes.` : 'No hubo faltantes.'}`;
+  } catch (err) {
+    console.error('Error en descarga masiva de certificados:', err);
+    status.textContent = `âŒ ${err?.message || 'No se pudo generar la descarga masiva.'}`;
+  }
+};
+
 window.cargarListaCursos = async function () {
   const contenedor = document.getElementById('lista-toggle-cursos');
   contenedor.innerHTML = '<p style="color:#888;font-size:0.88rem;">Cargando...</p>';

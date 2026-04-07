@@ -58,7 +58,7 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
     <div class="esquina tr"></div>
     <div class="esquina bl"></div>
     <div class="esquina br"></div>
-    <img class="logo" src="${LOGO_URL}" crossorigin="anonymous" />
+    <img class="logo" src="${LOGO_URL}" crossorigin="anonymous" alt="" />
     <img class="firma-img" src="${FIRMA_URL}" crossorigin="anonymous" />
     <div class="contenido">
       <div class="titulo">Certificado de Capacitación</div>

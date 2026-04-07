@@ -15,8 +15,7 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
   <title>Certificado - ${nombreCompleto}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 1122px; height: 794px; overflow: hidden; }
+    .certificado, .certificado * { margin: 0; padding: 0; box-sizing: border-box; }
     .certificado { width: 1122px; height: 794px; position: relative; font-family: 'Crimson Text', Georgia, serif; overflow: hidden; background: white; }
     .fondo { position: absolute; top: 0; left: 0; width: 1122px; height: 794px; object-fit: cover; z-index: 0; }
     .borde-ext { position: absolute; top: 23px; left: 23px; right: 23px; bottom: 23px; border: 2.5px solid #c9a84c; z-index: 1; pointer-events: none; }
@@ -89,8 +88,8 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
 async function crearContenedor(htmlContent, visible) {
   const contenedor = document.createElement('div');
   contenedor.style.cssText = visible
-    ? 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;margin-left:80px;'
-    : 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;margin-left:80px;opacity:0.01;pointer-events:none;';
+    ? 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;'
+    : 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
   contenedor.innerHTML = htmlContent;
   document.body.appendChild(contenedor);
   await Promise.all(

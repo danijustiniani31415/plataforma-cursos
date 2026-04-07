@@ -130,7 +130,17 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
 export async function generarCertificadoPDFBlob(htmlContent) {
   const contenedor = document.createElement('div');
   contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
-  contenedor.innerHTML = htmlContent;
+  const parsed = new DOMParser().parseFromString(htmlContent, 'text/html');
+
+  parsed.head.querySelectorAll('style, link[rel="stylesheet"]').forEach(node => {
+    contenedor.appendChild(node.cloneNode(true));
+  });
+
+  const bodyContent = parsed.body.firstElementChild
+    ? parsed.body.firstElementChild.cloneNode(true)
+    : document.createElement('div');
+
+  contenedor.appendChild(bodyContent);
   document.body.appendChild(contenedor);
 
   try {

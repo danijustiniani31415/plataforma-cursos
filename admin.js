@@ -1957,7 +1957,8 @@ window.descargarCertificadosMasivo = async function () {
         const pdfBlob = await window.html2pdf().set({
           margin:      0,
           image:       { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, scrollX: 0, scrollY: 0 },
+          pagebreak:   { mode: ['avoid-all'] },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
           jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
         }).from(contenedor.querySelector('.certificado') || contenedor).outputPdf('blob');
 

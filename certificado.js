@@ -6,47 +6,47 @@ const FONDO_URL = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/si
 const FIRMA_URL = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/sign/certificados/Firma.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MjRkNDBhNC1jZTI0LTQwYzItYTc3NC1lMmUwNzBjNGMzMzUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjZXJ0aWZpY2Fkb3MvRmlybWEucG5nIiwiaWF0IjoxNzc0MTkxNDYyLCJleHAiOjE5MzE4NzE0NjJ9.SdrIBlz2EWYzDVY35YYfCJMJO3LypxQ5JIE8oHvegTM';
 const LOGO_URL  = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/sign/certificados/Logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MjRkNDBhNC1jZTI0LTQwYzItYTc3NC1lMmUwNzBjNGMzMzUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjZXJ0aWZpY2Fkb3MvTG9nby5wbmciLCJpYXQiOjE3NzQxOTE4MjksImV4cCI6MTkzMTg3MTgyOX0.rzYxlgmM8bq-3Bmk8rTNgVfvsUu7ex3LVQyrI1oCIHk';
 
-// ─── Genera el HTML del certificado (reutilizable desde admin también) ───────
 export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo, cursotitulo, duracion, notaTexto, fechaHoy, codigo }) {
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=1122">
   <title>Certificado - ${nombreCompleto}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <style>
-    .certificado, .certificado * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 1122px; height: 794px; overflow: hidden; }
     .certificado { width: 1122px; height: 794px; position: relative; font-family: 'Crimson Text', Georgia, serif; overflow: hidden; background: white; }
-    .fondo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
-    .borde-ext { position: absolute; inset: 6mm; border: 2.5px solid #c9a84c; z-index: 1; pointer-events: none; }
-    .borde-int { position: absolute; inset: 9mm; border: 0.8px solid #c9a84c; opacity: 0.5; z-index: 1; pointer-events: none; }
-    .esquina { position: absolute; width: 12mm; height: 12mm; border-color: #002855; border-style: solid; z-index: 2; }
-    .esquina.tl { top: 5mm; left: 5mm; border-width: 2px 0 0 2px; }
-    .esquina.tr { top: 5mm; right: 5mm; border-width: 2px 2px 0 0; }
-    .esquina.bl { bottom: 5mm; left: 5mm; border-width: 0 0 2px 2px; }
-    .esquina.br { bottom: 5mm; right: 5mm; border-width: 0 2px 2px 0; }
-    .logo { position: absolute; top: 10mm; left: 14mm; height: 16mm; z-index: 3; }
-    .firma-img { position: absolute; bottom: 30mm; right: 24mm; height: 38.4mm; z-index: 3; opacity: 0.9; }
-    .contenido { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 0 25mm; transform: translateY(10mm); }
-    .titulo { margin-top: 38mm; font-family: 'Cinzel', Georgia, serif; font-size: 28pt; font-weight: 700; color: #002855; letter-spacing: 4px; text-transform: uppercase; text-align: center; line-height: 1.1; }
-    .subtitulo { margin-top: 2mm; font-family: 'Cinzel', serif; font-size: 8.5pt; font-weight: 400; color: #555; letter-spacing: 3px; text-transform: uppercase; text-align: center; }
-    .linea-decorativa { width: 180mm; margin: 4mm auto; display: flex; align-items: center; gap: 3mm; }
+    .fondo { position: absolute; top: 0; left: 0; width: 1122px; height: 794px; object-fit: cover; z-index: 0; }
+    .borde-ext { position: absolute; top: 23px; left: 23px; right: 23px; bottom: 23px; border: 2.5px solid #c9a84c; z-index: 1; pointer-events: none; }
+    .borde-int { position: absolute; top: 34px; left: 34px; right: 34px; bottom: 34px; border: 0.8px solid #c9a84c; opacity: 0.5; z-index: 1; pointer-events: none; }
+    .esquina { position: absolute; width: 45px; height: 45px; border-color: #002855; border-style: solid; z-index: 2; }
+    .esquina.tl { top: 19px; left: 19px; border-width: 2px 0 0 2px; }
+    .esquina.tr { top: 19px; right: 19px; border-width: 2px 2px 0 0; }
+    .esquina.bl { bottom: 19px; left: 19px; border-width: 0 0 2px 2px; }
+    .esquina.br { bottom: 19px; right: 19px; border-width: 0 2px 2px 0; }
+    .logo { position: absolute; top: 38px; left: 53px; height: 60px; z-index: 3; font-size: 0; }
+    .firma-img { position: absolute; bottom: 113px; right: 91px; height: 145px; z-index: 3; opacity: 0.9; }
+    .contenido { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 0 30px; }
+    .titulo { margin-top: 144px; font-family: 'Cinzel', Georgia, serif; font-size: 37px; font-weight: 700; color: #002855; letter-spacing: 3px; text-transform: uppercase; text-align: center; line-height: 1.1; }
+    .subtitulo { margin-top: 7px; font-family: 'Cinzel', serif; font-size: 11px; font-weight: 400; color: #555; letter-spacing: 3px; text-transform: uppercase; text-align: center; }
+    .linea-decorativa { width: 680px; margin: 15px auto; display: flex; align-items: center; gap: 11px; }
     .linea-decorativa::before, .linea-decorativa::after { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, transparent, #c9a84c, transparent); }
-    .linea-decorativa-icono { color: #c9a84c; font-size: 10pt; }
-    .certifica-texto { font-family: 'Crimson Text', serif; font-size: 11pt; font-style: italic; color: #555; text-align: center; letter-spacing: 1px; }
-    .nombre { margin-top: 3mm; font-family: 'Cinzel', Georgia, serif; font-size: 22pt; font-weight: 700; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 2px; line-height: 1.15; }
-    .dni-cargo { margin-top: 2mm; font-family: 'Crimson Text', serif; font-size: 10pt; color: #444; text-align: center; letter-spacing: 0.5px; }
-    .separador { width: 120mm; margin: 4mm auto; border-top: 0.5px solid #c9a84c; opacity: 0.6; }
-    .participacion-texto { font-family: 'Crimson Text', serif; font-size: 10pt; color: #555; text-align: center; font-style: italic; }
-    .curso-nombre { margin-top: 2mm; font-family: 'Cinzel', Georgia, serif; font-size: 14pt; font-weight: 600; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.2; }
-    .empresa-texto { margin-top: 3mm; font-family: 'Crimson Text', serif; font-size: 9.5pt; color: #666; text-align: center; }
-    .duracion-fecha { margin-top: 1.5mm; font-family: 'Crimson Text', serif; font-size: 9.5pt; color: #555; text-align: center; }
-    .pie-datos { position: absolute; bottom: 10mm; right: 18mm; text-align: right; font-family: 'Crimson Text', serif; font-size: 8pt; color: #666; line-height: 1.7; z-index: 3; }
-    .firma-bloque { position: absolute; bottom: 18mm; right: 12mm; text-align: center; width: 82mm; z-index: 3; }
-    .firma-linea { border-top: 1.5px solid #002855; margin-bottom: 2.5mm; }
-    .firma-nombre { font-family: 'Cinzel', serif; font-size: 11pt; font-weight: 600; color: #002855; letter-spacing: 0.7px; text-transform: uppercase; }
-    .firma-titulo { font-family: 'Crimson Text', serif; font-size: 10pt; color: #555; margin-top: 1.2mm; }
-    @media print { body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { size: A4 landscape; margin: 0; } }
+    .linea-decorativa-icono { color: #c9a84c; font-size: 13px; }
+    .certifica-texto { font-family: 'Crimson Text', serif; font-size: 15px; font-style: italic; color: #555; text-align: center; letter-spacing: 1px; }
+    .nombre { margin-top: 11px; font-family: 'Cinzel', Georgia, serif; font-size: 29px; font-weight: 700; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 2px; line-height: 1.15; }
+    .dni-cargo { margin-top: 7px; font-family: 'Crimson Text', serif; font-size: 13px; color: #444; text-align: center; letter-spacing: 0.5px; }
+    .separador { width: 453px; margin: 15px auto; border-top: 0.5px solid #c9a84c; opacity: 0.6; }
+    .participacion-texto { font-family: 'Crimson Text', serif; font-size: 13px; color: #555; text-align: center; font-style: italic; }
+    .curso-nombre { margin-top: 7px; font-family: 'Cinzel', Georgia, serif; font-size: 18px; font-weight: 600; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.2; }
+    .empresa-texto { margin-top: 11px; font-family: 'Crimson Text', serif; font-size: 13px; color: #666; text-align: center; }
+    .duracion-fecha { margin-top: 6px; font-family: 'Crimson Text', serif; font-size: 13px; color: #555; text-align: center; }
+    .pie-datos { position: absolute; bottom: 38px; right: 68px; text-align: right; font-family: 'Crimson Text', serif; font-size: 11px; color: #666; line-height: 1.7; z-index: 3; }
+    .firma-bloque { position: absolute; bottom: 68px; right: 45px; text-align: center; width: 310px; z-index: 3; }
+    .firma-linea { border-top: 1.5px solid #002855; margin-bottom: 9px; }
+    .firma-nombre { font-family: 'Cinzel', serif; font-size: 15px; font-weight: 600; color: #002855; letter-spacing: 0.7px; text-transform: uppercase; }
+    .firma-titulo { font-family: 'Crimson Text', serif; font-size: 13px; color: #555; margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -85,107 +85,77 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
 </html>`;
 }
 
-// ─── Descarga el HTML como PDF usando html2pdf.js ────────────────────────────
+// ─── Helper compartido ───────────────────────────────────────────────────────
+async function crearContenedor(htmlContent, visible) {
+  const contenedor = document.createElement('div');
+  contenedor.style.cssText = visible
+    ? 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;'
+    : 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
+  contenedor.innerHTML = htmlContent;
+  document.body.appendChild(contenedor);
+  await Promise.all(
+    Array.from(contenedor.querySelectorAll('img')).map(img =>
+      new Promise(r => { if (img.complete) return r(); img.onload = img.onerror = r; })
+    )
+  );
+  await new Promise(r => setTimeout(r, 1500));
+  return contenedor;
+}
+
+// Opciones fijas en px para que jsPDF no genere segunda hoja
+const PDF_OPTS = {
+  margin: 0,
+  image: { type: 'jpeg', quality: 0.98 },
+  html2canvas: {
+    scale: 1,
+    useCORS: true,
+    allowTaint: true,
+    imageTimeout: 0,
+    width: 1122,
+    height: 794,
+    windowWidth: 1122,
+    windowHeight: 794,
+    scrollX: 0,
+    scrollY: 0,
+  },
+  jsPDF: {
+    unit: 'px',
+    format: [1122, 794],
+    orientation: 'landscape',
+    hotfixes: ['px_scaling'],
+  },
+};
+
+// ─── Descarga PDF ─────────────────────────────────────────────────────────────
 export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99998;display:flex;align-items:center;justify-content:center;color:white;font-size:1.1rem;font-family:sans-serif;';
   overlay.textContent = '⏳ Generando certificado PDF...';
   document.body.appendChild(overlay);
 
-  const contenedor = document.createElement('div');
-  contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;';
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlContent, 'text/html');
-  const certDiv = doc.querySelector('.certificado');
-  contenedor.appendChild(certDiv);
-
-  const injectedStyles = [];
-  doc.querySelectorAll('style').forEach(s => {
-    const clone = s.cloneNode(true);
-    document.head.appendChild(clone);
-    injectedStyles.push(clone);
-  });
-
-  document.body.appendChild(contenedor);
-
-  await Promise.all(
-    Array.from(contenedor.querySelectorAll('img')).map(img =>
-      new Promise(resolve => {
-        if (img.complete) return resolve(null);
-        img.onload = img.onerror = resolve;
-      })
-    )
-  );
-  await new Promise(r => setTimeout(r, 1500));
-
-  const metaViewport = document.querySelector('meta[name=viewport]');
-  const valorOriginal = metaViewport?.content;
-  if (metaViewport) metaViewport.content = 'width=1122';
-
-  await window.html2pdf().set({
-    margin:      0,
-    filename:    nombreArchivo,
-    image:       { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, allowTaint: true, hotfixes: false, imageTimeout: 0, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
-    jsPDF:       { unit: 'mm', format: [297, 210], orientation: 'landscape' },
-  }).from(certDiv).save();
-
-  if (metaViewport) metaViewport.content = valorOriginal;
-  document.body.removeChild(contenedor);
-  injectedStyles.forEach(s => document.head.removeChild(s));
-  document.body.removeChild(overlay);
-}
-
-// ─── Flujo principal del trabajador ──────────────────────────────────────────
-export async function generarCertificadoPDFBlob(htmlContent) {
-  const contenedor = document.createElement('div');
-  contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlContent, 'text/html');
-  const certDiv = doc.querySelector('.certificado');
-  contenedor.appendChild(certDiv);
-
-  const injectedStyles = [];
-  doc.querySelectorAll('style').forEach(s => {
-    const clone = s.cloneNode(true);
-    document.head.appendChild(clone);
-    injectedStyles.push(clone);
-  });
-
-  document.body.appendChild(contenedor);
+  const contenedor = await crearContenedor(htmlContent, true);
+  const el = contenedor.querySelector('.certificado') || contenedor;
 
   try {
-    await Promise.all(
-      Array.from(contenedor.querySelectorAll('img')).map(img =>
-        new Promise(resolve => {
-          if (img.complete) return resolve(null);
-          img.onload = img.onerror = resolve;
-        })
-      )
-    );
-    await new Promise(r => setTimeout(r, 1500));
-
-    const metaViewport = document.querySelector('meta[name=viewport]');
-    const valorOriginal = metaViewport?.content;
-    if (metaViewport) metaViewport.content = 'width=1122';
-
-    const pdfBlob = await window.html2pdf().set({
-      margin:      0,
-      image:       { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, allowTaint: true, hotfixes: false, imageTimeout: 0, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
-      jsPDF:       { unit: 'mm', format: [297, 210], orientation: 'landscape' },
-    }).from(certDiv).outputPdf('blob');
-
-    if (metaViewport) metaViewport.content = valorOriginal;
-    return pdfBlob;
+    await window.html2pdf().set({ ...PDF_OPTS, filename: nombreArchivo }).from(el).save();
   } finally {
     document.body.removeChild(contenedor);
-    injectedStyles.forEach(s => document.head.removeChild(s));
+    document.body.removeChild(overlay);
   }
 }
 
+// ─── Genera blob ──────────────────────────────────────────────────────────────
+export async function generarCertificadoPDFBlob(htmlContent) {
+  const contenedor = await crearContenedor(htmlContent, false);
+  const el = contenedor.querySelector('.certificado') || contenedor;
+  try {
+    return await window.html2pdf().set(PDF_OPTS).from(el).outputPdf('blob');
+  } finally {
+    document.body.removeChild(contenedor);
+  }
+}
+
+// ─── Flujo principal ──────────────────────────────────────────────────────────
 export async function generarCertificadoPDF(curso, nota) {
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -202,7 +172,6 @@ export async function generarCertificadoPDF(curso, nota) {
   const notaTexto      = nota?.toFixed ? nota.toFixed(1) : String(nota);
   const fechaHoy       = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  // Llamar Edge Function: guarda en BD + envía email → devuelve código
   const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token || ANON_KEY;
@@ -244,7 +213,6 @@ export async function generarCertificadoPDF(curso, nota) {
     alert(`✅ ¡Certificado generado! Código: ${codigo}\nSe envió una notificación a tu correo.`);
   }
 
-  // Generar y descargar el PDF cliente
   const html = buildHtmlCertificado({
     nombreCompleto,
     dni,

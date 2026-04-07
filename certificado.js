@@ -15,9 +15,8 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
   <title>Certificado - ${nombreCompleto}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { width: 297mm; height: 210mm; overflow: hidden; background: white; }
-    .certificado { width: 297mm; height: 210mm; position: relative; font-family: 'Crimson Text', Georgia, serif; overflow: hidden; }
+    .certificado, .certificado * { margin: 0; padding: 0; box-sizing: border-box; }
+    .certificado { width: 1122px; height: 794px; position: relative; font-family: 'Crimson Text', Georgia, serif; overflow: hidden; background: white; }
     .fondo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
     .borde-ext { position: absolute; inset: 6mm; border: 2.5px solid #c9a84c; z-index: 1; pointer-events: none; }
     .borde-int { position: absolute; inset: 9mm; border: 0.8px solid #c9a84c; opacity: 0.5; z-index: 1; pointer-events: none; }

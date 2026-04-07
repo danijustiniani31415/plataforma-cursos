@@ -94,6 +94,9 @@ async function crearContenedor(htmlContent, visible) {
   // Extraer solo .certificado y estilos via DOMParser (no inyectar el HTML completo)
   const parsed = new DOMParser().parseFromString(htmlContent, 'text/html');
   const certDiv = parsed.querySelector('.certificado');
+  certDiv.style.position = 'absolute';
+  certDiv.style.top = '0';
+  certDiv.style.left = '0';
   contenedor.appendChild(document.adoptNode(certDiv));
 
   // Inyectar estilos en <head> temporalmente
@@ -136,19 +139,6 @@ const PDF_OPTS = {
     y: 0,
     scrollX: 0,
     scrollY: 0,
-    onclone: (clonedDoc) => {
-      const cert = clonedDoc.querySelector('.certificado');
-      if (cert) {
-        const styles = Array.from(clonedDoc.querySelectorAll('style'));
-        clonedDoc.body.innerHTML = '';
-        clonedDoc.body.style.cssText = 'margin:0;padding:0;width:1122px;height:794px;overflow:hidden;';
-        styles.forEach(s => clonedDoc.head.appendChild(s));
-        clonedDoc.body.appendChild(cert);
-        cert.style.position = 'absolute';
-        cert.style.top = '0';
-        cert.style.left = '0';
-      }
-    },
   },
   jsPDF: {
     unit: 'px',

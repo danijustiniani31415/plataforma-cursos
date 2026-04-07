@@ -140,6 +140,11 @@ export async function generarCertificadoPDFBlob(htmlContent) {
     ? parsed.body.firstElementChild.cloneNode(true)
     : document.createElement('div');
 
+  if (bodyContent instanceof HTMLElement) {
+    bodyContent.style.transform = 'translateX(12px)';
+    bodyContent.style.transformOrigin = 'top left';
+  }
+
   contenedor.appendChild(bodyContent);
   document.body.appendChild(contenedor);
 

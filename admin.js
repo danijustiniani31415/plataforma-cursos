@@ -1942,7 +1942,7 @@ window.descargarCertificadosMasivo = async function () {
       });
 
       const contenedor = document.createElement('div');
-      contenedor.style.cssText = 'position:fixed;left:-9999px;top:0;width:297mm;height:210mm;overflow:hidden;background:white;';
+      contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
       contenedor.innerHTML = html;
       document.body.appendChild(contenedor);
 
@@ -1957,7 +1957,7 @@ window.descargarCertificadosMasivo = async function () {
         const pdfBlob = await window.html2pdf().set({
           margin:      0,
           image:       { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794 },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, scrollX: 0, scrollY: 0 },
           jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
         }).from(contenedor.querySelector('.certificado') || contenedor).outputPdf('blob');
 

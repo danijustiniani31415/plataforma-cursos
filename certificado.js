@@ -90,7 +90,21 @@ async function crearContenedor(htmlContent, visible) {
   contenedor.style.cssText = visible
     ? 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;'
     : 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
-  contenedor.innerHTML = htmlContent;
+
+  // Extraer solo .certificado y estilos via DOMParser (no inyectar el HTML completo)
+  const parsed = new DOMParser().parseFromString(htmlContent, 'text/html');
+  const certDiv = parsed.querySelector('.certificado');
+  contenedor.appendChild(document.adoptNode(certDiv));
+
+  // Inyectar estilos en <head> temporalmente
+  const injectedStyles = [];
+  parsed.querySelectorAll('style').forEach(s => {
+    const clone = s.cloneNode(true);
+    document.head.appendChild(clone);
+    injectedStyles.push(clone);
+  });
+  contenedor._injectedStyles = injectedStyles;
+
   document.body.appendChild(contenedor);
   await Promise.all(
     Array.from(contenedor.querySelectorAll('img')).map(img =>
@@ -99,6 +113,11 @@ async function crearContenedor(htmlContent, visible) {
   );
   await new Promise(r => setTimeout(r, 1500));
   return contenedor;
+}
+
+function limpiarContenedor(contenedor) {
+  document.body.removeChild(contenedor);
+  (contenedor._injectedStyles || []).forEach(s => s.remove());
 }
 
 const PDF_OPTS = {
@@ -137,7 +156,7 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
   try {
     await window.html2pdf().set({ ...PDF_OPTS, filename: nombreArchivo }).from(el).save();
   } finally {
-    document.body.removeChild(contenedor);
+    limpiarContenedor(contenedor);
     document.body.removeChild(overlay);
   }
 }
@@ -149,7 +168,7 @@ export async function generarCertificadoPDFBlob(htmlContent) {
   try {
     return await window.html2pdf().set(PDF_OPTS).from(el).outputPdf('blob');
   } finally {
-    document.body.removeChild(contenedor);
+    limpiarContenedor(contenedor);
   }
 }
 

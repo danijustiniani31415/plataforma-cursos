@@ -145,18 +145,26 @@ export async function generarCertificadoPDFBlob(htmlContent) {
     await new Promise(r => setTimeout(r, 1500));
 
     const el = contenedor.querySelector('.certificado') || contenedor;
-    const canvas = await window.html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      width: 1122,
-      height: 794,
-      windowWidth: 1122,
-      windowHeight: 794,
-      scrollX: 0,
-      scrollY: 0,
-      backgroundColor: '#ffffff',
-    });
+    const worker = window.html2pdf().set({
+      margin:      0,
+      image:       { type: 'jpeg', quality: 0.98 },
+      pagebreak:   { mode: ['avoid-all'] },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        width: 1122,
+        height: 794,
+        windowWidth: 1122,
+        windowHeight: 794,
+        scrollX: 0,
+        scrollY: 0,
+        backgroundColor: '#ffffff',
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    }).from(el).toCanvas();
+
+    const canvas = await worker.get('canvas');
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({

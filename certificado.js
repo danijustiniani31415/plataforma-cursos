@@ -132,8 +132,22 @@ const PDF_OPTS = {
     height: 794,
     windowWidth: 1122,
     windowHeight: 794,
+    x: 0,
+    y: 0,
     scrollX: 0,
     scrollY: 0,
+    onclone: (clonedDoc) => {
+      // Aislar el certificado en el clon: quitar todo lo demás del body
+      const cert = clonedDoc.querySelector('.certificado');
+      if (cert) {
+        clonedDoc.body.innerHTML = '';
+        clonedDoc.body.style.cssText = 'margin:0;padding:0;width:1122px;height:794px;overflow:hidden;';
+        clonedDoc.body.appendChild(cert);
+        cert.style.position = 'absolute';
+        cert.style.top = '0';
+        cert.style.left = '0';
+      }
+    },
   },
   jsPDF: {
     unit: 'px',

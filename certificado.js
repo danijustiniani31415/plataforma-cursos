@@ -92,15 +92,25 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
   overlay.textContent = '⏳ Generando certificado PDF...';
   document.body.appendChild(overlay);
 
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;border:none;z-index:99999;opacity:0;pointer-events:none;';
-  iframe.srcdoc = htmlContent;
-  document.body.appendChild(iframe);
+  const contenedor = document.createElement('div');
+  contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;';
 
-  await new Promise(resolve => { iframe.onload = resolve; });
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlContent, 'text/html');
+  const certDiv = doc.querySelector('.certificado');
+  contenedor.appendChild(certDiv);
+
+  const injectedStyles = [];
+  doc.querySelectorAll('style').forEach(s => {
+    const clone = s.cloneNode(true);
+    document.head.appendChild(clone);
+    injectedStyles.push(clone);
+  });
+
+  document.body.appendChild(contenedor);
 
   await Promise.all(
-    Array.from(iframe.contentDocument.querySelectorAll('img')).map(img =>
+    Array.from(contenedor.querySelectorAll('img')).map(img =>
       new Promise(resolve => {
         if (img.complete) return resolve(null);
         img.onload = img.onerror = resolve;
@@ -109,32 +119,41 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
   );
   await new Promise(r => setTimeout(r, 1500));
 
-  const el = iframe.contentDocument.querySelector('.certificado');
-
   await window.html2pdf().set({
     margin:      0,
     filename:    nombreArchivo,
     image:       { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
-  }).from(el).save();
+  }).from(certDiv).save();
 
-  document.body.removeChild(iframe);
+  document.body.removeChild(contenedor);
+  injectedStyles.forEach(s => document.head.removeChild(s));
   document.body.removeChild(overlay);
 }
 
 // ─── Flujo principal del trabajador ──────────────────────────────────────────
 export async function generarCertificadoPDFBlob(htmlContent) {
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;border:none;z-index:99999;opacity:0.01;pointer-events:none;';
-  iframe.srcdoc = htmlContent;
-  document.body.appendChild(iframe);
+  const contenedor = document.createElement('div');
+  contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlContent, 'text/html');
+  const certDiv = doc.querySelector('.certificado');
+  contenedor.appendChild(certDiv);
+
+  const injectedStyles = [];
+  doc.querySelectorAll('style').forEach(s => {
+    const clone = s.cloneNode(true);
+    document.head.appendChild(clone);
+    injectedStyles.push(clone);
+  });
+
+  document.body.appendChild(contenedor);
 
   try {
-    await new Promise(resolve => { iframe.onload = resolve; });
-
     await Promise.all(
-      Array.from(iframe.contentDocument.querySelectorAll('img')).map(img =>
+      Array.from(contenedor.querySelectorAll('img')).map(img =>
         new Promise(resolve => {
           if (img.complete) return resolve(null);
           img.onload = img.onerror = resolve;
@@ -143,18 +162,17 @@ export async function generarCertificadoPDFBlob(htmlContent) {
     );
     await new Promise(r => setTimeout(r, 1500));
 
-    const el = iframe.contentDocument.querySelector('.certificado');
-
     const pdfBlob = await window.html2pdf().set({
       margin:      0,
       image:       { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
       jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
-    }).from(el).outputPdf('blob');
+    }).from(certDiv).outputPdf('blob');
 
     return pdfBlob;
   } finally {
-    document.body.removeChild(iframe);
+    document.body.removeChild(contenedor);
+    injectedStyles.forEach(s => document.head.removeChild(s));
   }
 }
 

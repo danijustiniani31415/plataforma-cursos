@@ -26,20 +26,20 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
     .esquina.tr { top: 19px; right: 19px; border-width: 2px 2px 0 0; }
     .esquina.bl { bottom: 19px; left: 19px; border-width: 0 0 2px 2px; }
     .esquina.br { bottom: 19px; right: 19px; border-width: 0 2px 2px 0; }
-    .logo { position: absolute; top: 38px; left: 53px; height: 60px; z-index: 3; font-size: 0; }
+    .logo { position: absolute; top: 38px; left: 53px; height: 60px; z-index: 3; font-size: 0; line-height: 0; }
     .firma-img { position: absolute; bottom: 113px; right: 91px; height: 145px; z-index: 3; opacity: 0.9; }
-    .contenido { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 0 30px; }
-    .titulo { margin-top: 144px; font-family: 'Cinzel', Georgia, serif; font-size: 37px; font-weight: 700; color: #002855; letter-spacing: 3px; text-transform: uppercase; text-align: center; line-height: 1.1; }
+    .contenido { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 0 100px; }
+    .titulo { margin-top: 144px; font-family: 'Cinzel', Georgia, serif; font-size: 34px; font-weight: 700; color: #002855; letter-spacing: 2px; text-transform: uppercase; text-align: center; line-height: 1.1; width: 100%; }
     .subtitulo { margin-top: 7px; font-family: 'Cinzel', serif; font-size: 11px; font-weight: 400; color: #555; letter-spacing: 3px; text-transform: uppercase; text-align: center; }
-    .linea-decorativa { width: 680px; margin: 15px auto; display: flex; align-items: center; gap: 11px; }
+    .linea-decorativa { width: 580px; margin: 15px auto; display: flex; align-items: center; gap: 11px; }
     .linea-decorativa::before, .linea-decorativa::after { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, transparent, #c9a84c, transparent); }
     .linea-decorativa-icono { color: #c9a84c; font-size: 13px; }
     .certifica-texto { font-family: 'Crimson Text', serif; font-size: 15px; font-style: italic; color: #555; text-align: center; letter-spacing: 1px; }
-    .nombre { margin-top: 11px; font-family: 'Cinzel', Georgia, serif; font-size: 29px; font-weight: 700; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 2px; line-height: 1.15; }
+    .nombre { margin-top: 11px; font-family: 'Cinzel', Georgia, serif; font-size: 29px; font-weight: 700; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 2px; line-height: 1.15; width: 100%; }
     .dni-cargo { margin-top: 7px; font-family: 'Crimson Text', serif; font-size: 13px; color: #444; text-align: center; letter-spacing: 0.5px; }
     .separador { width: 453px; margin: 15px auto; border-top: 0.5px solid #c9a84c; opacity: 0.6; }
     .participacion-texto { font-family: 'Crimson Text', serif; font-size: 13px; color: #555; text-align: center; font-style: italic; }
-    .curso-nombre { margin-top: 7px; font-family: 'Cinzel', Georgia, serif; font-size: 18px; font-weight: 600; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.2; }
+    .curso-nombre { margin-top: 7px; font-family: 'Cinzel', Georgia, serif; font-size: 18px; font-weight: 600; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.2; width: 100%; }
     .empresa-texto { margin-top: 11px; font-family: 'Crimson Text', serif; font-size: 13px; color: #666; text-align: center; }
     .duracion-fecha { margin-top: 6px; font-family: 'Crimson Text', serif; font-size: 13px; color: #555; text-align: center; }
     .pie-datos { position: absolute; bottom: 38px; right: 68px; text-align: right; font-family: 'Crimson Text', serif; font-size: 11px; color: #666; line-height: 1.7; z-index: 3; }
@@ -102,7 +102,6 @@ async function crearContenedor(htmlContent, visible) {
   return contenedor;
 }
 
-// Opciones fijas en px para que jsPDF no genere segunda hoja
 const PDF_OPTS = {
   margin: 0,
   image: { type: 'jpeg', quality: 0.98 },

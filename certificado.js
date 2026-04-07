@@ -141,8 +141,7 @@ export async function generarCertificadoPDFBlob(htmlContent) {
     : document.createElement('div');
 
   if (bodyContent instanceof HTMLElement) {
-    bodyContent.style.transform = 'translateX(96px)';
-    bodyContent.style.transformOrigin = 'top left';
+    bodyContent.style.transform = 'none';
   }
 
   contenedor.appendChild(bodyContent);
@@ -195,9 +194,9 @@ export async function generarCertificadoPDFBlob(htmlContent) {
     pdf.addImage(
       canvas.toDataURL('image/jpeg', 0.98),
       'JPEG',
-      22,
       0,
-      264,
+      0,
+      297,
       210,
       undefined,
       'FAST'

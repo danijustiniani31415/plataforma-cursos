@@ -127,6 +127,36 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
 }
 
 // ─── Flujo principal del trabajador ──────────────────────────────────────────
+export async function generarCertificadoPDFBlob(htmlContent) {
+  const contenedor = document.createElement('div');
+  contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
+  contenedor.innerHTML = htmlContent;
+  document.body.appendChild(contenedor);
+
+  try {
+    await Promise.all(
+      Array.from(contenedor.querySelectorAll('img')).map(img =>
+        new Promise(resolve => {
+          if (img.complete) return resolve(null);
+          img.onload = img.onerror = resolve;
+        })
+      )
+    );
+    await new Promise(r => setTimeout(r, 1500));
+
+    const el = contenedor.querySelector('.certificado') || contenedor;
+
+    return await window.html2pdf().set({
+      margin:      0,
+      image:       { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, scrollX: 0, scrollY: 0 },
+      jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    }).from(el).outputPdf('blob');
+  } finally {
+    document.body.removeChild(contenedor);
+  }
+}
+
 export async function generarCertificadoPDF(curso, nota) {
   const { data: { user } } = await supabase.auth.getUser();
 

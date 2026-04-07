@@ -1,6 +1,6 @@
 import { supabase } from './src/supabaseClient.js';
 import { alertToToast, withLoading, showConfirm, fieldValidation } from './toast.js';
-import { buildHtmlCertificado } from './certificado.js';
+import { buildHtmlCertificado, generarCertificadoPDFBlob } from './certificado.js';
 const alert = alertToToast;
 
 // Normaliza DNI: elimina espacios/saltos y padea a 8 dígitos con 0 a la izquierda
@@ -1941,33 +1941,10 @@ window.descargarCertificadosMasivo = async function () {
         codigo,
       });
 
-      const contenedor = document.createElement('div');
-      contenedor.style.cssText = 'position:fixed;top:0;left:0;width:1122px;height:794px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;';
-      contenedor.innerHTML = html;
-      document.body.appendChild(contenedor);
-
-      try {
-        await Promise.all(
-          Array.from(contenedor.querySelectorAll('img')).map(img =>
-            new Promise(r => { if (img.complete) return r(null); img.onload = img.onerror = r; })
-          )
-        );
-        await new Promise(r => setTimeout(r, 700));
-
-        const pdfBlob = await window.html2pdf().set({
-          margin:      0,
-          image:       { type: 'jpeg', quality: 0.95 },
-          pagebreak:   { mode: ['avoid-all'] },
-          html2canvas: { scale: 2, useCORS: true, allowTaint: true, width: 1122, height: 794, windowWidth: 1122, windowHeight: 794, scrollX: 0, scrollY: 0 },
-          jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
-        }).from(contenedor.querySelector('.certificado') || contenedor).outputPdf('blob');
-
-        const nombreSeguro = nombreCompleto.replace(/[\\/:*?\"<>|]+/g, '').replace(/\s+/g, '_');
-        const nombreArchivo = `${dni || 'sin_dni'}_${nombreSeguro}.pdf`;
-        folder.file(nombreArchivo, pdfBlob);
-      } finally {
-        document.body.removeChild(contenedor);
-      }
+      const pdfBlob = await generarCertificadoPDFBlob(html);
+      const nombreSeguro = nombreCompleto.replace(/[\\/:*?\"<>|]+/g, '').replace(/\s+/g, '_');
+      const nombreArchivo = `${dni || 'sin_dni'}_${nombreSeguro}.pdf`;
+      folder.file(nombreArchivo, pdfBlob);
 
       status.textContent = `ðŸ“„ Generando ${i + 1} / ${aprobados.length} PDFs...`;
     }

@@ -137,11 +137,12 @@ const PDF_OPTS = {
     scrollX: 0,
     scrollY: 0,
     onclone: (clonedDoc) => {
-      // Aislar el certificado en el clon: quitar todo lo demás del body
       const cert = clonedDoc.querySelector('.certificado');
       if (cert) {
+        const styles = Array.from(clonedDoc.querySelectorAll('style'));
         clonedDoc.body.innerHTML = '';
         clonedDoc.body.style.cssText = 'margin:0;padding:0;width:1122px;height:794px;overflow:hidden;';
+        styles.forEach(s => clonedDoc.head.appendChild(s));
         clonedDoc.body.appendChild(cert);
         cert.style.position = 'absolute';
         cert.style.top = '0';

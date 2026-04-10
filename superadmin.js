@@ -214,18 +214,22 @@ async function cargarAdmins() {
   const { data } = await supabase
     .from('profiles')
     .select('*, empresas(nombre)')
-    .eq('rol', 'admin')
+    .in('rol', ['admin', 'gestor'])
     .order('apellidos');
 
   const tbody = document.querySelector('#tabla-admins tbody');
   tbody.innerHTML = '';
   data?.forEach(u => {
+    const rolBadge = u.rol === 'gestor'
+      ? `<span style="background:#6f42c1;color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem;">Gestor</span>`
+      : `<span style="background:#002855;color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem;">Admin</span>`;
     tbody.innerHTML += `
       <tr>
         <td>${u.apellidos || ''} ${u.nombres || ''}</td>
         <td>${u.email}</td>
         <td>${u.empresas?.nombre || '—'}</td>
         <td>${u.documento_tipo}: ${u.documento_numero || '—'}</td>
+        <td>${rolBadge}</td>
         <td>${u.activo ? '✅ Activo' : '❌ Inactivo'}</td>
         <td style="display:flex; gap:6px;">
           <button onclick="toggleUsuario('${u.id}', ${u.activo})"
@@ -290,7 +294,7 @@ window.crearAdmin = async function () {
       empresa_id,
       cargo_id:         cargo_id || null,
       fecha_ingreso:    fecha_ingreso || null,
-      rol:              'admin'
+      rol:              document.getElementById('admin-rol').value || 'admin'
     }
   });
 
@@ -298,7 +302,8 @@ window.crearAdmin = async function () {
     alert('❌ ' + (res.data?.error || res.error.message)); return;
   }
 
-  alert(`✅ Administrador creado.\nContraseña inicial: ${dni}`);
+  const rolCreado = document.getElementById('admin-rol').value;
+  alert(`✅ ${rolCreado === 'gestor' ? 'Gestor de Personal' : 'Administrador'} creado.\nContraseña inicial: ${dni}`);
   ['admin-nombres','admin-apellidos','admin-dni','admin-email',
    'admin-telefono','admin-fecha-ingreso'].forEach(id => {
     document.getElementById(id).value = '';
@@ -309,6 +314,7 @@ window.crearAdmin = async function () {
   document.getElementById('admin-nombres').disabled = true;
   document.getElementById('admin-apellidos').disabled = true;
   document.getElementById('admin-dni-reniec-msg').textContent = '';
+  document.getElementById('admin-rol').value = 'admin';
   await cargarAdmins();
 };
 

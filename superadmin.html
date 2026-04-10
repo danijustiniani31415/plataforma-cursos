@@ -152,11 +152,15 @@
           <option value="">-- Selecciona cargo --</option>
         </select>
         <input type="date" id="admin-fecha-ingreso" />
+        <select id="admin-rol">
+          <option value="admin">Administrador</option>
+          <option value="gestor">Gestor de Personal</option>
+        </select>
       </div>
       <button onclick="crearAdmin()" class="btn-primary" style="margin-top:15px;">
-        Crear Administrador
+        Crear Usuario
       </button>
-      <h3 style="margin-top:30px;">Lista de Administradores</h3>
+      <h3 style="margin-top:30px;">Lista de Administradores y Gestores</h3>
       <table id="tabla-admins">
         <thead>
           <tr>
@@ -164,6 +168,7 @@
             <th>Email</th>
             <th>Empresa</th>
             <th>Documento</th>
+            <th>Rol</th>
             <th>Estado</th>
             <th>Acción</th>
           </tr>

@@ -44,13 +44,30 @@ let empresaAdminRuc = null;
     .eq("id", user.id)
     .single();
 
-  if (perfil?.rol !== "admin" && perfil?.rol !== "superadmin") {
+  const rolesPermitidos = ["admin", "superadmin", "gestor"];
+  if (!rolesPermitidos.includes(perfil?.rol)) {
     alert("Acceso denegado. Solo administradores.");
     window.location.href = "index.html";
     return;
   }
 
   await cargarDatosAdmin();
+
+  // Gestor de Personal: solo ve las tabs de importar y actualizar trabajadores
+  if (perfil?.rol === "gestor") {
+    const tabsPermitidas = ["importar", "actualizar"];
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+      const onclick = btn.getAttribute('onclick') || '';
+      const match = onclick.match(/mostrarTab\('([^']+)'/);
+      const tabNombre = match ? match[1] : null;
+      if (!tabNombre || !tabsPermitidas.includes(tabNombre)) {
+        btn.style.display = 'none';
+      }
+    });
+    // Activar la tab de importar por defecto
+    const btnImportar = document.querySelector(".nav-tab[onclick*=\"mostrarTab('importar'\"]");
+    if (btnImportar) btnImportar.click();
+  }
 })();
 
 // ═══════════════════════════════

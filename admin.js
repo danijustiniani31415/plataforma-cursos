@@ -55,7 +55,8 @@ let empresaAdminRuc = null;
 
   // Gestor de Personal: solo ve las tabs de importar y actualizar trabajadores
   if (perfil?.rol === "gestor") {
-    const tabsPermitidas = ["importar", "actualizar"];
+    const tabsPermitidas = ["trabajadores", "importar", "actualizar"];
+    document.getElementById('panel-crear-gestor')?.remove();
     document.querySelectorAll('.nav-tab').forEach(btn => {
       const onclick = btn.getAttribute('onclick') || '';
       const match = onclick.match(/mostrarTab\('([^']+)'/);
@@ -116,6 +117,7 @@ async function cargarDatosAdmin() {
   });
 
   configurarRENIEC('nuevo-dni', 'nuevo-doc-tipo', 'nuevo-nombres', 'nuevo-apellidos');
+  configurarRENIEC('gestor-dni', 'gestor-doc-tipo', 'gestor-nombres', 'gestor-apellidos');
 
   // Cargar cursos en los selects que los necesitan (Forms import + bulk cert)
   const { data: cursosForSelect } = await supabase
@@ -275,6 +277,68 @@ window.crearUsuario = async function () {
     document.getElementById(id).value = '';
   });
   document.getElementById('nuevo-cargo').value = '';
+};
+
+window.crearGestor = async function () {
+  const email         = document.getElementById("gestor-email").value.trim();
+  const dni           = document.getElementById("gestor-dni").value.trim();
+  const nombres       = document.getElementById("gestor-nombres").value.trim();
+  const apellidos     = document.getElementById("gestor-apellidos").value.trim();
+  const doc_tipo      = document.getElementById("gestor-doc-tipo").value;
+
+  if (!dni || !nombres || !apellidos) {
+    alert("❌ Completa los campos obligatorios: nombres, apellidos y documento.");
+    return;
+  }
+
+  const emailFinal = email || `${dni}@cvglobal-group.com`;
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    alert("❌ Ingresa un correo electrónico válido.");
+    return;
+  }
+
+  if (!empresaAdminId) {
+    alert("❌ Tu usuario no tiene empresa asignada. Contacta al superadmin.");
+    return;
+  }
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) { alert("❌ Sesión expirada. Vuelve a iniciar sesión."); return; }
+
+  const response = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/crear-usuario', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s'
+    },
+    body: JSON.stringify({
+      email:            emailFinal,
+      password:         dni,
+      nombres,
+      apellidos,
+      documento_tipo:   doc_tipo,
+      documento_numero: dni,
+      empresa_id:       empresaAdminId,
+      rol:              'gestor'
+    })
+  });
+
+  const data = await response.json();
+  if (!response.ok || data?.error) {
+    alert('❌ ' + (data?.error || 'Error al crear gestor'));
+    return;
+  }
+
+  alert(`✅ Gestor de Personal creado.\nCorreo: ${emailFinal}\nContraseña inicial: ${dni}`);
+  ["gestor-email", "gestor-dni", "gestor-nombres", "gestor-apellidos"].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('gestor-doc-tipo').value = 'DNI';
+  document.getElementById('gestor-nombres').disabled = true;
+  document.getElementById('gestor-apellidos').disabled = true;
 };
 
 // ═══════════════════════════════

@@ -376,6 +376,33 @@
       <button onclick="crearUsuario()" class="btn-primary" style="margin-top:16px;">Crear usuario</button>
     </div>
 
+    <!-- Panel solo visible para admins/superadmins, oculto para gestores -->
+    <div class="panel-card" id="panel-crear-gestor">
+      <h2>🔑 Crear Gestor de Personal</h2>
+      <p style="color:#555; margin-bottom:14px; font-size:0.9rem;">
+        El gestor solo puede cargar y actualizar trabajadores. No tiene acceso a reportes, cursos ni otras secciones.
+      </p>
+      <div class="form-grid">
+        <select id="gestor-doc-tipo">
+          <option value="DNI">DNI</option>
+          <option value="CE">Carnet de Extranjería</option>
+          <option value="PASAPORTE">Pasaporte</option>
+        </select>
+        <div class="field-wrap">
+          <input type="text" id="gestor-dni" placeholder="Nº documento * (contraseña inicial)"
+                 oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12" />
+          <div class="field-hint" id="gestor-dni-reniec-msg"></div>
+        </div>
+        <input type="text" id="gestor-nombres"   placeholder="Nombres *"   disabled />
+        <input type="text" id="gestor-apellidos" placeholder="Apellidos *" disabled />
+        <div class="field-wrap">
+          <input type="email" id="gestor-email" placeholder="Correo electrónico (opcional)" />
+          <div class="field-hint">Si no tiene correo se generará uno automático con su DNI</div>
+        </div>
+      </div>
+      <button onclick="crearGestor()" class="btn-primary" style="margin-top:16px;">Crear Gestor</button>
+    </div>
+
     <div class="panel-card">
       <h2>📋 Lista de trabajadores</h2>
       <button onclick="cargarTrabajadores()" class="btn-primary" style="margin-bottom:14px;">Cargar trabajadores</button>

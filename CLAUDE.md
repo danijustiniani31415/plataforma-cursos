@@ -5,60 +5,62 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Development Commands
 
 ```bash
-npm install          # Install dependencies
-npm run dev          # Start Vite dev server (http://localhost:5173)
-npm run build        # Production build
-npm run preview      # Preview production build
+npm install          # Instalar dependencias
+npm run dev          # Dev server Vite (http://localhost:5173)
+npm run preview      # Preview del build
 ```
 
-Supabase Edge Functions (in `supabase/functions/`) run on Deno and are deployed via Supabase CLI.
+Supabase Edge Functions (en `supabase/functions/`) corren en Deno y se despliegan con Supabase CLI.
 
-Deployed to **Cloudflare Workers** (see `wrangler.toml`) as a static site — no Node.js backend.
+Desplegado en **Cloudflare Workers** (ver `wrangler.toml`) como sitio estático — sin backend Node.js.
 
 ## Architecture
 
-**Multi-page app** with vanilla JS + Supabase as the backend. Each HTML page is its own entry point with a corresponding JS module:
+**Multi-page app** con vanilla JS + Supabase como backend. Cada HTML es su propio entry point:
 
-- `index.html` / `main.js` — Login and user dashboard (course list, progress, certificates)
-- `admin.html` / `admin.js` — Admin panel (user management, course assignments, analytics)
-- `superadmin.html` / `superadmin.js` — Superadmin panel (company management)
-- `cambiar-clave.html` — Password change (forced on first login via `debe_cambiar_password` flag)
-- `qr-asistencia.html` — QR-based attendance tracking for in-person sessions
+- `index.html` / `main.js` — Login y dashboard de usuario (lista de cursos, progreso, certificados)
+- `admin.html` / `admin.js` — Panel admin (gestión de usuarios, asignaciones, reportes)
+- `superadmin.html` / `superadmin.js` — Panel superadmin (gestión de empresas)
+- `cambiar-clave.html` — Cambio de contraseña (forzado en primer login por flag `debe_cambiar_password`)
+- `qr-asistencia.html` — Registro de asistencia por QR para sesiones presenciales
 
-There is a minimal React setup in `src/App.jsx` via Vite, but the main app logic is vanilla JS.
+Hay un setup mínimo de React en `src/App.jsx` vía Vite, pero la lógica principal es vanilla JS.
+
+### Course Flow (main.js)
+
+El flujo de un curso es secuencial y obligatorio: **Material → Videos → Asistencia → Encuesta → Examen de eficacia → Examen final → Certificado**. Cada paso desbloquea el siguiente.
 
 ### Data Layer
 
-All data access goes through **Supabase** (PostgREST + Auth + Storage). The client is initialized in `src/supabaseClient.js`. Key tables: `profiles`, `cursos`, `empresas`, `cargos`, `certificados`, `envios_formulario`, `asignaciones_mes`.
+Todo acceso a datos va por **Supabase** (PostgREST + Auth + Storage). El cliente se inicializa en `src/supabaseClient.js`. Tablas clave: `profiles`, `cursos`, `videos_curso`, `empresas`, `cargos`, `certificados`, `envios_formulario`, `formularios`, `asignaciones_mes`.
 
 ### Supabase Edge Functions (Deno/TypeScript)
 
-- `supabase/functions/enviar-certificado/` — Generates certificate codes (YYYY-NNNN format), saves to `certificados` table, sends email via Resend API
-- `supabase/functions/enviar-notificaciones/` — Sends reminder emails for pending courses and expiring certificates
+- `supabase/functions/enviar-certificado/` — Genera códigos de certificado (formato YYYY-NNNN), guarda en tabla `certificados`, envía email vía Resend API
+- `supabase/functions/enviar-notificaciones/` — Envía recordatorios de cursos pendientes y certificaciones por vencer
 
 ### Certificate PDF Generation
 
-Client-side via `certificado.js` using html2pdf.js (HTML → Canvas → PDF). The edge function handles metadata storage and email delivery.
+Client-side en `certificado.js` usando jsPDF con fuentes personalizadas, logos y firmas desde Supabase Storage. Las coordenadas de posición están definidas directamente en el archivo.
 
 ### Auth & Roles
 
-Supabase email/password auth with three roles: regular user, `admin`, `superadmin`. Role is stored in `profiles.rol`. Users with `debe_cambiar_password = true` are redirected to password change.
+Auth email/password de Supabase con tres roles: usuario regular, `admin`, `superadmin`. El rol se guarda en `profiles.rol`. RLS activo en todas las tablas.
 
 ### Service Worker (sw.js)
 
-PWA with cache name `cvglobal-sst-v8`. CDN assets are cache-first, Supabase API calls always go to network, HTML is never cached. Offline fallback: `offline.html`.
+PWA con caché `cvglobal-sst-v8`. CDN assets: cache-first. Llamadas a Supabase: siempre a red. HTML: nunca se cachea. Fallback offline: `offline.html`.
 
 ### UI Patterns
 
-- `toast.js` — Toast notification and modal system (replaces native alerts)
-- Tom Select (CDN) — Searchable dropdowns
-- CSS variables for theming (navy `#002855`, gold `#c9a84c`)
-- Loading states via `withLoading()` wrapper, form validation via `fieldValidation()`
+- `toast.js` — Sistema de notificaciones toast y modales (reemplaza `alert()`, traduce errores de Supabase al español)
+- Tom Select (CDN) — Dropdowns con búsqueda
+- CSS variables para theming (navy `#002855`, gold `#c9a84c`)
 
 ## Environment Variables
 
-The Supabase URL and anon key are in `src/supabaseClient.js`. Edge functions require `SUPABASE_SERVICE_ROLE_KEY` and `RESEND_API_KEY` as env variables.
+La URL de Supabase y anon key están en `src/supabaseClient.js`. Las edge functions requieren `SUPABASE_SERVICE_ROLE_KEY` y `RESEND_API_KEY` como variables de entorno.
 
 ## Language
 
-The app UI and user-facing content are in **Spanish**. Code comments and variable names mix Spanish and English.
+La UI y contenido de cara al usuario están en **español peruano (es-PE)**. Los comentarios y nombres de variables mezclan español e inglés.

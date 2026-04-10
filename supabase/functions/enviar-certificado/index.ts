@@ -76,7 +76,8 @@ Deno.serve(async (req) => {
       empresa,
     }])
 
-    // Enviar email de notificación con Resend
+    // DESHABILITADO: solo admins pueden ver certificados, no se notifica al trabajador
+    /* Enviar email de notificación con Resend
     console.log('RESEND_API_KEY presente:', !!RESEND_API_KEY, '| email destino:', usuario_email)
     if (RESEND_API_KEY && usuario_email) {
       const nombreCompleto = `${apellidos || ''} ${nombres || ''}`.trim()
@@ -129,6 +130,7 @@ Deno.serve(async (req) => {
       const resendText = await resendResp.text()
       console.log('Resend status:', resendResp.status, '| respuesta:', resendText)
     }
+    */
 
     return new Response(JSON.stringify({ success: true, codigo }), {
       status: 200,

@@ -6,7 +6,11 @@ const FONDO_URL = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/si
 const FIRMA_URL = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/sign/certificados/Firma.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MjRkNDBhNC1jZTI0LTQwYzItYTc3NC1lMmUwNzBjNGMzMzUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjZXJ0aWZpY2Fkb3MvRmlybWEucG5nIiwiaWF0IjoxNzc0MTkxNDYyLCJleHAiOjE5MzE4NzE0NjJ9.SdrIBlz2EWYzDVY35YYfCJMJO3LypxQ5JIE8oHvegTM';
 const LOGO_URL  = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/sign/certificados/Logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MjRkNDBhNC1jZTI0LTQwYzItYTc3NC1lMmUwNzBjNGMzMzUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjZXJ0aWZpY2Fkb3MvTG9nby5wbmciLCJpYXQiOjE3NzQxOTE4MjksImV4cCI6MTkzMTg3MTgyOX0.rzYxlgmM8bq-3Bmk8rTNgVfvsUu7ex3LVQyrI1oCIHk';
 
+const PLATAFORMA_URL = 'https://plataforma-cursos.sdjustiniani-a.workers.dev';
+
 export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo, cursotitulo, duracion, notaTexto, fechaHoy, codigo }) {
+  const verificarUrl = `${PLATAFORMA_URL}/verificar.html?codigo=${encodeURIComponent(codigo)}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=72x72&data=${encodeURIComponent(verificarUrl)}&color=002855&bgcolor=ffffff&margin=2`;
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -41,6 +45,9 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
     .curso-nombre { margin-top: 7px; font-family: 'Cinzel', Georgia, serif; font-size: 18px; font-weight: 600; color: #002855; text-align: center; text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.2; width: 100%; }
     .empresa-texto { margin-top: 11px; font-family: 'Crimson Text', serif; font-size: 13px; color: #666; text-align: center; }
     .duracion-fecha { margin-top: 6px; font-family: 'Crimson Text', serif; font-size: 13px; color: #555; text-align: center; }
+    .qr-bloque { position: absolute; bottom: 38px; left: 53px; text-align: center; z-index: 3; }
+    .qr-bloque img { width: 72px; height: 72px; display: block; }
+    .qr-bloque span { display: block; font-family: 'Crimson Text', serif; font-size: 9px; color: #888; margin-top: 3px; letter-spacing: 0.3px; }
     .pie-datos { position: absolute; bottom: 38px; right: 68px; text-align: right; font-family: 'Crimson Text', serif; font-size: 11px; color: #666; line-height: 1.7; z-index: 3; }
     .firma-bloque { position: absolute; bottom: 68px; right: 45px; text-align: center; width: 310px; z-index: 3; }
     .firma-linea { border-top: 1.5px solid #002855; margin-bottom: 9px; }
@@ -71,6 +78,10 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
       <div class="curso-nombre">${cursotitulo}</div>
       <div class="empresa-texto">Dictado por CV GLOBAL S.A.C. &nbsp;·&nbsp; Duración: <strong>${duracion}</strong></div>
       <div class="duracion-fecha">Lima, ${fechaHoy}</div>
+    </div>
+    <div class="qr-bloque">
+      <img src="${qrUrl}" crossorigin="anonymous" alt="QR verificación" />
+      <span>Verificar autenticidad</span>
     </div>
     <div class="pie-datos"><strong>Nota:</strong> ${notaTexto}/20 &nbsp;&nbsp; <strong>Código:</strong> ${codigo}</div>
     <div class="firma-bloque">

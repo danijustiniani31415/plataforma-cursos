@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verificar Certificado · CV Global</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f7fa;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 40px 16px;
+    }
+    .logo-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .logo-header img { height: 48px; }
+    .logo-header span { font-size: 1.1rem; font-weight: 700; color: #002855; }
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,40,85,0.1);
+      padding: 32px;
+      width: 100%;
+      max-width: 520px;
+    }
+    .estado-valido {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #e8f5e9;
+      border: 1.5px solid #66bb6a;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+    }
+    .estado-invalido {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #fff3f3;
+      border: 1.5px solid #e57373;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+    }
+    .estado-icon { font-size: 1.8rem; }
+    .estado-texto strong { display: block; font-size: 1rem; color: #1b5e20; }
+    .estado-invalido .estado-texto strong { color: #b71c1c; }
+    .estado-texto span { font-size: 0.85rem; color: #555; }
+    .codigo-badge {
+      display: inline-block;
+      background: #002855;
+      color: white;
+      font-family: monospace;
+      font-size: 1rem;
+      padding: 6px 14px;
+      border-radius: 6px;
+      margin-bottom: 24px;
+      letter-spacing: 1px;
+    }
+    .datos-grid {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 10px 12px;
+      font-size: 0.92rem;
+    }
+    .datos-grid .label {
+      color: #888;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding-top: 2px;
+    }
+    .datos-grid .valor { color: #222; font-weight: 500; }
+    .separador { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+    .vigencia-ok { color: #27ae60; font-weight: 600; }
+    .vigencia-vencida { color: #c0392b; font-weight: 600; }
+    .cargando { text-align: center; color: #888; padding: 40px 0; }
+    .footer-note {
+      margin-top: 24px;
+      font-size: 0.78rem;
+      color: #aaa;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="logo-header">
+    <img src="Logo.png" alt="CV Global" />
+    <span>CV Global S.A.C.</span>
+  </div>
+
+  <div class="card" id="card-resultado">
+    <div class="cargando">Verificando certificado...</div>
+  </div>
+
+  <div class="footer-note">
+    Sistema de Verificación de Certificados · CV Global S.A.C.<br>
+    Capacitación en Seguridad y Salud en el Trabajo
+  </div>
+
+  <script type="module">
+    import { supabase } from './src/supabaseClient.js';
+
+    const params = new URLSearchParams(window.location.search);
+    const codigo = params.get('codigo')?.trim().toUpperCase();
+    const card   = document.getElementById('card-resultado');
+
+    if (!codigo) {
+      card.innerHTML = `
+        <div class="estado-invalido">
+          <span class="estado-icon">❌</span>
+          <div class="estado-texto">
+            <strong>Código no especificado</strong>
+            <span>El enlace no contiene un código de certificado válido.</span>
+          </div>
+        </div>`;
+    } else {
+      const { data: cert } = await supabase
+        .from('certificados')
+        .select('*, cursos(titulo, duracion)')
+        .eq('codigo', codigo)
+        .maybeSingle();
+
+      if (!cert) {
+        card.innerHTML = `
+          <div class="estado-invalido">
+            <span class="estado-icon">❌</span>
+            <div class="estado-texto">
+              <strong>Certificado no encontrado</strong>
+              <span>El código <strong>${codigo}</strong> no corresponde a ningún certificado registrado.</span>
+            </div>
+          </div>`;
+      } else {
+        const fechaEmision  = new Date(cert.created_at);
+        const fechaVence    = new Date(fechaEmision);
+        fechaVence.setFullYear(fechaVence.getFullYear() + 1);
+        const vencido       = fechaVence < new Date();
+
+        const fmt = d => d.toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+        const vigenciaHTML  = vencido
+          ? `<span class="vigencia-vencida">⚠️ Vencido el ${fmt(fechaVence)}</span>`
+          : `<span class="vigencia-ok">✅ Vigente hasta ${fmt(fechaVence)}</span>`;
+
+        const notaDisplay = cert.nota != null ? `${parseFloat(cert.nota).toFixed(1)} / 20` : '—';
+
+        card.innerHTML = `
+          <div class="estado-valido">
+            <span class="estado-icon">🏅</span>
+            <div class="estado-texto">
+              <strong>Certificado ${vencido ? 'vencido pero' : ''} Válido</strong>
+              <span>Registrado en el sistema de CV Global S.A.C.</span>
+            </div>
+          </div>
+          <div class="codigo-badge">${cert.codigo}</div>
+          <div class="datos-grid">
+            <span class="label">Trabajador</span>
+            <span class="valor">${cert.apellidos || ''} ${cert.nombres || ''}</span>
+
+            <span class="label">DNI</span>
+            <span class="valor">${cert.dni || '—'}</span>
+
+            <span class="label">Cargo</span>
+            <span class="valor">${cert.cargo || '—'}</span>
+
+            <span class="label">Empresa</span>
+            <span class="valor">${cert.empresa || '—'}</span>
+
+            <hr class="separador" style="grid-column:1/-1; margin:4px 0;">
+
+            <span class="label">Curso</span>
+            <span class="valor">${cert.cursos?.titulo || '—'}</span>
+
+            <span class="label">Nota</span>
+            <span class="valor">${notaDisplay}</span>
+
+            <span class="label">Fecha emisión</span>
+            <span class="valor">${fmt(fechaEmision)}</span>
+
+            <span class="label">Vigencia</span>
+            <span class="valor">${vigenciaHTML}</span>
+          </div>
+          <div class="footer-note" style="margin-top:20px;">
+            Verificado el ${new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'long', year:'numeric' })}
+          </div>`;
+      }
+    }
+  </script>
+</body>
+</html>

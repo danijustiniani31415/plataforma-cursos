@@ -1022,27 +1022,41 @@ window.consultarEstado = async function () {
 
   resultado.innerHTML = `<div class="consulta-cargando">Buscando...</div>`;
 
-  // Buscar perfil por DNI
+  // Buscar perfil por DNI (sin filtro activo para no perder trabajadores)
   const { data: perfil, error } = await supabase
     .from('profiles')
-    .select('id, nombres, apellidos, empresa_id, empresas(nombre)')
+    .select('id, nombres, apellidos, empresas(nombre)')
     .eq('documento_numero', dni)
-    .eq('activo', true)
     .maybeSingle();
 
   if (error || !perfil) {
-    resultado.innerHTML = `<div class="consulta-error">❌ No se encontró ningún trabajador con ese DNI.</div>`;
+    resultado.innerHTML = `<div class="consulta-error">❌ No se encontró ningún trabajador con ese DNI.<br><small style="color:#999">Si el problema persiste contacta a tu administrador.</small></div>`;
     return;
   }
 
   // Traer todos los cursos activos
   const { data: cursos } = await supabase
     .from('cursos')
-    .select('id, titulo, vigencia_meses')
+    .select('id, titulo')
     .eq('activo', true)
     .order('titulo');
 
-  // Traer certificados del trabajador
+  // Traer el envío aprobado más reciente por curso (eficacia = último paso del curso)
+  const { data: envios } = await supabase
+    .from('envios_formulario')
+    .select('id_curso, aprobado, created_at')
+    .eq('usuario_id', perfil.id)
+    .eq('estado', 'completado')
+    .eq('aprobado', true)
+    .order('created_at', { ascending: false });
+
+  // Mapa: id_curso → fecha más reciente de aprobación
+  const envioMap = {};
+  envios?.forEach(e => {
+    if (!envioMap[e.id_curso]) envioMap[e.id_curso] = e.created_at;
+  });
+
+  // También revisar tabla certificados (cursos completados antes de ocultar el botón)
   const { data: certificados } = await supabase
     .from('certificados')
     .select('curso_id, created_at')
@@ -1051,42 +1065,39 @@ window.consultarEstado = async function () {
   const certMap = {};
   certificados?.forEach(c => { certMap[c.curso_id] = c.created_at; });
 
-  // Traer envíos de examen aprobados (sin certificado todavía)
-  const { data: envios } = await supabase
-    .from('envios_formulario')
-    .select('id_curso, aprobado, estado')
-    .eq('usuario_id', perfil.id)
-    .eq('estado', 'completado');
-
-  const envioMap = {};
-  envios?.forEach(e => { if (!envioMap[e.id_curso]) envioMap[e.id_curso] = e.aprobado; });
-
   const nombreCompleto = `${perfil.apellidos || ''} ${perfil.nombres || ''}`.trim();
   const empresa = perfil.empresas?.nombre || '—';
 
+  function formatFecha(iso) {
+    return new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
   let filasHTML = '';
   for (const curso of (cursos || [])) {
+    // Fecha de realización: preferir certificado si existe, sino envío
+    const fechaRaw = certMap[curso.id] || envioMap[curso.id];
     let estadoHTML = '';
-    if (certMap[curso.id]) {
-      const fechaCert = new Date(certMap[curso.id]);
-      const meses = curso.vigencia_meses || 12;
-      const vencimiento = new Date(fechaCert);
-      vencimiento.setMonth(vencimiento.getMonth() + meses);
-      const venceStr = vencimiento.toLocaleDateString('es-PE', { month: 'short', year: 'numeric' });
+
+    if (fechaRaw) {
+      const fechaRealizacion = new Date(fechaRaw);
+      const vencimiento = new Date(fechaRealizacion);
+      vencimiento.setFullYear(vencimiento.getFullYear() + 1); // vigencia fija 1 año
       const vencido = vencimiento < new Date();
-      estadoHTML = vencido
-        ? `<span class="estado-vencido">⚠️ Vencido (${venceStr})</span>`
-        : `<span class="estado-aprobado">✅ Aprobado · vence ${venceStr}</span>`;
-    } else if (envioMap[curso.id]) {
-      estadoHTML = `<span class="estado-aprobado">✅ Aprobado</span>`;
-    } else if (envioMap[curso.id] === false) {
-      estadoHTML = `<span class="estado-pendiente">⏳ En progreso</span>`;
+      const estadoClass = vencido ? 'estado-vencido' : 'estado-aprobado';
+      const estadoIcon  = vencido ? '⚠️ Vencido' : '✅ Aprobado';
+      estadoHTML = `
+        <span class="${estadoClass}">${estadoIcon}</span>
+        <div style="font-size:0.78rem; color:#777; margin-top:2px;">
+          Realizado: ${formatFecha(fechaRaw)}<br>
+          Vence: ${formatFecha(vencimiento)}
+        </div>`;
     } else {
       estadoHTML = `<span class="estado-pendiente">⏳ Pendiente</span>`;
     }
+
     filasHTML += `
       <tr>
-        <td style="padding:10px 12px; border-bottom:1px solid #eee;">${curso.titulo}</td>
+        <td style="padding:10px 12px; border-bottom:1px solid #eee; font-weight:500;">${curso.titulo}</td>
         <td style="padding:10px 12px; border-bottom:1px solid #eee;">${estadoHTML}</td>
       </tr>`;
   }
@@ -1101,7 +1112,7 @@ window.consultarEstado = async function () {
         <thead>
           <tr style="background:#f5f7fa;">
             <th style="padding:8px 12px; text-align:left; color:#002855;">Curso</th>
-            <th style="padding:8px 12px; text-align:left; color:#002855;">Estado</th>
+            <th style="padding:8px 12px; text-align:left; color:#002855;">Estado · Fechas</th>
           </tr>
         </thead>
         <tbody>${filasHTML}</tbody>

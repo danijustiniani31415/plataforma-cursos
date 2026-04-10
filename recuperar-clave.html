@@ -54,7 +54,7 @@
       }
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'https://cursossstcvglobal.netlify.app/cambiar-clave.html'
+        redirectTo: window.location.origin + '/cambiar-clave.html'
       });
 
       if (error) {

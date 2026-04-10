@@ -66,6 +66,22 @@
       </p>
     </section>
 
+    <!-- 🔍 CONSULTA PÚBLICA POR DNI -->
+    <section id="consulta-section" class="container" style="max-width:420px; margin:0 auto 40px;">
+      <div style="text-align:center; color:#888; margin-bottom:14px; font-size:0.88rem;">
+        — o consulta tu estado de cursos —
+      </div>
+      <div class="form-group">
+        <input type="text" id="consulta-dni" placeholder="Ingresa tu DNI"
+               oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12"
+               onkeydown="if(event.key==='Enter') consultarEstado()" />
+        <button onclick="consultarEstado()" class="btn-primary" style="background:#4a6fa5;">
+          🔍 Consultar estado
+        </button>
+      </div>
+      <div id="consulta-resultado"></div>
+    </section>
+
     <!-- 📚 CURSOS DISPONIBLES -->
     <section id="cursos-disponibles" style="display:none;" class="container">
       <div id="gamificacion-widget" style="display:none; margin-bottom:20px;"></div>

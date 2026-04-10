@@ -1460,3 +1460,50 @@ body {
   from { opacity: 0; transform: translateY(-12px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0)     scale(1); }
 }
+/* ── Consulta pública por DNI ── */
+.consulta-card {
+  background: #fff;
+  border: 1px solid #e0e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 12px;
+  box-shadow: 0 2px 8px rgba(0,40,85,0.07);
+}
+.consulta-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 4px;
+}
+.consulta-error {
+  background: #fff3f3;
+  border: 1px solid #f5c6c6;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+  color: #c0392b;
+  font-size: 0.9rem;
+}
+.consulta-cargando {
+  text-align: center;
+  color: #888;
+  padding: 12px;
+  font-size: 0.9rem;
+}
+.estado-aprobado {
+  color: #27ae60;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.estado-pendiente {
+  color: #e67e22;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.estado-vencido {
+  color: #c0392b;
+  font-weight: 600;
+  font-size: 0.85rem;
+}

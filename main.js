@@ -1008,3 +1008,103 @@ window.navegarAtras = function() {
     volverACursos();
   }
 };
+// ═══════════════════════════════
+// 🔍 CONSULTA PÚBLICA POR DNI
+// ═══════════════════════════════
+window.consultarEstado = async function () {
+  const dni = document.getElementById('consulta-dni').value.trim();
+  const resultado = document.getElementById('consulta-resultado');
+
+  if (!dni) {
+    resultado.innerHTML = `<div class="consulta-error">❌ Ingresa tu DNI.</div>`;
+    return;
+  }
+
+  resultado.innerHTML = `<div class="consulta-cargando">Buscando...</div>`;
+
+  // Buscar perfil por DNI
+  const { data: perfil, error } = await supabase
+    .from('profiles')
+    .select('id, nombres, apellidos, empresa_id, empresas(nombre)')
+    .eq('documento_numero', dni)
+    .eq('activo', true)
+    .maybeSingle();
+
+  if (error || !perfil) {
+    resultado.innerHTML = `<div class="consulta-error">❌ No se encontró ningún trabajador con ese DNI.</div>`;
+    return;
+  }
+
+  // Traer todos los cursos activos
+  const { data: cursos } = await supabase
+    .from('cursos')
+    .select('id, titulo, vigencia_meses')
+    .eq('activo', true)
+    .order('titulo');
+
+  // Traer certificados del trabajador
+  const { data: certificados } = await supabase
+    .from('certificados')
+    .select('curso_id, created_at')
+    .eq('usuario_id', perfil.id);
+
+  const certMap = {};
+  certificados?.forEach(c => { certMap[c.curso_id] = c.created_at; });
+
+  // Traer envíos de examen aprobados (sin certificado todavía)
+  const { data: envios } = await supabase
+    .from('envios_formulario')
+    .select('id_curso, aprobado, estado')
+    .eq('usuario_id', perfil.id)
+    .eq('estado', 'completado');
+
+  const envioMap = {};
+  envios?.forEach(e => { if (!envioMap[e.id_curso]) envioMap[e.id_curso] = e.aprobado; });
+
+  const nombreCompleto = `${perfil.apellidos || ''} ${perfil.nombres || ''}`.trim();
+  const empresa = perfil.empresas?.nombre || '—';
+
+  let filasHTML = '';
+  for (const curso of (cursos || [])) {
+    let estadoHTML = '';
+    if (certMap[curso.id]) {
+      const fechaCert = new Date(certMap[curso.id]);
+      const meses = curso.vigencia_meses || 12;
+      const vencimiento = new Date(fechaCert);
+      vencimiento.setMonth(vencimiento.getMonth() + meses);
+      const venceStr = vencimiento.toLocaleDateString('es-PE', { month: 'short', year: 'numeric' });
+      const vencido = vencimiento < new Date();
+      estadoHTML = vencido
+        ? `<span class="estado-vencido">⚠️ Vencido (${venceStr})</span>`
+        : `<span class="estado-aprobado">✅ Aprobado · vence ${venceStr}</span>`;
+    } else if (envioMap[curso.id]) {
+      estadoHTML = `<span class="estado-aprobado">✅ Aprobado</span>`;
+    } else if (envioMap[curso.id] === false) {
+      estadoHTML = `<span class="estado-pendiente">⏳ En progreso</span>`;
+    } else {
+      estadoHTML = `<span class="estado-pendiente">⏳ Pendiente</span>`;
+    }
+    filasHTML += `
+      <tr>
+        <td style="padding:10px 12px; border-bottom:1px solid #eee;">${curso.titulo}</td>
+        <td style="padding:10px 12px; border-bottom:1px solid #eee;">${estadoHTML}</td>
+      </tr>`;
+  }
+
+  resultado.innerHTML = `
+    <div class="consulta-card">
+      <div class="consulta-header">
+        <strong>👤 ${nombreCompleto}</strong>
+        <span style="color:#666; font-size:0.85rem;">🏢 ${empresa}</span>
+      </div>
+      <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:0.88rem;">
+        <thead>
+          <tr style="background:#f5f7fa;">
+            <th style="padding:8px 12px; text-align:left; color:#002855;">Curso</th>
+            <th style="padding:8px 12px; text-align:left; color:#002855;">Estado</th>
+          </tr>
+        </thead>
+        <tbody>${filasHTML}</tbody>
+      </table>
+    </div>`;
+};

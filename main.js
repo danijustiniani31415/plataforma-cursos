@@ -5,6 +5,7 @@ const alert = alertToToast;
 
 const loginSection            = document.getElementById('login-section');
 const cursosDisponiblesSection = document.getElementById('cursos-disponibles');
+const consultaSection         = document.getElementById('consulta-section');
 const cursoSection            = document.getElementById('curso-section');
 const certificadoSection      = document.getElementById('certificado-section');
 const tituloCurso             = document.getElementById('titulo-curso');
@@ -39,6 +40,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     usuarioActual = session.user;
     document.getElementById('btn-logout').style.display = 'flex';
     loginSection.style.display = 'none';
+    consultaSection.style.display = 'none';
     cursosDisponiblesSection.style.display = 'block';
     await Promise.all([cargarCursos(), verificarAdmin(session.user.id)]);
   }
@@ -77,6 +79,7 @@ async function login() {
   usuarioActual = data.user;
   document.getElementById('btn-logout').style.display = 'flex';
   loginSection.style.display = 'none';
+  consultaSection.style.display = 'none';
   cursosDisponiblesSection.style.display = 'block';
   await Promise.all([cargarCursos(), verificarAdmin(data.user.id)]);
 }

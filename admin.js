@@ -1026,15 +1026,22 @@ let _trabTotal = 0;
 
 window.cargarTrabajadores = async function (page = 0) {
   const desde = page * PAGE_SIZE;
+  const busqueda = document.getElementById('buscar-apellido')?.value.trim() || '';
+
+  let query = supabase
+    .from('profiles')
+    .select('id, nombres, apellidos, email, documento_numero, telefono, cargo_id, cargo, fecha_ingreso, activo', { count: 'exact' })
+    .eq('empresa_id', empresaAdminId)
+    .eq('rol', 'trabajador')
+    .order('apellidos')
+    .range(desde, desde + PAGE_SIZE - 1);
+
+  if (busqueda) {
+    query = query.or(`apellidos.ilike.%${busqueda}%,documento_numero.ilike.%${busqueda}%`);
+  }
 
   const [{ data, error, count }, { data: cargos }] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('id, nombres, apellidos, email, documento_numero, telefono, cargo_id, cargo, fecha_ingreso, activo', { count: 'exact' })
-      .eq('empresa_id', empresaAdminId)
-      .eq('rol', 'trabajador')
-      .order('apellidos')
-      .range(desde, desde + PAGE_SIZE - 1),
+    query,
     supabase.from('cargos').select('id, nombre').eq('activo', true).order('nombre'),
   ]);
 

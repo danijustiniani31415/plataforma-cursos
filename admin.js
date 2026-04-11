@@ -555,12 +555,19 @@ window.previsualizarExcel = function () {
 window.importarDesdeExcel = async function () {
   if (!filasExcel.length) return;
 
-  // Detectar DNIs duplicados en el Excel
-  const dnisExcel = filasExcel.map(f => normalizarDNI(f[0]));
-  const duplicados = dnisExcel.filter((d, i) => dnisExcel.indexOf(d) !== i);
-  if (duplicados.length > 0) {
-    alert(`⚠️ El Excel tiene DNIs duplicados:\n${[...new Set(duplicados)].join(', ')}\n\nCorrige el archivo antes de continuar.`);
-    return;
+  // Auto-eliminar DNIs duplicados (se queda con la primera aparición)
+  const vistos = new Set();
+  const antesDeDedup = filasExcel.length;
+  filasExcel = filasExcel.filter(f => {
+    const dni = normalizarDNI(f[0]);
+    if (vistos.has(dni)) return false;
+    vistos.add(dni);
+    return true;
+  });
+  const eliminados = antesDeDedup - filasExcel.length;
+  if (eliminados > 0) {
+    const progreso = document.getElementById('progreso-importacion');
+    progreso.textContent = `ℹ️ ${eliminados} fila(s) duplicada(s) eliminadas automáticamente.`;
   }
 
   const btnImportar = document.querySelector('#preview-excel .btn-primary');
@@ -1243,11 +1250,17 @@ window.previsualizarActualizacion = function () {
     const hoja = workbook.Sheets[workbook.SheetNames[0]];
     const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
 
-    filasActualizacion = filas.slice(1).filter(f => f[0]);
-
-    // Detectar duplicados en preview
-    const dnisAct = filasActualizacion.map(f => normalizarDNI(f[0]));
-    const dupsAct = [...new Set(dnisAct.filter((d, i) => dnisAct.indexOf(d) !== i))];
+    // Auto-eliminar duplicados (se queda con la primera aparición de cada DNI)
+    const vistosAct = new Set();
+    const todasFilas = filas.slice(1).filter(f => f[0]);
+    filasActualizacion = todasFilas.filter(f => {
+      const dni = normalizarDNI(f[0]);
+      if (vistosAct.has(dni)) return false;
+      vistosAct.add(dni);
+      return true;
+    });
+    const elimAct = todasFilas.length - filasActualizacion.length;
+    const dupsAct = [];
 
     const tbody = document.getElementById('tbody-actualizacion');
     tbody.innerHTML = '';
@@ -1263,11 +1276,9 @@ window.previsualizarActualizacion = function () {
         fecha = String(fechaRaw).trim();
       }
       const dni = normalizarDNI(f[0]);
-      const esDup = dupsAct.includes(dni);
       const tr = document.createElement('tr');
-      if (esDup) tr.style.background = '#fff3cd';
       tr.innerHTML = `
-        <td style="padding:5px;">${f[0]}${esDup ? ' ⚠️' : ''}</td>
+        <td style="padding:5px;">${f[0]}</td>
         <td style="padding:5px;">${f[1]}</td>
         <td style="padding:5px;">${f[2]}</td>
         <td style="padding:5px;">${String(f[3]).trim().toLowerCase()}</td>
@@ -1280,7 +1291,7 @@ window.previsualizarActualizacion = function () {
     });
 
     let resumen = `${filasActualizacion.length} trabajadores a actualizar.`;
-    if (dupsAct.length > 0) resumen += ` ⚠️ DNIs duplicados: ${dupsAct.join(', ')}`;
+    if (elimAct > 0) resumen += ` ℹ️ ${elimAct} fila(s) duplicada(s) eliminadas automáticamente.`;
     document.getElementById('preview-resumen-act').textContent = resumen;
     document.getElementById('preview-actualizacion').style.display = 'block';
   };
@@ -1289,14 +1300,6 @@ window.previsualizarActualizacion = function () {
 
 window.ejecutarActualizacion = async function () {
   if (!filasActualizacion.length) return;
-
-  // Bloquear si hay duplicados
-  const dnisAct = filasActualizacion.map(f => normalizarDNI(f[0]));
-  const dupsAct = [...new Set(dnisAct.filter((d, i) => dnisAct.indexOf(d) !== i))];
-  if (dupsAct.length > 0) {
-    alert(`⚠️ El Excel tiene DNIs duplicados:\n${dupsAct.join(', ')}\n\nCorrige el archivo antes de continuar.`);
-    return;
-  }
 
   const btnActualizar = document.querySelector('#preview-actualizacion .btn-primary');
   btnActualizar.disabled = true;

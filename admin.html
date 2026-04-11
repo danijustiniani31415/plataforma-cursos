@@ -472,8 +472,9 @@
       <h2>🔄 Actualización masiva desde Excel</h2>
       <div class="info-box">
         Usa el <strong>DNI</strong> para identificar al trabajador. Columnas:
-        <strong>DNI · Email · Teléfono · Cargo · Fecha Ingreso</strong><br>
-        Solo se actualizan los campos que tengan valor — los vacíos no se modifican.
+        <strong>DNI · Apellidos · Nombres · Email · Teléfono · Cargo · Fecha Ingreso</strong><br>
+        Solo se actualizan los campos que tengan valor — los vacíos no se modifican.<br>
+        Al actualizar el email también se actualiza el acceso de ingreso a la plataforma.
       </div>
       <a href="#" class="plantilla-link" onclick="descargarPlantillaActualizacion(event)">📄 Descargar plantilla</a>
       <div class="file-input-wrap">
@@ -487,7 +488,7 @@
           <table>
             <thead>
               <tr>
-                <th>DNI</th><th>Email</th><th>Teléfono</th><th>Cargo</th><th>Fecha Ingreso</th><th>Estado</th>
+                <th>DNI</th><th>Apellidos</th><th>Nombres</th><th>Email</th><th>Teléfono</th><th>Cargo</th><th>Fecha Ingreso</th><th>Estado</th>
               </tr>
             </thead>
             <tbody id="tbody-actualizacion"></tbody>

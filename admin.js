@@ -555,6 +555,14 @@ window.previsualizarExcel = function () {
 window.importarDesdeExcel = async function () {
   if (!filasExcel.length) return;
 
+  // Detectar DNIs duplicados en el Excel
+  const dnisExcel = filasExcel.map(f => normalizarDNI(f[0]));
+  const duplicados = dnisExcel.filter((d, i) => dnisExcel.indexOf(d) !== i);
+  if (duplicados.length > 0) {
+    alert(`⚠️ El Excel tiene DNIs duplicados:\n${[...new Set(duplicados)].join(', ')}\n\nCorrige el archivo antes de continuar.`);
+    return;
+  }
+
   const btnImportar = document.querySelector('#preview-excel .btn-primary');
   btnImportar.disabled = true;
   btnImportar.textContent = '⏳ Importando...';
@@ -567,13 +575,14 @@ window.importarDesdeExcel = async function () {
   const progreso = document.getElementById('progreso-importacion');
   const filas = document.querySelectorAll('#tbody-preview tr');
   let ok = 0, errores = 0;
+  const filasError = [['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Error']];
 
   for (let i = 0; i < filasExcel.length; i++) {
     const f = filasExcel[i];
     const dni          = normalizarDNI(f[0]);
     const apellidos    = String(f[1]).trim();
     const nombres      = String(f[2]).trim();
-    const emailRaw     = String(f[3]).trim();
+    const emailRaw     = String(f[3]).trim().toLowerCase();
     const email        = emailRaw.includes('@') ? emailRaw : `${dni}@cvglobal-group.com`;
     const cargoNombre  = String(f[4]).trim();
     const telefono     = String(f[5]).trim();
@@ -619,8 +628,10 @@ window.importarDesdeExcel = async function () {
     const data = await response.json();
 
     if (!response.ok || data?.error) {
-      tdEstado.textContent = '❌ ' + (data?.error || 'Error');
+      const msgError = data?.error || 'Error desconocido';
+      tdEstado.textContent = '❌ ' + msgError;
       tdEstado.style.color = 'red';
+      filasError.push([dni, apellidos, nombres, email, cargoNombre, msgError]);
       errores++;
     } else {
       tdEstado.textContent = '✅ Creado';
@@ -634,6 +645,16 @@ window.importarDesdeExcel = async function () {
   progreso.textContent += ' — ¡Importación completada!';
   btnImportar.disabled = false;
   btnImportar.textContent = '✅ Confirmar importación';
+
+  if (errores > 0) {
+    const XLSX = window.XLSX;
+    const ws = XLSX.utils.aoa_to_sheet(filasError);
+    ws['!cols'] = [12, 20, 20, 30, 20, 40].map(w => ({ wch: w }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Errores');
+    XLSX.writeFile(wb, 'errores_importacion.xlsx');
+    alert(`⚠️ ${errores} registro(s) fallaron. Se descargó "errores_importacion.xlsx" con el detalle.`);
+  }
 };
 
 // ═══════════════════════════════
@@ -1186,19 +1207,19 @@ window.descargarPlantillaActualizacion = async function (e) {
   const listaCargos = cargos?.map(c => c.nombre) || [];
 
   const ws = XLSX.utils.aoa_to_sheet([
-    ['DNI', 'Email', 'Telefono', 'Cargo', 'Fecha Ingreso'],
-    ['', '', '', '', ''],
+    ['DNI', 'Apellidos', 'Nombres', 'Email', 'Telefono', 'Cargo', 'Fecha Ingreso'],
+    ['', '', '', '', '', '', ''],
   ]);
 
   const wsCargos = XLSX.utils.aoa_to_sheet(listaCargos.map(c => [c]));
 
-  ws['!cols'] = [12, 28, 14, 22, 14].map(w => ({ wch: w }));
+  ws['!cols'] = [12, 22, 22, 28, 14, 22, 14].map(w => ({ wch: w }));
 
   ws['!dataValidations'] = ws['!dataValidations'] || [];
   if (listaCargos.length > 0) {
     ws['!dataValidations'].push({
       type: 'list',
-      sqref: 'D2:D200',
+      sqref: 'F2:F200',
       formula1: listaCargos.map(c => `"${c}"`).join(',').length <= 255
         ? '"' + listaCargos.join(',') + '"'
         : 'Cargos!$A$1:$A$' + listaCargos.length
@@ -1224,10 +1245,14 @@ window.previsualizarActualizacion = function () {
 
     filasActualizacion = filas.slice(1).filter(f => f[0]);
 
+    // Detectar duplicados en preview
+    const dnisAct = filasActualizacion.map(f => normalizarDNI(f[0]));
+    const dupsAct = [...new Set(dnisAct.filter((d, i) => dnisAct.indexOf(d) !== i))];
+
     const tbody = document.getElementById('tbody-actualizacion');
     tbody.innerHTML = '';
     filasActualizacion.forEach(f => {
-      const fechaRaw = f[4];
+      const fechaRaw = f[6];
       let fecha = '';
       if (fechaRaw instanceof Date) {
         const y = fechaRaw.getFullYear();
@@ -1237,20 +1262,26 @@ window.previsualizarActualizacion = function () {
       } else if (fechaRaw) {
         fecha = String(fechaRaw).trim();
       }
+      const dni = normalizarDNI(f[0]);
+      const esDup = dupsAct.includes(dni);
       const tr = document.createElement('tr');
+      if (esDup) tr.style.background = '#fff3cd';
       tr.innerHTML = `
-        <td style="padding:5px;">${f[0]}</td>
+        <td style="padding:5px;">${f[0]}${esDup ? ' ⚠️' : ''}</td>
         <td style="padding:5px;">${f[1]}</td>
         <td style="padding:5px;">${f[2]}</td>
-        <td style="padding:5px;">${f[3]}</td>
+        <td style="padding:5px;">${String(f[3]).trim().toLowerCase()}</td>
+        <td style="padding:5px;">${f[4]}</td>
+        <td style="padding:5px;">${f[5]}</td>
         <td style="padding:5px;">${fecha}</td>
         <td style="padding:5px; color:#888;">Pendiente</td>
       `;
       tbody.appendChild(tr);
     });
 
-    document.getElementById('preview-resumen-act').textContent =
-      `${filasActualizacion.length} trabajadores a actualizar.`;
+    let resumen = `${filasActualizacion.length} trabajadores a actualizar.`;
+    if (dupsAct.length > 0) resumen += ` ⚠️ DNIs duplicados: ${dupsAct.join(', ')}`;
+    document.getElementById('preview-resumen-act').textContent = resumen;
     document.getElementById('preview-actualizacion').style.display = 'block';
   };
   reader.readAsArrayBuffer(archivo);
@@ -1259,22 +1290,47 @@ window.previsualizarActualizacion = function () {
 window.ejecutarActualizacion = async function () {
   if (!filasActualizacion.length) return;
 
+  // Bloquear si hay duplicados
+  const dnisAct = filasActualizacion.map(f => normalizarDNI(f[0]));
+  const dupsAct = [...new Set(dnisAct.filter((d, i) => dnisAct.indexOf(d) !== i))];
+  if (dupsAct.length > 0) {
+    alert(`⚠️ El Excel tiene DNIs duplicados:\n${dupsAct.join(', ')}\n\nCorrige el archivo antes de continuar.`);
+    return;
+  }
+
   const btnActualizar = document.querySelector('#preview-actualizacion .btn-primary');
   btnActualizar.disabled = true;
   btnActualizar.textContent = '⏳ Actualizando...';
 
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
+
   const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true);
+
+  // Cargar todos los perfiles de la empresa de una sola vez para detectar no encontrados
+  const { data: perfilesEmpresa } = await supabase
+    .from('profiles')
+    .select('id, documento_numero')
+    .eq('empresa_id', empresaAdminId)
+    .eq('rol', 'trabajador');
+  const perfilPorDni = {};
+  perfilesEmpresa?.forEach(p => { perfilPorDni[p.documento_numero] = p.id; });
+
   const filas = document.querySelectorAll('#tbody-actualizacion tr');
   const progreso = document.getElementById('progreso-actualizacion');
-  let ok = 0, errores = 0;
+  let ok = 0, errores = 0, noEncontrados = 0;
+  const filasError = [['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Error']];
 
   for (let i = 0; i < filasActualizacion.length; i++) {
-    const f = filasActualizacion[i];
-    const dni      = String(f[0]).trim();
-    const emailRaw = String(f[1]).trim();
-    const telefono = String(f[2]).trim();
-    const cargoNombre = String(f[3]).trim();
-    const fechaRaw = f[4];
+    const f           = filasActualizacion[i];
+    const dni         = normalizarDNI(f[0]);
+    const apellidos   = String(f[1]).trim();
+    const nombres     = String(f[2]).trim();
+    const emailRaw    = String(f[3]).trim().toLowerCase();
+    const telefono    = String(f[4]).trim();
+    const cargoNombre = String(f[5]).trim();
+    const fechaRaw    = f[6];
 
     let fechaIngreso = '';
     if (fechaRaw instanceof Date) {
@@ -1286,35 +1342,56 @@ window.ejecutarActualizacion = async function () {
       fechaIngreso = String(fechaRaw).trim();
     }
 
-    const tdEstado = filas[i].querySelectorAll('td')[5];
+    const tdEstado = filas[i].querySelectorAll('td')[7];
     tdEstado.textContent = '⏳ Actualizando...';
     tdEstado.style.color = '#888';
+
+    const usuarioId = perfilPorDni[dni];
+    if (!usuarioId) {
+      tdEstado.textContent = '⚠️ DNI no encontrado';
+      tdEstado.style.color = 'orange';
+      filasError.push([dni, apellidos, nombres, emailRaw, cargoNombre, 'DNI no encontrado en esta empresa']);
+      noEncontrados++;
+      progreso.textContent = `Progreso: ${i + 1}/${filasActualizacion.length} — ✅ ${ok}, ❌ ${errores}, ⚠️ ${noEncontrados} no encontrados`;
+      continue;
+    }
 
     const email = emailRaw.includes('@') ? emailRaw : null;
     const cargo = cargos?.find(c => c.nombre.toLowerCase() === cargoNombre.toLowerCase());
 
     const updates = {};
-    if (email) updates.email = email;
-    if (telefono) updates.telefono = telefono;
-    if (cargo) { updates.cargo_id = cargo.id; updates.cargo = cargo.nombre; }
+    if (apellidos) updates.apellidos = apellidos;
+    if (nombres)   updates.nombres   = nombres;
+    if (email)     updates.email     = email;
+    if (telefono)  updates.telefono  = telefono;
+    if (cargo)   { updates.cargo_id  = cargo.id; updates.cargo = cargo.nombre; }
     if (fechaIngreso) updates.fecha_ingreso = fechaIngreso;
 
     if (Object.keys(updates).length === 0) {
       tdEstado.textContent = '⚠️ Sin cambios';
       tdEstado.style.color = '#888';
       ok++;
-      progreso.textContent = `Progreso: ${i + 1}/${filasActualizacion.length} — ✅ ${ok} procesados, ❌ ${errores} errores`;
+      progreso.textContent = `Progreso: ${i + 1}/${filasActualizacion.length} — ✅ ${ok}, ❌ ${errores}, ⚠️ ${noEncontrados} no encontrados`;
       continue;
     }
 
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('documento_numero', dni);
+    // Usar edge function para actualizar (actualiza profiles + Auth si cambia email)
+    const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'apikey': ANON_KEY,
+      },
+      body: JSON.stringify({ usuario_id: usuarioId, updates }),
+    });
 
-    if (error) {
-      tdEstado.textContent = '❌ ' + error.message;
+    const data = await res.json();
+    if (!res.ok || data?.error) {
+      const msgError = data?.error || 'Error desconocido';
+      tdEstado.textContent = '❌ ' + msgError;
       tdEstado.style.color = 'red';
+      filasError.push([dni, apellidos, nombres, emailRaw, cargoNombre, msgError]);
       errores++;
     } else {
       tdEstado.textContent = '✅ Actualizado';
@@ -1322,12 +1399,22 @@ window.ejecutarActualizacion = async function () {
       ok++;
     }
 
-    progreso.textContent = `Progreso: ${i + 1}/${filasActualizacion.length} — ✅ ${ok} actualizados, ❌ ${errores} errores`;
+    progreso.textContent = `Progreso: ${i + 1}/${filasActualizacion.length} — ✅ ${ok}, ❌ ${errores}, ⚠️ ${noEncontrados} no encontrados`;
   }
 
   progreso.textContent += ' — ¡Completado!';
   btnActualizar.disabled = false;
   btnActualizar.textContent = '✅ Confirmar actualización';
+
+  if (errores > 0 || noEncontrados > 0) {
+    const XLSX = window.XLSX;
+    const ws = XLSX.utils.aoa_to_sheet(filasError);
+    ws['!cols'] = [12, 22, 22, 30, 22, 40].map(w => ({ wch: w }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Errores');
+    XLSX.writeFile(wb, 'errores_actualizacion.xlsx');
+    alert(`⚠️ Proceso completado con observaciones:\n✅ ${ok} actualizados\n❌ ${errores} con error\n⚠️ ${noEncontrados} DNI no encontrado\n\nSe descargó "errores_actualizacion.xlsx".`);
+  }
 };
 
 window.toggleActivo = async function (id, activo) {

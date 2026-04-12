@@ -53,6 +53,18 @@
       background-color: #0056b3;
     }
 
+    .btn-cancelar {
+      background-color: transparent;
+      color: #888;
+      border: 1px solid #ccc;
+      margin-top: 8px;
+    }
+
+    .btn-cancelar:hover {
+      background-color: #f0f0f0;
+      color: #555;
+    }
+
     @media (max-width: 400px) {
       .container {
         padding: 1.5rem 1rem;
@@ -66,6 +78,7 @@
     <p>Ingresa tu nueva contraseña</p>
     <input type="password" id="new-password" placeholder="Nueva contraseña" />
     <button onclick="actualizarClave()">Actualizar</button>
+    <button class="btn-cancelar" onclick="cancelar()">Cancelar / Volver al inicio</button>
   </div>
 
   <script type="module">
@@ -108,7 +121,13 @@ async function actualizarClave() {
   window.location.href = "index.html";
 }
 
+async function cancelar() {
+  await supabase.auth.signOut();
+  window.location.href = "index.html";
+}
+
 window.actualizarClave = actualizarClave;
+window.cancelar = cancelar;
   </script>
 </body>
 </html>

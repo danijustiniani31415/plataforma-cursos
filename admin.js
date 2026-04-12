@@ -1315,10 +1315,10 @@ window.ejecutarActualizacion = async function () {
   const { data: perfilesEmpresa } = await supabase
     .from('profiles')
     .select('id, documento_numero')
-    .eq('empresa_id', empresaAdminId)
-    .eq('rol', 'trabajador');
+    .eq('empresa_id', empresaAdminId);
   const perfilPorDni = {};
-  perfilesEmpresa?.forEach(p => { perfilPorDni[p.documento_numero] = p.id; });
+  // Normalizar DNI del lado de la base de datos también para evitar mismatch de formato
+  perfilesEmpresa?.forEach(p => { perfilPorDni[normalizarDNI(p.documento_numero)] = p.id; });
 
   const filas = document.querySelectorAll('#tbody-actualizacion tr');
   const progreso = document.getElementById('progreso-actualizacion');
@@ -1389,9 +1389,10 @@ window.ejecutarActualizacion = async function () {
       body: JSON.stringify({ usuario_id: usuarioId, updates }),
     });
 
-    const data = await res.json();
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
     if (!res.ok || data?.error) {
-      const msgError = data?.error || 'Error desconocido';
+      const msgError = data?.error || data?.message || `HTTP ${res.status}`;
       tdEstado.textContent = '❌ ' + msgError;
       tdEstado.style.color = 'red';
       filasError.push([dni, apellidos, nombres, emailRaw, cargoNombre, msgError]);

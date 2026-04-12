@@ -1383,7 +1383,7 @@ window.ejecutarActualizacion = async function () {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${ANON_KEY}`,
         'apikey': ANON_KEY,
       },
       body: JSON.stringify({ usuario_id: usuarioId, updates }),

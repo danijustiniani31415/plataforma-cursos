@@ -487,8 +487,13 @@ window.descargarPlantilla = async function (e) {
   // Hoja principal
   const ws = XLSX.utils.aoa_to_sheet([
     ['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Telefono', 'Fecha Ingreso'],
-    ['', '', '', '', '', '', ''],
   ]);
+
+  // Forzar columna DNI como texto en 200 filas para que Excel preserve ceros iniciales
+  for (let row = 2; row <= 201; row++) {
+    ws[`A${row}`] = { t: 's', v: '' };
+  }
+  ws['!ref'] = 'A1:G201';
 
   // Hoja oculta con la lista de cargos para el dropdown
   const wsCargos = XLSX.utils.aoa_to_sheet(listaCargos.map(c => [c]));
@@ -736,8 +741,11 @@ window.descargarPlantillaAsignacion = async function (e) {
 
   const ws = XLSX.utils.aoa_to_sheet([
     ['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Telefono', 'Fecha Ingreso'],
-    ['', '', '', '', '', '', '']
   ]);
+  for (let row = 2; row <= 501; row++) {
+    ws[`A${row}`] = { t: 's', v: '' };
+  }
+  ws['!ref'] = 'A1:G501';
   ws['!cols'] = [12, 22, 22, 28, 22, 14, 14].map(w => ({ wch: w }));
 
   if (listaCargos.length > 0) {
@@ -1215,8 +1223,13 @@ window.descargarPlantillaActualizacion = async function (e) {
 
   const ws = XLSX.utils.aoa_to_sheet([
     ['DNI', 'Apellidos', 'Nombres', 'Email', 'Telefono', 'Cargo', 'Fecha Ingreso'],
-    ['', '', '', '', '', '', ''],
   ]);
+
+  // Forzar columna DNI como texto en 200 filas para que Excel preserve ceros iniciales
+  for (let row = 2; row <= 201; row++) {
+    ws[`A${row}`] = { t: 's', v: '' };
+  }
+  ws['!ref'] = 'A1:G201';
 
   const wsCargos = XLSX.utils.aoa_to_sheet(listaCargos.map(c => [c]));
 

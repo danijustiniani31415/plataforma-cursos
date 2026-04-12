@@ -1434,6 +1434,55 @@ window.ejecutarActualizacion = async function () {
   }
 };
 
+// ═══════════════════════════════
+// 🔑 CORREGIR CONTRASEÑAS DNI CON CERO INICIAL
+// ═══════════════════════════════
+window.corregirPasswordsDNI = async function () {
+  if (!empresaAdminId) { alert('❌ Sin empresa asignada.'); return; }
+
+  const { data: afectados } = await supabase
+    .from('profiles')
+    .select('id, documento_numero, nombres, apellidos')
+    .eq('empresa_id', empresaAdminId)
+    .eq('rol', 'trabajador')
+    .like('documento_numero', '0%');
+
+  if (!afectados || afectados.length === 0) {
+    alert('✅ No hay trabajadores con DNI que empiece en 0 en tu empresa.');
+    return;
+  }
+
+  const confirmado = await showConfirm(
+    `Se encontraron ${afectados.length} trabajador(es) con DNI que empieza en 0.\n\nSe les actualizará la contraseña para que sea su DNI completo (con el cero).\n\n¿Continuar?`,
+    { confirmText: 'Sí, corregir' }
+  );
+  if (!confirmado) return;
+
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
+
+  let ok = 0, errores = 0;
+  for (const u of afectados) {
+    const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ANON_KEY}`,
+        'apikey': ANON_KEY,
+      },
+      body: JSON.stringify({
+        usuario_id: u.id,
+        updates: {},
+        password: u.documento_numero,  // DNI con el cero completo
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.error) errores++;
+    else ok++;
+  }
+
+  alert(`✅ Proceso completado.\n${ok} contraseña(s) corregida(s).\n${errores > 0 ? `❌ ${errores} con error.` : ''}`);
+};
+
 window.toggleActivo = async function (id, activo) {
   await supabase.from('profiles').update({ activo: !activo }).eq('id', id);
   cargarTrabajadores();

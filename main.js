@@ -1028,7 +1028,7 @@ window.consultarEstado = async function () {
   // Buscar perfil por DNI (sin filtro activo para no perder trabajadores)
   const { data: perfil, error } = await supabase
     .from('profiles')
-    .select('id, nombres, apellidos, empresas(nombre)')
+    .select('id, email, nombres, apellidos, empresas(nombre)')
     .eq('documento_numero', dni)
     .maybeSingle();
 
@@ -1040,23 +1040,26 @@ window.consultarEstado = async function () {
   // Traer todos los cursos activos
   const { data: cursos } = await supabase
     .from('cursos')
-    .select('id, titulo')
+    .select('id, titulo, vigencia_meses')
     .eq('activo', true)
     .order('titulo');
 
-  // Traer el envío aprobado más reciente por curso (eficacia = último paso del curso)
+  // Traer el examen aprobado más reciente por curso
+  // Se filtra por email (igual que cargarCursos al estar logueado)
   const { data: envios } = await supabase
     .from('envios_formulario')
-    .select('id_curso, aprobado, created_at')
-    .eq('usuario_id', perfil.id)
+    .select('id_curso, aprobado, created_at, formularios(tipo)')
+    .eq('usuario_email', perfil.email)
     .eq('estado', 'completado')
     .eq('aprobado', true)
     .order('created_at', { ascending: false });
 
-  // Mapa: id_curso → fecha más reciente de aprobación
+  // Mapa: id_curso → fecha más reciente de aprobación del examen final
   const envioMap = {};
   envios?.forEach(e => {
-    if (!envioMap[e.id_curso]) envioMap[e.id_curso] = e.created_at;
+    if (e.formularios?.tipo === 'examen' && !envioMap[e.id_curso]) {
+      envioMap[e.id_curso] = e.created_at;
+    }
   });
 
   // También revisar tabla certificados (cursos completados antes de ocultar el botón)
@@ -1084,7 +1087,7 @@ window.consultarEstado = async function () {
     if (fechaRaw) {
       const fechaRealizacion = new Date(fechaRaw);
       const vencimiento = new Date(fechaRealizacion);
-      vencimiento.setFullYear(vencimiento.getFullYear() + 1); // vigencia fija 1 año
+      vencimiento.setMonth(vencimiento.getMonth() + (curso.vigencia_meses || 12));
       const vencido = vencimiento < new Date();
       const estadoClass = vencido ? 'estado-vencido' : 'estado-aprobado';
       const estadoIcon  = vencido ? '⚠️ Vencido' : '✅ Aprobado';

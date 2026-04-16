@@ -58,7 +58,11 @@
       });
 
       if (error) {
-        alert('❌ Error: ' + error.message);
+        if (error.message.toLowerCase().includes('rate limit')) {
+          alert('⚠️ Has solicitado demasiados correos seguidos. Espera unos minutos e intenta de nuevo.');
+        } else {
+          alert('❌ Error: ' + error.message);
+        }
       } else {
         alert('✅ Enlace enviado. Revisa tu correo.');
         window.location.href = 'index.html';

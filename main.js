@@ -1040,21 +1040,28 @@ window.consultarEstado = async function () {
   }
 
   // Traer todos los cursos activos
-  const { data: cursos } = await supabase
+  const { data: cursos, error: errorCursos } = await supabase
     .from('cursos')
     .select('id, titulo, vigencia_meses')
     .eq('activo', true)
     .order('titulo');
 
+  if (errorCursos) {
+    resultado.innerHTML = `<div class="consulta-error">❌ Error al cargar cursos: ${errorCursos.message}</div>`;
+    return;
+  }
+
   // Traer el examen aprobado más reciente por curso
   // Se filtra por email (igual que cargarCursos al estar logueado)
-  const { data: envios } = await supabase
+  const emailBusqueda = perfil.email || '';
+  const { data: envios } = emailBusqueda ? await supabase
     .from('envios_formulario')
     .select('id_curso, aprobado, created_at, formularios(tipo)')
-    .eq('usuario_email', perfil.email)
+    .eq('usuario_email', emailBusqueda)
     .eq('estado', 'completado')
     .eq('aprobado', true)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+  : { data: [] };
 
   // Mapa: id_curso → fecha más reciente de aprobación del examen final
   const envioMap = {};

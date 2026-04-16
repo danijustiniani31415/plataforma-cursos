@@ -1042,7 +1042,7 @@ window.consultarEstado = async function () {
   // Traer todos los cursos activos
   const { data: cursos, error: errorCursos } = await supabase
     .from('cursos')
-    .select('id, titulo, vigencia_meses')
+    .select('id, titulo')
     .eq('activo', true)
     .order('titulo');
 
@@ -1096,7 +1096,7 @@ window.consultarEstado = async function () {
     if (fechaRaw) {
       const fechaRealizacion = new Date(fechaRaw);
       const vencimiento = new Date(fechaRealizacion);
-      vencimiento.setMonth(vencimiento.getMonth() + (curso.vigencia_meses || 12));
+      vencimiento.setMonth(vencimiento.getMonth() + 12);
       const vencido = vencimiento < new Date();
       const estadoClass = vencido ? 'estado-vencido' : 'estado-aprobado';
       const estadoIcon  = vencido ? '⚠️ Vencido' : '✅ Aprobado';

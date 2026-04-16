@@ -1025,12 +1025,14 @@ window.consultarEstado = async function () {
 
   resultado.innerHTML = `<div class="consulta-cargando">Buscando...</div>`;
 
-  // Buscar perfil por DNI (sin filtro activo para no perder trabajadores)
-  const { data: perfil, error } = await supabase
+  // Buscar perfil por DNI — se intenta con y sin cero inicial para tolerar ambos formatos
+  const dniVariantes = [...new Set([dni, dni.padStart(8, '0'), String(parseInt(dni, 10))])];
+  const { data: perfiles, error } = await supabase
     .from('profiles')
     .select('id, email, nombres, apellidos, empresas(nombre)')
-    .eq('documento_numero', dni)
-    .maybeSingle();
+    .in('documento_numero', dniVariantes);
+
+  const perfil = perfiles?.[0] ?? null;
 
   if (error || !perfil) {
     resultado.innerHTML = `<div class="consulta-error">❌ No se encontró ningún trabajador con ese DNI.<br><small style="color:#999">Si el problema persiste contacta a tu administrador.</small></div>`;

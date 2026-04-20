@@ -989,8 +989,10 @@ window.descargarReporteExcel = async function () {
   if (!perfiles || perfiles.length === 0) { alert('No hay trabajadores en tu empresa.'); return; }
 
   const perfilMap = {};
-  perfiles.forEach(p => { perfilMap[p.email] = p; });
-  const emails = perfiles.map(p => p.email);
+  perfiles.forEach(p => { if (p.email) perfilMap[p.email] = p; });
+  // Filtrar emails null/vacios: si van en el .in() PostgREST responde 400.
+  const emails = perfiles.map(p => p.email).filter(Boolean);
+  if (emails.length === 0) { alert('No hay trabajadores con email registrado en tu empresa.'); return; }
 
   // 2. Formularios y cursos (sin joins)
   const [{ data: todosFormularios }, { data: todosCursos }] = await Promise.all([
@@ -1505,7 +1507,8 @@ window.cargarGraficaSatisfaccion = async function () {
     .eq('rol', 'trabajador')
     .eq('activo', true);
   if (!trabajadores?.length) return;
-  const emails = trabajadores.map(t => t.email);
+  const emails = trabajadores.map(t => t.email).filter(Boolean);
+  if (!emails.length) return;
 
   // IDs de formularios tipo encuesta
   const { data: formsEncuesta } = await supabase
@@ -1808,7 +1811,8 @@ window.cargarEstadoCurso = async function () {
   const tipoFormMap = {};
   todosFormularios?.forEach(f => { tipoFormMap[f.id] = f.tipo; });
 
-  const emails = todosTrabajadoresDash.map(t => t.email);
+  const emails = todosTrabajadoresDash.map(t => t.email).filter(Boolean);
+  if (!emails.length) return;
   const { data: envios } = await supabase
     .from('envios_formulario')
     .select('usuario_email, id_formulario, puntaje')
@@ -2945,7 +2949,12 @@ async function cargarResumenCumplimiento() {
     return;
   }
 
-  const emails = workers.map(w => w.email);
+  const emails = workers.map(w => w.email).filter(Boolean);
+  if (!emails.length) {
+    document.getElementById('cumpl-kpis').innerHTML = '<p style="color:#888;">No hay trabajadores con email registrado.</p>';
+    document.getElementById('tabla-por-vencer').innerHTML = '';
+    return;
+  }
   const { data: envios } = await supabase
     .from('envios_formulario')
     .select('usuario_email, id_curso, created_at, formularios(tipo)')
@@ -3289,7 +3298,11 @@ window.cargarProgresoRuta = async function () {
     return;
   }
 
-  const emails = workers.map(w => w.email);
+  const emails = workers.map(w => w.email).filter(Boolean);
+  if (!emails.length) {
+    cont.innerHTML = '<p style="color:#888;">No hay trabajadores con email registrado.</p>';
+    return;
+  }
   const { data: envios } = await supabase
     .from('envios_formulario')
     .select('usuario_email, id_curso, created_at, formularios(tipo)')

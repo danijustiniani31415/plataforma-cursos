@@ -8,6 +8,22 @@ function normalizarDNI(raw) {
   return String(raw).trim().replace(/[\n\r]/g, '').padStart(8, '0');
 }
 
+// Ejecuta un query Supabase con .in(col, values) en chunks, en paralelo,
+// para evitar exceder el límite de URL (~8-16KB) cuando values es grande.
+// queryFn recibe un sub-array y debe retornar { data, error }.
+async function chunkedInQuery(values, chunkSize, queryFn) {
+  if (!values?.length) return { data: [], error: null };
+  const chunks = [];
+  for (let i = 0; i < values.length; i += chunkSize) {
+    chunks.push(values.slice(i, i + chunkSize));
+  }
+  const results = await Promise.all(chunks.map(queryFn));
+  for (const r of results) {
+    if (r?.error) return { data: null, error: r.error };
+  }
+  return { data: results.flatMap(r => r?.data || []), error: null };
+}
+
 // Select buscable con Tom Select
 function initSelectBuscable(id) {
   const el = document.getElementById(id);
@@ -1004,15 +1020,17 @@ window.descargarReporteExcel = async function () {
   const cursoTitMap  = {};
   todosCursos?.forEach(c => { cursoTitMap[c.id] = c.titulo; });
 
-  // 3. Envíos del período
-  const { data: envios, error } = await supabase
-    .from('envios_formulario')
-    .select('usuario_email, id_formulario, id_curso, puntaje, porcentaje, aprobado, created_at')
-    .in('usuario_email', emails)
-    .eq('estado', 'completado')
-    .gte('created_at', desde)
-    .lt('created_at', hasta)
-    .order('created_at', { ascending: true });
+  // 3. Envíos del período (chunked: con muchos emails la URL excederia el limite)
+  const { data: envios, error } = await chunkedInQuery(emails, 150, chunk =>
+    supabase
+      .from('envios_formulario')
+      .select('usuario_email, id_formulario, id_curso, puntaje, porcentaje, aprobado, created_at')
+      .in('usuario_email', chunk)
+      .eq('estado', 'completado')
+      .gte('created_at', desde)
+      .lt('created_at', hasta)
+  );
+  envios?.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
   if (error) { alert('❌ Error: ' + error.message); return; }
   if (!envios || envios.length === 0) { alert('No hay registros de tu empresa para ese mes.'); return; }
@@ -1520,14 +1538,16 @@ window.cargarGraficaSatisfaccion = async function () {
   const desde = new Date(Date.UTC(anio,  0, 1, 5, 0, 0)).toISOString();
   const hasta = new Date(Date.UTC(anio + 1, 0, 1, 5, 0, 0)).toISOString();
 
-  const { data: envios } = await supabase
-    .from('envios_formulario')
-    .select('porcentaje, created_at')
-    .in('usuario_email', emails)
-    .in('id_formulario', encuestaIds)
-    .eq('estado', 'completado')
-    .gte('created_at', desde)
-    .lt('created_at', hasta);
+  const { data: envios } = await chunkedInQuery(emails, 150, chunk =>
+    supabase
+      .from('envios_formulario')
+      .select('porcentaje, created_at')
+      .in('usuario_email', chunk)
+      .in('id_formulario', encuestaIds)
+      .eq('estado', 'completado')
+      .gte('created_at', desde)
+      .lt('created_at', hasta)
+  );
 
   // Agrupar por mes y calcular promedio
   const mesesNombre = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -1612,10 +1632,12 @@ window.cargarDashboardMes = async function () {
   if (asignaciones?.length) {
     // Usar lista de asignados
     emails = asignaciones.map(a => a.usuario_email).filter(Boolean);
-    const { data: perfs } = await supabase
-      .from('profiles')
-      .select('id, nombres, apellidos, documento_numero, cargo, email')
-      .in('email', emails);
+    const { data: perfs } = await chunkedInQuery(emails, 150, chunk =>
+      supabase
+        .from('profiles')
+        .select('id, nombres, apellidos, documento_numero, cargo, email')
+        .in('email', chunk)
+    );
     trabajadores = perfs || [];
     fuenteLabel  = `📋 Lista asignada (${asignaciones.length} trabajadores)`;
   } else {
@@ -1627,7 +1649,7 @@ window.cargarDashboardMes = async function () {
       .eq('rol', 'trabajador')
       .eq('activo', true);
     trabajadores = todos || [];
-    emails = trabajadores.map(t => t.email);
+    emails = trabajadores.map(t => t.email).filter(Boolean);
     fuenteLabel = `👥 Todos los activos (sin lista asignada)`;
   }
 
@@ -1636,13 +1658,15 @@ window.cargarDashboardMes = async function () {
     return;
   }
 
-  const { data: enviosMes } = await supabase
-    .from('envios_formulario')
-    .select('usuario_email, aprobado')
-    .in('usuario_email', emails)
-    .eq('estado', 'completado')
-    .gte('created_at', desde)
-    .lt('created_at', hasta);
+  const { data: enviosMes } = await chunkedInQuery(emails, 150, chunk =>
+    supabase
+      .from('envios_formulario')
+      .select('usuario_email, aprobado')
+      .in('usuario_email', chunk)
+      .eq('estado', 'completado')
+      .gte('created_at', desde)
+      .lt('created_at', hasta)
+  );
 
   const correosConActividad = new Set(enviosMes?.map(n => n.usuario_email) || []);
   const aprobados = new Set(enviosMes?.filter(n => n.aprobado).map(n => n.usuario_email) || []);
@@ -1813,12 +1837,14 @@ window.cargarEstadoCurso = async function () {
 
   const emails = todosTrabajadoresDash.map(t => t.email).filter(Boolean);
   if (!emails.length) return;
-  const { data: envios } = await supabase
-    .from('envios_formulario')
-    .select('usuario_email, id_formulario, puntaje')
-    .eq('id_curso', cursoId)
-    .in('usuario_email', emails)
-    .eq('estado', 'completado');
+  const { data: envios } = await chunkedInQuery(emails, 150, chunk =>
+    supabase
+      .from('envios_formulario')
+      .select('usuario_email, id_formulario, puntaje')
+      .eq('id_curso', cursoId)
+      .in('usuario_email', chunk)
+      .eq('estado', 'completado')
+  );
 
   const notasMap = {};
   envios?.filter(n => tipoFormMap[n.id_formulario] === 'examen')
@@ -2955,11 +2981,13 @@ async function cargarResumenCumplimiento() {
     document.getElementById('tabla-por-vencer').innerHTML = '';
     return;
   }
-  const { data: envios } = await supabase
-    .from('envios_formulario')
-    .select('usuario_email, id_curso, created_at, formularios(tipo)')
-    .in('usuario_email', emails)
-    .eq('aprobado', true);
+  const { data: envios } = await chunkedInQuery(emails, 150, chunk =>
+    supabase
+      .from('envios_formulario')
+      .select('usuario_email, id_curso, created_at, formularios(tipo)')
+      .in('usuario_email', chunk)
+      .eq('aprobado', true)
+  );
 
   // Solo tipo examen, más reciente por worker+curso
   const lastSub = {};
@@ -3303,11 +3331,13 @@ window.cargarProgresoRuta = async function () {
     cont.innerHTML = '<p style="color:#888;">No hay trabajadores con email registrado.</p>';
     return;
   }
-  const { data: envios } = await supabase
-    .from('envios_formulario')
-    .select('usuario_email, id_curso, created_at, formularios(tipo)')
-    .in('usuario_email', emails)
-    .eq('aprobado', true);
+  const { data: envios } = await chunkedInQuery(emails, 150, chunk =>
+    supabase
+      .from('envios_formulario')
+      .select('usuario_email, id_curso, created_at, formularios(tipo)')
+      .in('usuario_email', chunk)
+      .eq('aprobado', true)
+  );
 
   const lastSub = {};
   (envios || []).filter(e => e.formularios?.tipo === 'examen').forEach(e => {
@@ -3429,11 +3459,13 @@ window.generarReporteSUNAFIL = async function () {
   if (!envios?.length) { alert('No hay registros para ese año.'); return; }
 
   // 3. Perfiles
-  const emails = [...new Set(envios.map(e => e.usuario_email))];
-  const { data: perfiles } = await supabase
-    .from('profiles')
-    .select('email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
-    .in('email', emails);
+  const emails = [...new Set(envios.map(e => e.usuario_email))].filter(Boolean);
+  const { data: perfiles } = await chunkedInQuery(emails, 150, chunk =>
+    supabase
+      .from('profiles')
+      .select('email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
+      .in('email', chunk)
+  );
 
   const perfilMap = {};
   (perfiles || []).forEach(p => { perfilMap[p.email] = p; });

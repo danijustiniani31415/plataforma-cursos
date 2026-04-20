@@ -188,10 +188,12 @@ async function cargarCursos() {
     headerSubtitle.textContent = `${perfil.nombres} ${perfil.apellidos || ''} · ${empresa?.nombre || ''}`;
   }
 
-  // Por curso: saber si aprobó examen y cuándo
+  // Por curso: saber si aprobó la evaluación final y cuándo.
+  // La evaluación puede ser de tipo 'examen' o 'eficacia' (algunos cursos solo tienen eficacia).
   const estadoCurso = {};
   (envios || []).forEach(e => {
-    if (e.formularios?.tipo === 'examen' && e.aprobado) {
+    const esEvaluacion = e.formularios?.tipo === 'examen' || e.formularios?.tipo === 'eficacia';
+    if (esEvaluacion && e.aprobado) {
       if (!estadoCurso[e.id_curso] || new Date(e.created_at) > new Date(estadoCurso[e.id_curso].fecha)) {
         estadoCurso[e.id_curso] = { aprobado: true, fecha: e.created_at };
       }
@@ -1063,10 +1065,12 @@ window.consultarEstado = async function () {
     .order('created_at', { ascending: false })
   : { data: [] };
 
-  // Mapa: id_curso → fecha más reciente de aprobación del examen final
+  // Mapa: id_curso → fecha más reciente de aprobación de la evaluación final
+  // (puede ser 'examen' o 'eficacia' según el curso)
   const envioMap = {};
   envios?.forEach(e => {
-    if (e.formularios?.tipo === 'examen' && !envioMap[e.id_curso]) {
+    const esEvaluacion = e.formularios?.tipo === 'examen' || e.formularios?.tipo === 'eficacia';
+    if (esEvaluacion && !envioMap[e.id_curso]) {
       envioMap[e.id_curso] = e.created_at;
     }
   });

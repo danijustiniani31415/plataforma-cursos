@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#002855" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/Logo.png" />
-  <title>Cambiar Contraseña</title>
+  <title>Personaliza tu acceso</title>
   <link rel="stylesheet" href="styles.css" />
   <style>
     body {
@@ -31,38 +31,77 @@
 
     h2 {
       text-align: center;
-      margin-bottom: 1rem;
+      margin-bottom: 0.5rem;
     }
 
-    input, button {
+    .subtitulo {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #555;
+      margin-bottom: 1.5rem;
+      line-height: 1.4;
+    }
+
+    .field-label {
+      font-size: 0.85rem;
+      color: #333;
+      margin-top: 1rem;
+      margin-bottom: 2px;
+      font-weight: 600;
+    }
+
+    .field-hint {
+      font-size: 0.78rem;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-top: 4px;
+      font-size: 1rem;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+
+    button {
       width: 100%;
       padding: 12px;
       margin-top: 10px;
       font-size: 1rem;
       border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-
-    button {
-      background-color: #007BFF;
-      color: white;
       border: none;
+      cursor: pointer;
     }
 
-    button:hover {
-      background-color: #0056b3;
+    .btn-primary {
+      background-color: #002855;
+      color: white;
     }
 
-    .btn-cancelar {
+    .btn-primary:hover {
+      background-color: #003d80;
+    }
+
+    .btn-omitir {
       background-color: transparent;
       color: #888;
       border: 1px solid #ccc;
       margin-top: 8px;
     }
 
-    .btn-cancelar:hover {
+    .btn-omitir:hover {
       background-color: #f0f0f0;
       color: #555;
+    }
+
+    .separador {
+      text-align: center;
+      color: #bbb;
+      font-size: 0.82rem;
+      margin: 1.2rem 0 0.2rem;
     }
 
     @media (max-width: 400px) {
@@ -74,60 +113,99 @@
 </head>
 <body>
   <div class="container">
-    <h2>🔐 Cambiar Contraseña</h2>
-    <p>Ingresa tu nueva contraseña</p>
-    <input type="password" id="new-password" placeholder="Nueva contraseña" />
-    <button onclick="actualizarClave()">Actualizar</button>
-    <button class="btn-cancelar" onclick="cancelar()">Cancelar / Volver al inicio</button>
+    <h2>🔐 Personaliza tu acceso</h2>
+    <p class="subtitulo">
+      Puedes ingresar tu correo real para recuperar tu acceso si lo olvidas,
+      y cambiar tu contraseña por una más segura.<br/>
+      <strong>Todo es opcional — puedes omitir por ahora.</strong>
+    </p>
+
+    <div class="field-label">Correo electrónico (opcional)</div>
+    <div class="field-hint">Si lo ingresas, podrás recuperar tu acceso por correo.</div>
+    <input type="email" id="nuevo-email" placeholder="tu@correo.com" autocomplete="email" />
+
+    <div class="separador">── Nueva contraseña (opcional) ──</div>
+
+    <div class="field-label">Nueva contraseña</div>
+    <input type="password" id="new-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
+
+    <div class="field-label">Confirmar contraseña</div>
+    <input type="password" id="confirm-password" placeholder="Repite la contraseña" autocomplete="new-password" />
+
+    <button class="btn-primary" onclick="actualizarClave()">Guardar cambios</button>
+    <button class="btn-omitir" onclick="omitir()">Omitir por ahora</button>
   </div>
 
   <script type="module">
 import { supabase } from './src/supabaseClient.js';
 
-// 🆕 Capturar sesión desde el enlace del correo
-supabase.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'PASSWORD_RECOVERY') {
-    console.log('✅ Sesión de recuperación activa');
-  }
-});
-
 async function actualizarClave() {
-  const nuevaClave = document.getElementById("new-password").value;
+  const nuevoEmail    = document.getElementById('nuevo-email').value.trim();
+  const nuevaClave    = document.getElementById('new-password').value;
+  const confirmClave  = document.getElementById('confirm-password').value;
 
-  if (!nuevaClave || nuevaClave.length < 6) {
-    alert("⚠️ La contraseña debe tener al menos 6 caracteres.");
+  // Validar email si se ingresó
+  if (nuevoEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nuevoEmail)) {
+    alert('⚠️ Ingresa un correo electrónico válido.');
     return;
   }
 
-  const { error } = await supabase.auth.updateUser({
-    password: nuevaClave,
-  });
+  // Validar contraseñas si se ingresó alguna
+  if (nuevaClave || confirmClave) {
+    if (nuevaClave.length < 6) {
+      alert('⚠️ La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (nuevaClave !== confirmClave) {
+      alert('⚠️ Las contraseñas no coinciden.');
+      return;
+    }
+  }
 
-  if (error) {
-    alert("❌ Error: " + error.message);
+  // Si no se ingresó nada, comportarse como "omitir"
+  if (!nuevoEmail && !nuevaClave) {
+    await omitir();
     return;
   }
 
-  // Marcar que ya cambió la contraseña
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
-    await supabase
-      .from('profiles')
-      .update({ debe_cambiar_password: false })
-      .eq('id', user.id);
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (!user) {
+    alert('❌ Sesión expirada. Vuelve a iniciar sesión.');
+    window.location.href = 'index.html';
+    return;
   }
 
-  alert("✅ Contraseña actualizada correctamente.");
-  window.location.href = "index.html";
+  // Construir payload para updateUser
+  const updatePayload = {};
+  if (nuevoEmail)  updatePayload.email    = nuevoEmail;
+  if (nuevaClave)  updatePayload.password = nuevaClave;
+
+  const { error: authError } = await supabase.auth.updateUser(updatePayload);
+  if (authError) {
+    alert('❌ Error: ' + authError.message);
+    return;
+  }
+
+  // Actualizar profiles: debe_cambiar_password y email si aplica
+  const profileUpdate = { debe_cambiar_password: false };
+  if (nuevoEmail) profileUpdate.email = nuevoEmail;
+
+  await supabase.from('profiles').update(profileUpdate).eq('id', user.id);
+
+  alert('✅ Cambios guardados correctamente.');
+  window.location.href = 'index.html';
 }
 
-async function cancelar() {
-  await supabase.auth.signOut();
-  window.location.href = "index.html";
+async function omitir() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    await supabase.from('profiles').update({ debe_cambiar_password: false }).eq('id', user.id);
+  }
+  window.location.href = 'index.html';
 }
 
 window.actualizarClave = actualizarClave;
-window.cancelar = cancelar;
+window.omitir = omitir;
   </script>
 </body>
 </html>

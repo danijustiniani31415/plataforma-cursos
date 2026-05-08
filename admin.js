@@ -235,7 +235,7 @@ window.crearUsuario = async function () {
     return;
   }
 
-  const emailFinal = email || `${dni}@cvglobal-group.com`;
+  const emailFinal = email || `${dni}@cvglobal.pe`;
 
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     alert("❌ Ingresa un correo electrónico válido.");
@@ -286,7 +286,14 @@ window.crearUsuario = async function () {
     return;
   }
 
-  alert(`✅ Usuario creado correctamente.\nCorreo: ${emailFinal}\nContraseña inicial: ${dni}`);
+  // Setear debe_cambiar_password en el perfil recién creado
+  const { data: nuevoPerfil } = await supabase
+    .from('profiles').select('id').eq('documento_numero', dni).eq('empresa_id', empresaAdminId).single();
+  if (nuevoPerfil?.id) {
+    await supabase.from('profiles').update({ debe_cambiar_password: true }).eq('id', nuevoPerfil.id);
+  }
+
+  alert(`✅ Usuario creado correctamente.\nDNI: ${dni}\nContraseña inicial: ${dni}`);
 
   ["nuevo-email", "nuevo-dni", "nuevo-nombres", "nuevo-apellidos",
    "nuevo-telefono", "nuevo-fecha-ingreso"].forEach(id => {
@@ -307,7 +314,7 @@ window.crearGestor = async function () {
     return;
   }
 
-  const emailFinal = email || `${dni}@cvglobal-group.com`;
+  const emailFinal = email || `${dni}@cvglobal.pe`;
 
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     alert("❌ Ingresa un correo electrónico válido.");
@@ -348,7 +355,14 @@ window.crearGestor = async function () {
     return;
   }
 
-  alert(`✅ Gestor de Personal creado.\nCorreo: ${emailFinal}\nContraseña inicial: ${dni}`);
+  // Setear debe_cambiar_password en el perfil recién creado
+  const { data: nuevoPerfilGestor } = await supabase
+    .from('profiles').select('id').eq('documento_numero', dni).eq('empresa_id', empresaAdminId).single();
+  if (nuevoPerfilGestor?.id) {
+    await supabase.from('profiles').update({ debe_cambiar_password: true }).eq('id', nuevoPerfilGestor.id);
+  }
+
+  alert(`✅ Gestor de Personal creado.\nDNI: ${dni}\nContraseña inicial: ${dni}`);
   ["gestor-email", "gestor-dni", "gestor-nombres", "gestor-apellidos"].forEach(id => {
     document.getElementById(id).value = '';
   });
@@ -611,7 +625,7 @@ window.importarDesdeExcel = async function () {
     const apellidos    = String(f[1]).trim();
     const nombres      = String(f[2]).trim();
     const emailRaw     = String(f[3]).trim().toLowerCase();
-    const email        = emailRaw.includes('@') ? emailRaw : `${dni}@cvglobal-group.com`;
+    const email        = emailRaw.includes('@') ? emailRaw : `${dni}@cvglobal.pe`;
     const cargoNombre  = String(f[4]).trim();
     const telefono     = String(f[5]).trim();
     const fechaRaw = f[6];
@@ -662,6 +676,12 @@ window.importarDesdeExcel = async function () {
       filasError.push([dni, apellidos, nombres, email, cargoNombre, msgError]);
       errores++;
     } else {
+      // Setear debe_cambiar_password en el perfil recién creado
+      const { data: pImport } = await supabase
+        .from('profiles').select('id').eq('documento_numero', dni).eq('empresa_id', empresaAdminId).single();
+      if (pImport?.id) {
+        await supabase.from('profiles').update({ debe_cambiar_password: true }).eq('id', pImport.id);
+      }
       tdEstado.textContent = '✅ Creado';
       tdEstado.style.color = 'green';
       ok++;
@@ -899,7 +919,7 @@ window.importarAsignacion = async function () {
       ok++;
     } else if (apellidos && nombres) {
       // Trabajador nuevo — crear cuenta y asignar
-      const email  = emailRaw.includes('@') ? emailRaw : `${dni}@cvglobal-group.com`;
+      const email  = emailRaw.includes('@') ? emailRaw : `${dni}@cvglobal.pe`;
       const cargo  = cargos?.find(c => c.nombre.toLowerCase() === cargoNombre.toLowerCase());
       if (tdEstado) { tdEstado.textContent = '⏳ Creando...'; tdEstado.style.color = '#888'; }
 
@@ -926,6 +946,7 @@ window.importarAsignacion = async function () {
         const { data: nuevoPerfil } = await supabase
           .from('profiles').select('id, email').eq('documento_numero', dni).single();
         if (nuevoPerfil) {
+          await supabase.from('profiles').update({ debe_cambiar_password: true }).eq('id', nuevoPerfil.id);
           registros.push({
             empresa_id: empresaAdminId,
             usuario_id: nuevoPerfil.id,
@@ -1196,7 +1217,7 @@ window.guardarEdicion = async function () {
 
   if (!nombres || !apellidos) { alert('❌ Nombres y apellidos son obligatorios.'); return; }
 
-  const emailFinal = email || `${documento}@cvglobal-group.com`;
+  const emailFinal = email || `${documento}@cvglobal.pe`;
 
   // Obtener nombre del cargo y datos de empresa
   let cargoNombre = null;

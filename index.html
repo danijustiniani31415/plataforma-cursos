@@ -53,7 +53,9 @@
         <p class="login-subtitle">Ingresa tus credenciales para continuar</p>
       </div>
       <div class="form-group">
-        <input type="email" id="email" placeholder="Correo electrónico" autocomplete="email" />
+        <input type="text" id="dni-login" placeholder="DNI" autocomplete="off"
+               oninput="this.value=this.value.replace(/[^0-9]/g,'')" maxlength="12"
+               onkeydown="if(event.key==='Enter') document.getElementById('password').focus()" />
         <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password"
                onkeydown="if(event.key==='Enter') login()" />
         <button onclick="login()" class="btn-primary">
@@ -61,8 +63,8 @@
           Ingresar
         </button>
       </div>
-      <p class="link-muted">
-        <a href="recuperar-clave.html">¿Olvidaste tu contraseña?</a>
+      <p class="link-muted" style="color:#888; font-size:0.85rem;">
+        ¿Olvidaste tu contraseña? Contacta a tu administrador.
       </p>
     </section>
 

@@ -50,8 +50,9 @@ window.addEventListener("DOMContentLoaded", async () => {
 // 🔐 LOGIN
 // ═══════════════════════════════
 async function login() {
-  const email    = document.getElementById('email').value;
+  const dni      = document.getElementById('dni-login').value.trim();
   const password = document.getElementById('password').value;
+  const email    = dni + '@cvglobal.pe';
 
   const btnLogin = document.querySelector('#login-section .btn-primary');
   if (btnLogin) { btnLogin.disabled = true; btnLogin.textContent = 'Ingresando...'; }
@@ -61,7 +62,7 @@ async function login() {
   if (btnLogin) { btnLogin.disabled = false; btnLogin.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Ingresar'; }
 
   if (error) {
-    alert("❌ Correo o contraseña incorrectos.");
+    alert("❌ DNI o contraseña incorrectos.");
     return;
   }
 

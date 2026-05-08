@@ -771,7 +771,8 @@ window.enviarFormulario = async function (tipoPaso) {
 
     if (pasoActual === pasosCurso.length - 1 && tipoPaso === 'eficacia') {
       cursosAprobados[cursoSeleccionado.id] = { aprobado: true };
-      certificadoSection.style.display = 'block';
+      toast('¡Felicidades! Completaste el curso 🎉', 'success', 3000);
+      setTimeout(() => volverACursos(), 3000);
     }
   }
 };
@@ -817,6 +818,7 @@ function volverACursos() {
   pasoActual = 0;
   cursoSeleccionado = null;
   window.scrollTo(0, 0);
+  cargarCursos();
 }
 window.volverACursos = volverACursos;
 

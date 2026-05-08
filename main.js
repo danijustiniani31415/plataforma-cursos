@@ -49,10 +49,35 @@ window.addEventListener("DOMContentLoaded", async () => {
 // ═══════════════════════════════
 // 🔐 LOGIN
 // ═══════════════════════════════
+let modoAdmin = false;
+
+window.toggleModoAdmin = function () {
+  modoAdmin = !modoAdmin;
+  document.getElementById('dni-login').style.display    = modoAdmin ? 'none' : '';
+  document.getElementById('email-login').style.display  = modoAdmin ? ''     : 'none';
+  document.getElementById('login-subtitle').textContent = modoAdmin
+    ? 'Ingresa tus credenciales de administrador'
+    : 'Ingresa tu DNI para continuar';
+  document.getElementById('toggle-modo-link').textContent = modoAdmin
+    ? '← Acceso Trabajador'
+    : 'Acceso Administrador';
+  document.getElementById('login-footer-msg').style.display = modoAdmin ? 'none' : '';
+  document.getElementById('dni-login').value   = '';
+  document.getElementById('email-login').value = '';
+  document.getElementById('password').value    = '';
+};
+
 async function login() {
-  const dni      = document.getElementById('dni-login').value.trim();
+  let email, errorMsg;
+  if (modoAdmin) {
+    email    = document.getElementById('email-login').value.trim();
+    errorMsg = '❌ Correo o contraseña incorrectos.';
+  } else {
+    const dni = document.getElementById('dni-login').value.trim();
+    email     = dni + '@cvglobal.pe';
+    errorMsg  = '❌ DNI o contraseña incorrectos.';
+  }
   const password = document.getElementById('password').value;
-  const email    = dni + '@cvglobal.pe';
 
   const btnLogin = document.querySelector('#login-section .btn-primary');
   if (btnLogin) { btnLogin.disabled = true; btnLogin.textContent = 'Ingresando...'; }
@@ -62,7 +87,7 @@ async function login() {
   if (btnLogin) { btnLogin.disabled = false; btnLogin.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Ingresar'; }
 
   if (error) {
-    alert("❌ DNI o contraseña incorrectos.");
+    alert(errorMsg);
     return;
   }
 

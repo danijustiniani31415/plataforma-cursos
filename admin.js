@@ -286,13 +286,6 @@ window.crearUsuario = async function () {
     return;
   }
 
-  // Setear debe_cambiar_password en el perfil recién creado
-  const { data: nuevoPerfil } = await supabase
-    .from('profiles').select('id').eq('documento_numero', dni).eq('empresa_id', empresaAdminId).single();
-  if (nuevoPerfil?.id) {
-    await supabase.from('profiles').update({ debe_cambiar_password: true }).eq('id', nuevoPerfil.id);
-  }
-
   alert(`✅ Usuario creado correctamente.\nDNI: ${dni}\nContraseña inicial: ${dni}`);
 
   ["nuevo-email", "nuevo-dni", "nuevo-nombres", "nuevo-apellidos",
@@ -353,13 +346,6 @@ window.crearGestor = async function () {
   if (!response.ok || data?.error) {
     alert('❌ ' + (data?.error || 'Error al crear gestor'));
     return;
-  }
-
-  // Setear debe_cambiar_password en el perfil recién creado
-  const { data: nuevoPerfilGestor } = await supabase
-    .from('profiles').select('id').eq('documento_numero', dni).eq('empresa_id', empresaAdminId).single();
-  if (nuevoPerfilGestor?.id) {
-    await supabase.from('profiles').update({ debe_cambiar_password: true }).eq('id', nuevoPerfilGestor.id);
   }
 
   alert(`✅ Gestor de Personal creado.\nDNI: ${dni}\nContraseña inicial: ${dni}`);
@@ -676,12 +662,6 @@ window.importarDesdeExcel = async function () {
       filasError.push([dni, apellidos, nombres, email, cargoNombre, msgError]);
       errores++;
     } else {
-      // Setear debe_cambiar_password en el perfil recién creado
-      const { data: pImport } = await supabase
-        .from('profiles').select('id').eq('documento_numero', dni).eq('empresa_id', empresaAdminId).single();
-      if (pImport?.id) {
-        await supabase.from('profiles').update({ debe_cambiar_password: true }).eq('id', pImport.id);
-      }
       tdEstado.textContent = '✅ Creado';
       tdEstado.style.color = 'green';
       ok++;
@@ -946,7 +926,6 @@ window.importarAsignacion = async function () {
         const { data: nuevoPerfil } = await supabase
           .from('profiles').select('id, email').eq('documento_numero', dni).single();
         if (nuevoPerfil) {
-          await supabase.from('profiles').update({ debe_cambiar_password: true }).eq('id', nuevoPerfil.id);
           registros.push({
             empresa_id: empresaAdminId,
             usuario_id: nuevoPerfil.id,

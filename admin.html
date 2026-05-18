@@ -444,29 +444,28 @@
       <h2>📥 Importar trabajadores desde Excel</h2>
       <div class="info-box">
         Columnas requeridas en orden:
-        <strong>DNI · Apellidos · Nombres · Email · Cargo · Teléfono · Fecha Ingreso</strong><br>
-        El email es opcional — si se deja vacío se genera automático con el DNI.
+        <strong>DNI · Apellidos · Nombres · Cargo · Teléfono · Fecha Ingreso</strong><br>
+        El sistema detecta automáticamente trabajadores nuevos y cambios de cargo.
       </div>
       <a href="#" class="plantilla-link" onclick="descargarPlantilla(event)">📄 Descargar plantilla</a>
       <div class="file-input-wrap">
         <input type="file" id="archivo-excel" accept=".xlsx,.xls" />
       </div>
-      <button onclick="previsualizarExcel()" class="btn-primary">Vista previa</button>
+      <button onclick="previsualizarExcel()" class="btn-primary" id="btn-vista-previa">Vista previa</button>
 
       <div id="preview-excel" style="display:none; margin-top:16px;">
-        <p id="preview-resumen" style="font-weight:600; margin-bottom:10px; color:#333;"></p>
+        <p id="preview-resumen" style="font-weight:600; margin-bottom:12px; color:#333; font-size:0.95rem; line-height:2;"></p>
         <div class="preview-table-wrap">
           <table id="tabla-preview">
             <thead>
               <tr>
-                <th>DNI</th><th>Apellidos</th><th>Nombres</th>
-                <th>Email</th><th>Cargo</th><th>Teléfono</th><th>Fecha Ingreso</th><th>Estado</th>
+                <th>DNI</th><th>Apellidos</th><th>Nombres</th><th>Cargo</th><th>Estado</th>
               </tr>
             </thead>
             <tbody id="tbody-preview"></tbody>
           </table>
         </div>
-        <button onclick="importarDesdeExcel()" class="btn-primary" style="margin-top:14px;">✅ Confirmar importación</button>
+        <div id="acciones-importacion" style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;"></div>
       </div>
       <div id="progreso-importacion" class="progreso"></div>
     </div>

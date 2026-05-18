@@ -491,6 +491,7 @@ document.getElementById('nuevo-dni').addEventListener('blur', async function () 
 // 📥 Importar desde Excel
 // ═══════════════════════════════
 let filasExcel = [];
+let filasClasificadas = [];
 
 window.descargarPlantilla = async function (e) {
   e.preventDefault();
@@ -502,27 +503,27 @@ window.descargarPlantilla = async function (e) {
 
   // Hoja principal
   const ws = XLSX.utils.aoa_to_sheet([
-    ['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Telefono', 'Fecha Ingreso'],
+    ['DNI', 'Apellidos', 'Nombres', 'Cargo', 'Teléfono', 'Fecha Ingreso'],
   ]);
 
   // Forzar columna DNI como texto en 200 filas para que Excel preserve ceros iniciales
   for (let row = 2; row <= 201; row++) {
     ws[`A${row}`] = { t: 's', v: '' };
   }
-  ws['!ref'] = 'A1:G201';
+  ws['!ref'] = 'A1:F201';
 
   // Hoja oculta con la lista de cargos para el dropdown
   const wsCargos = XLSX.utils.aoa_to_sheet(listaCargos.map(c => [c]));
 
   // Ancho de columnas
-  ws['!cols'] = [12, 22, 22, 28, 22, 14, 14].map(w => ({ wch: w }));
+  ws['!cols'] = [12, 22, 22, 28, 14, 14].map(w => ({ wch: w }));
 
-  // Validación desplegable en columna E (Cargo) para filas 2-200
+  // Validación desplegable en columna D (Cargo) para filas 2-200
   ws['!dataValidations'] = ws['!dataValidations'] || [];
   if (listaCargos.length > 0) {
     ws['!dataValidations'].push({
       type: 'list',
-      sqref: 'E2:E200',
+      sqref: 'D2:D200',
       formula1: listaCargos.map(c => `"${c}"`).join(',').length <= 255
         ? '"' + listaCargos.join(',') + '"'
         : 'Cargos!$A$1:$A$' + listaCargos.length
@@ -539,149 +540,189 @@ window.previsualizarExcel = function () {
   const archivo = document.getElementById('archivo-excel').files[0];
   if (!archivo) { alert('Selecciona un archivo Excel.'); return; }
 
+  const btnVista = document.getElementById('btn-vista-previa');
+  btnVista.disabled = true;
+  btnVista.textContent = '⏳ Analizando...';
+
   const reader = new FileReader();
-  reader.onload = function (e) {
-    const XLSX = window.XLSX;
-    const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-    const hoja = workbook.Sheets[workbook.SheetNames[0]];
-    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
+  reader.onload = async function (e) {
+    try {
+      const XLSX = window.XLSX;
+      const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const hoja = workbook.Sheets[workbook.SheetNames[0]];
+      const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
 
-    // Saltar encabezado
-    filasExcel = filas.slice(1).filter(f => f[0] || f[3]);
+      filasExcel = filas.slice(1).filter(f => f[0]);
 
-    const tbody = document.getElementById('tbody-preview');
-    tbody.innerHTML = '';
-    filasExcel.forEach(f => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td style="padding:5px;">${f[0]}</td>
-        <td style="padding:5px;">${f[1]}</td>
-        <td style="padding:5px;">${f[2]}</td>
-        <td style="padding:5px;">${f[3]}</td>
-        <td style="padding:5px;">${f[4]}</td>
-        <td style="padding:5px;">${f[5]}</td>
-        <td style="padding:5px;">${f[6]}</td>
-        <td style="padding:5px; color:#888;">Pendiente</td>
-      `;
-      tbody.appendChild(tr);
-    });
+      // Detectar duplicados dentro del Excel
+      const vistosDni = new Set();
+      const dnisDuplicados = new Set();
+      filasExcel.forEach(f => {
+        const dni = normalizarDNI(f[0]);
+        if (vistosDni.has(dni)) dnisDuplicados.add(dni);
+        vistosDni.add(dni);
+      });
 
-    document.getElementById('preview-resumen').textContent =
-      `${filasExcel.length} trabajadores encontrados. Revisa los datos antes de importar.`;
-    document.getElementById('preview-excel').style.display = 'block';
+      // Consultar perfiles y cargos en paralelo
+      const dnisUnicos = [...vistosDni];
+      const [{ data: perfilesExistentes }, { data: cargos }] = await Promise.all([
+        supabase.from('profiles').select('id, documento_numero, cargo_id, cargo')
+          .in('documento_numero', dnisUnicos).eq('empresa_id', empresaAdminId),
+        supabase.from('cargos').select('id, nombre').eq('activo', true)
+      ]);
+
+      const perfilPorDni = {};
+      (perfilesExistentes || []).forEach(p => { perfilPorDni[p.documento_numero] = p; });
+
+      // Clasificar cada fila (plantilla: DNI, Apellidos, Nombres, Cargo, Teléfono, Fecha)
+      const vistosOrden = new Set();
+      filasClasificadas = filasExcel.map(f => {
+        const dni = normalizarDNI(f[0]);
+        const cargoNombre = String(f[3] || '').trim();
+        const cargo = cargos?.find(c => c.nombre.toLowerCase() === cargoNombre.toLowerCase());
+        let tipo;
+        if (vistosOrden.has(dni)) {
+          tipo = 'duplicado';
+        } else if (!perfilPorDni[dni]) {
+          tipo = 'nuevo';
+        } else {
+          const p = perfilPorDni[dni];
+          const mismoCargo = (p.cargo || '').toLowerCase() === cargoNombre.toLowerCase()
+            || (cargo && p.cargo_id === cargo.id);
+          tipo = mismoCargo ? 'sin_cambios' : 'cambio_cargo';
+        }
+        vistosOrden.add(dni);
+        return { fila: f, dni, tipo, perfil: perfilPorDni[dni] || null, cargo };
+      });
+
+      // Renderizar tabla
+      const etiquetas = {
+        nuevo:        { texto: '🆕 Nuevo',           color: '#1a7f37' },
+        cambio_cargo: { texto: '🔄 Cambio de cargo', color: '#9a6700' },
+        sin_cambios:  { texto: '✅ Sin cambios',      color: '#888'    },
+        duplicado:    { texto: '❌ Duplicado',        color: '#d1242f' },
+      };
+
+      const tbody = document.getElementById('tbody-preview');
+      tbody.innerHTML = '';
+      filasClasificadas.forEach(({ fila: f, tipo, perfil, cargo }) => {
+        const { texto, color } = etiquetas[tipo];
+        const cargoNombre = String(f[3] || '').trim();
+        const cargoCell = tipo === 'cambio_cargo'
+          ? `<span style="color:#aaa;text-decoration:line-through;font-size:0.85em">${perfil?.cargo || '—'}</span><br>${cargoNombre}`
+          : (cargoNombre || '—');
+        const tr = document.createElement('tr');
+        tr.style.opacity = tipo === 'sin_cambios' ? '0.45' : '1';
+        tr.innerHTML = `
+          <td style="padding:5px;">${normalizarDNI(f[0])}</td>
+          <td style="padding:5px;">${String(f[1]).trim()}</td>
+          <td style="padding:5px;">${String(f[2]).trim()}</td>
+          <td style="padding:5px;">${cargoCell}</td>
+          <td style="padding:5px; font-weight:600; color:${color};">${texto}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Contar por tipo
+      const counts = { nuevo: 0, cambio_cargo: 0, sin_cambios: 0, duplicado: 0 };
+      filasClasificadas.forEach(r => counts[r.tipo]++);
+
+      const partes = [];
+      if (counts.nuevo > 0)        partes.push(`<span style="color:#1a7f37">🆕 ${counts.nuevo} nuevos</span>`);
+      if (counts.cambio_cargo > 0) partes.push(`<span style="color:#9a6700">🔄 ${counts.cambio_cargo} cambios de cargo</span>`);
+      if (counts.sin_cambios > 0)  partes.push(`<span style="color:#888">✅ ${counts.sin_cambios} sin cambios</span>`);
+      if (counts.duplicado > 0)    partes.push(`<span style="color:#d1242f">❌ ${counts.duplicado} duplicados en el Excel</span>`);
+      document.getElementById('preview-resumen').innerHTML = partes.join(' &nbsp;·&nbsp; ');
+
+      // Botones de acción
+      const botonesDiv = document.getElementById('acciones-importacion');
+      botonesDiv.innerHTML = '';
+      if (counts.nuevo > 0) {
+        botonesDiv.innerHTML += `<button onclick="descargarNuevosExcel()" class="btn-secondary" style="background:#f0f7f0;border:1px solid #1a7f37;color:#1a7f37;">⬇️ Descargar ${counts.nuevo} nuevos para verificar</button>`;
+      }
+      if (counts.cambio_cargo > 0) {
+        botonesDiv.innerHTML += `<button onclick="aplicarCambiosDeCargo()" id="btn-aplicar-cargos" class="btn-primary">🔄 Aplicar ${counts.cambio_cargo} cambios de cargo</button>`;
+      }
+      if (counts.nuevo === 0 && counts.cambio_cargo === 0) {
+        botonesDiv.innerHTML = '<p style="color:#888; margin:0;">No hay cambios que aplicar.</p>';
+      }
+
+      document.getElementById('preview-excel').style.display = 'block';
+    } catch (err) {
+      alert('Error al analizar el archivo: ' + err.message);
+    } finally {
+      btnVista.disabled = false;
+      btnVista.textContent = 'Vista previa';
+    }
   };
   reader.readAsArrayBuffer(archivo);
 };
 
-window.importarDesdeExcel = async function () {
-  if (!filasExcel.length) return;
+// ─── Descargar nuevos para verificar vía RENIEC ──────────────────────────────
+window.descargarNuevosExcel = function () {
+  const nuevos = filasClasificadas.filter(r => r.tipo === 'nuevo');
+  if (!nuevos.length) return;
 
-  // Auto-eliminar DNIs duplicados (se queda con la primera aparición)
-  const vistos = new Set();
-  const antesDeDedup = filasExcel.length;
-  filasExcel = filasExcel.filter(f => {
-    const dni = normalizarDNI(f[0]);
-    if (vistos.has(dni)) return false;
-    vistos.add(dni);
-    return true;
-  });
-  const eliminados = antesDeDedup - filasExcel.length;
-  if (eliminados > 0) {
-    const progreso = document.getElementById('progreso-importacion');
-    progreso.textContent = `ℹ️ ${eliminados} fila(s) duplicada(s) eliminadas automáticamente.`;
-  }
-
-  const btnImportar = document.querySelector('#preview-excel .btn-primary');
-  btnImportar.disabled = true;
-  btnImportar.textContent = '⏳ Importando...';
-
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
-
-  const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true);
-
-  const progreso = document.getElementById('progreso-importacion');
-  const filas = document.querySelectorAll('#tbody-preview tr');
-  let ok = 0, errores = 0;
-  const filasError = [['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Error']];
-
-  for (let i = 0; i < filasExcel.length; i++) {
-    const f = filasExcel[i];
-    const dni          = normalizarDNI(f[0]);
-    const apellidos    = String(f[1]).trim();
-    const nombres      = String(f[2]).trim();
-    const email        = `${dni}@cvglobal.pe`;
-    const cargoNombre  = String(f[4]).trim();
-    const telefono     = String(f[5]).trim();
-    const fechaRaw = f[6];
+  const XLSX = window.XLSX;
+  // Plantilla: DNI, Apellidos, Nombres, Cargo, Teléfono, Fecha Ingreso
+  const filas = nuevos.map(({ fila: f, dni }) => {
+    const fechaRaw = f[5];
     let fechaIngreso = '';
     if (fechaRaw instanceof Date) {
-      const y = fechaRaw.getFullYear();
-      const m = String(fechaRaw.getMonth() + 1).padStart(2, '0');
-      const d = String(fechaRaw.getDate()).padStart(2, '0');
-      fechaIngreso = `${y}-${m}-${d}`;
+      fechaIngreso = `${fechaRaw.getFullYear()}-${String(fechaRaw.getMonth()+1).padStart(2,'0')}-${String(fechaRaw.getDate()).padStart(2,'0')}`;
     } else if (fechaRaw) {
       fechaIngreso = String(fechaRaw).trim();
     }
+    return [
+      dni,
+      String(f[1]).trim(),
+      String(f[2]).trim(),
+      String(f[3] || '').trim(),
+      String(f[4] || '').trim(),
+      fechaIngreso
+    ];
+  });
 
-    const tdEstado = filas[i].querySelectorAll('td')[7];
-    tdEstado.textContent = '⏳ Procesando...';
-    tdEstado.style.color = '#888';
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['DNI', 'Apellidos', 'Nombres', 'Cargo', 'Teléfono', 'Fecha Ingreso'],
+    ...filas
+  ]);
+  for (let row = 2; row <= filas.length + 1; row++) {
+    ws[`A${row}`] = { t: 's', v: filas[row-2][0] };
+  }
+  ws['!cols'] = [12, 22, 22, 22, 14, 14].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Nuevos');
+  XLSX.writeFile(wb, 'trabajadores_nuevos_para_verificar.xlsx');
+};
 
-    const cargo = cargos?.find(c => c.nombre.toLowerCase() === cargoNombre.toLowerCase());
+// ─── Aplicar cambios de cargo ─────────────────────────────────────────────────
+window.aplicarCambiosDeCargo = async function () {
+  const cambios = filasClasificadas.filter(r => r.tipo === 'cambio_cargo');
+  if (!cambios.length) return;
 
-    const response = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/crear-usuario', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s'
-      },
-      body: JSON.stringify({
-        email,
-        password:         dni,
-        nombres,
-        apellidos,
-        documento_tipo:   'DNI',
-        documento_numero: dni,
-        telefono:         telefono || null,
-        empresa_id:       empresaAdminId,
-        cargo_id:         cargo?.id || null,
-        fecha_ingreso:    fechaIngreso || null,
-        rol:              'trabajador'
-      })
-    });
+  const btn = document.getElementById('btn-aplicar-cargos');
+  btn.disabled = true;
+  btn.textContent = '⏳ Aplicando...';
 
-    const data = await response.json();
+  const progreso = document.getElementById('progreso-importacion');
+  let ok = 0, errores = 0;
 
-    if (!response.ok || data?.error) {
-      const msgError = data?.error || 'Error desconocido';
-      tdEstado.textContent = '❌ ' + msgError;
-      tdEstado.style.color = 'red';
-      filasError.push([dni, apellidos, nombres, email, cargoNombre, msgError]);
-      errores++;
-    } else {
-      tdEstado.textContent = '✅ Creado';
-      tdEstado.style.color = 'green';
-      ok++;
-    }
+  for (const { perfil, cargo, fila } of cambios) {
+    const cargoNombre = String(fila[3] || '').trim();
+    const { error } = await supabase
+      .from('profiles')
+      .update({ cargo_id: cargo?.id || null, cargo: cargoNombre })
+      .eq('id', perfil.id);
 
-    progreso.textContent = `Progreso: ${i + 1}/${filasExcel.length} — ✅ ${ok} creados, ❌ ${errores} errores`;
+    if (error) errores++;
+    else ok++;
+    progreso.textContent = `Actualizando cargos: ✅ ${ok} OK · ❌ ${errores} errores`;
   }
 
-  progreso.textContent += ' — ¡Importación completada!';
-  btnImportar.disabled = false;
-  btnImportar.textContent = '✅ Confirmar importación';
-
-  if (errores > 0) {
-    const XLSX = window.XLSX;
-    const ws = XLSX.utils.aoa_to_sheet(filasError);
-    ws['!cols'] = [12, 20, 20, 30, 20, 40].map(w => ({ wch: w }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Errores');
-    XLSX.writeFile(wb, 'errores_importacion.xlsx');
-    alert(`⚠️ ${errores} registro(s) fallaron. Se descargó "errores_importacion.xlsx" con el detalle.`);
-  }
+  progreso.textContent = `Cargos actualizados — ✅ ${ok} correctos · ❌ ${errores} errores`;
+  btn.textContent = `✅ Aplicados (${ok})`;
+  btn.disabled = false;
 };
 
 // ═══════════════════════════════

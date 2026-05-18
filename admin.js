@@ -518,15 +518,18 @@ window.descargarPlantilla = async function (e) {
   // Ancho de columnas
   ws['!cols'] = [12, 22, 22, 28, 14, 14].map(w => ({ wch: w }));
 
-  // Validación desplegable en columna D (Cargo) para filas 2-200
-  ws['!dataValidations'] = ws['!dataValidations'] || [];
+  // Validación desplegable en columna D (Cargo) — bloquea valores fuera de la lista
+  ws['!dataValidations'] = [];
   if (listaCargos.length > 0) {
     ws['!dataValidations'].push({
       type: 'list',
       sqref: 'D2:D200',
-      formula1: listaCargos.map(c => `"${c}"`).join(',').length <= 255
-        ? '"' + listaCargos.join(',') + '"'
-        : 'Cargos!$A$1:$A$' + listaCargos.length
+      formula1: 'Cargos!$A$1:$A$' + listaCargos.length,
+      showDropDown: false,
+      showErrorMessage: true,
+      errorStyle: 'stop',
+      errorTitle: 'Cargo no válido',
+      error: 'Selecciona un cargo de la lista desplegable. No se permiten valores personalizados.'
     });
   }
 
@@ -583,6 +586,8 @@ window.previsualizarExcel = function () {
         let tipo;
         if (vistosOrden.has(dni)) {
           tipo = 'duplicado';
+        } else if (cargoNombre && !cargo) {
+          tipo = 'cargo_invalido';
         } else if (!perfilPorDni[dni]) {
           tipo = 'nuevo';
         } else {
@@ -592,15 +597,16 @@ window.previsualizarExcel = function () {
           tipo = mismoCargo ? 'sin_cambios' : 'cambio_cargo';
         }
         vistosOrden.add(dni);
-        return { fila: f, dni, tipo, perfil: perfilPorDni[dni] || null, cargo };
+        return { fila: f, dni, tipo, perfil: perfilPorDni[dni] || null, cargo, cargoNombre };
       });
 
       // Renderizar tabla
       const etiquetas = {
-        nuevo:        { texto: '🆕 Nuevo',           color: '#1a7f37' },
-        cambio_cargo: { texto: '🔄 Cambio de cargo', color: '#9a6700' },
-        sin_cambios:  { texto: '✅ Sin cambios',      color: '#888'    },
-        duplicado:    { texto: '❌ Duplicado',        color: '#d1242f' },
+        nuevo:          { texto: '🆕 Nuevo',             color: '#1a7f37' },
+        cambio_cargo:   { texto: '🔄 Cambio de cargo',   color: '#9a6700' },
+        sin_cambios:    { texto: '✅ Sin cambios',        color: '#888'    },
+        duplicado:      { texto: '❌ Duplicado',          color: '#d1242f' },
+        cargo_invalido: { texto: '⚠️ Cargo no existe',   color: '#c0392b' },
       };
 
       const tbody = document.getElementById('tbody-preview');
@@ -624,26 +630,30 @@ window.previsualizarExcel = function () {
       });
 
       // Contar por tipo
-      const counts = { nuevo: 0, cambio_cargo: 0, sin_cambios: 0, duplicado: 0 };
+      const counts = { nuevo: 0, cambio_cargo: 0, sin_cambios: 0, duplicado: 0, cargo_invalido: 0 };
       filasClasificadas.forEach(r => counts[r.tipo]++);
 
       const partes = [];
-      if (counts.nuevo > 0)        partes.push(`<span style="color:#1a7f37">🆕 ${counts.nuevo} nuevos</span>`);
-      if (counts.cambio_cargo > 0) partes.push(`<span style="color:#9a6700">🔄 ${counts.cambio_cargo} cambios de cargo</span>`);
-      if (counts.sin_cambios > 0)  partes.push(`<span style="color:#888">✅ ${counts.sin_cambios} sin cambios</span>`);
-      if (counts.duplicado > 0)    partes.push(`<span style="color:#d1242f">❌ ${counts.duplicado} duplicados en el Excel</span>`);
+      if (counts.nuevo > 0)          partes.push(`<span style="color:#1a7f37">🆕 ${counts.nuevo} nuevos</span>`);
+      if (counts.cambio_cargo > 0)   partes.push(`<span style="color:#9a6700">🔄 ${counts.cambio_cargo} cambios de cargo</span>`);
+      if (counts.sin_cambios > 0)    partes.push(`<span style="color:#888">✅ ${counts.sin_cambios} sin cambios</span>`);
+      if (counts.duplicado > 0)      partes.push(`<span style="color:#d1242f">❌ ${counts.duplicado} duplicados</span>`);
+      if (counts.cargo_invalido > 0) partes.push(`<span style="color:#c0392b">⚠️ ${counts.cargo_invalido} con cargo inválido</span>`);
       document.getElementById('preview-resumen').innerHTML = partes.join(' &nbsp;·&nbsp; ');
 
       // Botones de acción
       const botonesDiv = document.getElementById('acciones-importacion');
       botonesDiv.innerHTML = '';
+      if (counts.cargo_invalido > 0) {
+        botonesDiv.innerHTML += `<button onclick="descargarCargosInvalidosExcel()" style="background:#fff3f3;border:1px solid #c0392b;color:#c0392b;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:0.9rem;">⬇️ Descargar ${counts.cargo_invalido} con cargo inválido para corregir</button>`;
+      }
       if (counts.nuevo > 0) {
         botonesDiv.innerHTML += `<button onclick="descargarNuevosExcel()" class="btn-secondary" style="background:#f0f7f0;border:1px solid #1a7f37;color:#1a7f37;">⬇️ Descargar ${counts.nuevo} nuevos para verificar</button>`;
       }
       if (counts.cambio_cargo > 0) {
         botonesDiv.innerHTML += `<button onclick="aplicarCambiosDeCargo()" id="btn-aplicar-cargos" class="btn-primary">🔄 Aplicar ${counts.cambio_cargo} cambios de cargo</button>`;
       }
-      if (counts.nuevo === 0 && counts.cambio_cargo === 0) {
+      if (counts.nuevo === 0 && counts.cambio_cargo === 0 && counts.cargo_invalido === 0) {
         botonesDiv.innerHTML = '<p style="color:#888; margin:0;">No hay cambios que aplicar.</p>';
       }
 
@@ -694,6 +704,33 @@ window.descargarNuevosExcel = function () {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Nuevos');
   XLSX.writeFile(wb, 'trabajadores_nuevos_para_verificar.xlsx');
+};
+
+// ─── Descargar filas con cargo inválido para corregir ────────────────────────
+window.descargarCargosInvalidosExcel = function () {
+  const invalidos = filasClasificadas.filter(r => r.tipo === 'cargo_invalido');
+  if (!invalidos.length) return;
+
+  const XLSX = window.XLSX;
+  const filas = invalidos.map(({ fila: f, dni, cargoNombre }) => {
+    const fechaRaw = f[5];
+    let fechaIngreso = '';
+    if (fechaRaw instanceof Date) {
+      fechaIngreso = `${fechaRaw.getFullYear()}-${String(fechaRaw.getMonth()+1).padStart(2,'0')}-${String(fechaRaw.getDate()).padStart(2,'0')}`;
+    } else if (fechaRaw) {
+      fechaIngreso = String(fechaRaw).trim();
+    }
+    return [dni, String(f[1]).trim(), String(f[2]).trim(), cargoNombre + ' ← CORREGIR', String(f[4] || '').trim(), fechaIngreso];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['DNI', 'Apellidos', 'Nombres', 'Cargo (CORREGIR)', 'Teléfono', 'Fecha Ingreso'],
+    ...filas
+  ]);
+  ws['!cols'] = [12, 22, 22, 30, 14, 14].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Cargo Inválido');
+  XLSX.writeFile(wb, 'trabajadores_cargo_invalido.xlsx');
 };
 
 // ─── Aplicar cambios de cargo ─────────────────────────────────────────────────

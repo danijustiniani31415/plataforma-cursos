@@ -72,7 +72,7 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
       <div class="linea-decorativa"><span class="linea-decorativa-icono">✦</span></div>
       <div class="certifica-texto">La empresa CV GLOBAL S.A.C. certifica que:</div>
       <div class="nombre">${nombreCompleto}</div>
-      <div class="dni-cargo">Con ${documentoTipo || 'DNI'} N°: <strong>${dni}</strong> &nbsp;&nbsp;·&nbsp;&nbsp; Puesto de trabajo: <strong>${cargo}</strong></div>
+      <div class="dni-cargo">Con ${documentoTipo || 'DNI'} N°: <strong>${dni}</strong></div>
       <div class="separador"></div>
       <div class="participacion-texto">Ha PARTICIPADO y APROBADO satisfactoriamente el curso:</div>
       <div class="curso-nombre">${cursotitulo}</div>

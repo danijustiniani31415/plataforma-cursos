@@ -422,7 +422,7 @@ window.cargarRegistros = async function () {
   const tbody = document.querySelector("#tabla-registros tbody");
   tbody.innerHTML = "";
 
-  const tipoLabel = { encuesta: 'Encuesta', examen: 'Examen', eficacia: 'Eficacia' };
+  const tipoLabel = { encuesta: 'Encuesta', examen: 'Examen', eficacia: 'Evaluación de la eficacia' };
 
   data.forEach(reg => {
     const tipo = reg.formularios?.tipo || '';
@@ -1119,7 +1119,7 @@ window.descargarReporteExcel = async function () {
   const mesesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                        'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-  const tipoLabel = { encuesta: 'Encuesta', examen: 'Examen', eficacia: 'Eficacia' };
+  const tipoLabel = { encuesta: 'Encuesta', examen: 'Examen', eficacia: 'Evaluación de la eficacia' };
 
   const filas = [
     ['Apellidos', 'Nombres', 'Documento', 'Tipo Doc', 'Cargo', 'Empresa', 'Curso', 'Tipo Evaluación', 'Nota (/20)', 'Porcentaje', 'Estado', 'Fecha']
@@ -2418,7 +2418,7 @@ window.cargarFormulariosCurso = async function () {
 
   for (const tipo of ['examen', 'eficacia']) {
     const form  = forms?.find(f => f.tipo === tipo);
-    const label = tipo === 'examen' ? '📝 Examen' : '✅ Eficacia';
+    const label = tipo === 'examen' ? '📝 Examen' : '✅ Evaluación de la eficacia';
     const color = tipo === 'examen' ? '#002855' : '#28a745';
     const bloque = document.createElement('div');
     bloque.style.cssText = 'border:1px solid #e0e0e0;border-radius:10px;padding:16px;margin-bottom:16px;';
@@ -2457,7 +2457,7 @@ window.cargarFormulariosCurso = async function () {
 };
 
 window.crearFormulario = async function (cursoId, tipo) {
-  const label = tipo === 'examen' ? 'Examen' : 'Eficacia';
+  const label = tipo === 'examen' ? 'Examen' : 'Evaluación de la eficacia';
   const { error } = await supabase.from('formularios').insert([{ tipo, titulo: label, id_curso: cursoId, activo: true }]);
   if (error) { alert('❌ ' + error.message); return; }
   cargarFormulariosCurso();

@@ -1036,7 +1036,7 @@ function obtenerTituloPaso(paso) {
     'asistencia': '✅ Asistencia',
     'encuesta':   '📋 Encuesta',
     'examen':     '📝 Evaluación',
-    'eficacia':   '🎯 Eficacia'
+    'eficacia':   '🎯 Evaluación de la eficacia'
   };
   return titulos[paso] || paso;
 }

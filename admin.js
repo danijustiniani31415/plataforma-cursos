@@ -503,27 +503,27 @@ window.descargarPlantilla = async function (e) {
 
   // Hoja principal
   const ws = XLSX.utils.aoa_to_sheet([
-    ['DNI', 'Apellidos', 'Nombres', 'Cargo', 'Teléfono', 'Fecha Ingreso'],
+    ['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Teléfono', 'Fecha Ingreso'],
   ]);
 
   // Forzar columna DNI como texto en 200 filas para que Excel preserve ceros iniciales
   for (let row = 2; row <= 201; row++) {
     ws[`A${row}`] = { t: 's', v: '' };
   }
-  ws['!ref'] = 'A1:F201';
+  ws['!ref'] = 'A1:G201';
 
   // Hoja oculta con la lista de cargos para el dropdown
   const wsCargos = XLSX.utils.aoa_to_sheet(listaCargos.map(c => [c]));
 
   // Ancho de columnas
-  ws['!cols'] = [12, 22, 22, 28, 14, 14].map(w => ({ wch: w }));
+  ws['!cols'] = [12, 22, 22, 28, 28, 14, 14].map(w => ({ wch: w }));
 
-  // Validación desplegable en columna D (Cargo) — bloquea valores fuera de la lista
+  // Validación desplegable en columna E (Cargo) — bloquea valores fuera de la lista
   ws['!dataValidations'] = [];
   if (listaCargos.length > 0) {
     ws['!dataValidations'].push({
       type: 'list',
-      sqref: 'D2:D200',
+      sqref: 'E2:E200',
       formula1: 'Cargos!$A$1:$A$' + listaCargos.length,
       showDropDown: false,
       showErrorMessage: true,
@@ -577,11 +577,11 @@ window.previsualizarExcel = function () {
       const perfilPorDni = {};
       (perfilesExistentes || []).forEach(p => { perfilPorDni[p.documento_numero] = p; });
 
-      // Clasificar cada fila (plantilla: DNI, Apellidos, Nombres, Cargo, Teléfono, Fecha)
+      // Clasificar cada fila (plantilla: DNI, Apellidos, Nombres, Email, Cargo, Teléfono, Fecha)
       const vistosOrden = new Set();
       filasClasificadas = filasExcel.map(f => {
         const dni = normalizarDNI(f[0]);
-        const cargoNombre = String(f[3] || '').trim();
+        const cargoNombre = String(f[4] || '').trim();
         const cargo = cargos?.find(c => c.nombre.toLowerCase() === cargoNombre.toLowerCase());
         let tipo;
         if (vistosOrden.has(dni)) {
@@ -613,7 +613,7 @@ window.previsualizarExcel = function () {
       tbody.innerHTML = '';
       filasClasificadas.forEach(({ fila: f, tipo, perfil, cargo }) => {
         const { texto, color } = etiquetas[tipo];
-        const cargoNombre = String(f[3] || '').trim();
+        const cargoNombre = String(f[4] || '').trim();
         const cargoCell = tipo === 'cambio_cargo'
           ? `<span style="color:#aaa;text-decoration:line-through;font-size:0.85em">${perfil?.cargo || '—'}</span><br>${cargoNombre}`
           : (cargoNombre || '—');
@@ -674,9 +674,9 @@ window.descargarNuevosExcel = function () {
   if (!nuevos.length) return;
 
   const XLSX = window.XLSX;
-  // Plantilla: DNI, Apellidos, Nombres, Cargo, Teléfono, Fecha Ingreso
+  // Plantilla: DNI, Apellidos, Nombres, Email, Cargo, Teléfono, Fecha Ingreso
   const filas = nuevos.map(({ fila: f, dni }) => {
-    const fechaRaw = f[5];
+    const fechaRaw = f[6];
     let fechaIngreso = '';
     if (fechaRaw instanceof Date) {
       fechaIngreso = `${fechaRaw.getFullYear()}-${String(fechaRaw.getMonth()+1).padStart(2,'0')}-${String(fechaRaw.getDate()).padStart(2,'0')}`;
@@ -689,18 +689,19 @@ window.descargarNuevosExcel = function () {
       String(f[2]).trim(),
       String(f[3] || '').trim(),
       String(f[4] || '').trim(),
+      String(f[5] || '').trim(),
       fechaIngreso
     ];
   });
 
   const ws = XLSX.utils.aoa_to_sheet([
-    ['DNI', 'Apellidos', 'Nombres', 'Cargo', 'Teléfono', 'Fecha Ingreso'],
+    ['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Teléfono', 'Fecha Ingreso'],
     ...filas
   ]);
   for (let row = 2; row <= filas.length + 1; row++) {
     ws[`A${row}`] = { t: 's', v: filas[row-2][0] };
   }
-  ws['!cols'] = [12, 22, 22, 22, 14, 14].map(w => ({ wch: w }));
+  ws['!cols'] = [12, 22, 22, 28, 22, 14, 14].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Nuevos');
   XLSX.writeFile(wb, 'trabajadores_nuevos_para_verificar.xlsx');
@@ -713,21 +714,21 @@ window.descargarCargosInvalidosExcel = function () {
 
   const XLSX = window.XLSX;
   const filas = invalidos.map(({ fila: f, dni, cargoNombre }) => {
-    const fechaRaw = f[5];
+    const fechaRaw = f[6];
     let fechaIngreso = '';
     if (fechaRaw instanceof Date) {
       fechaIngreso = `${fechaRaw.getFullYear()}-${String(fechaRaw.getMonth()+1).padStart(2,'0')}-${String(fechaRaw.getDate()).padStart(2,'0')}`;
     } else if (fechaRaw) {
       fechaIngreso = String(fechaRaw).trim();
     }
-    return [dni, String(f[1]).trim(), String(f[2]).trim(), cargoNombre + ' ← CORREGIR', String(f[4] || '').trim(), fechaIngreso];
+    return [dni, String(f[1]).trim(), String(f[2]).trim(), String(f[3] || '').trim(), cargoNombre + ' ← CORREGIR', String(f[5] || '').trim(), fechaIngreso];
   });
 
   const ws = XLSX.utils.aoa_to_sheet([
-    ['DNI', 'Apellidos', 'Nombres', 'Cargo (CORREGIR)', 'Teléfono', 'Fecha Ingreso'],
+    ['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo (CORREGIR)', 'Teléfono', 'Fecha Ingreso'],
     ...filas
   ]);
-  ws['!cols'] = [12, 22, 22, 30, 14, 14].map(w => ({ wch: w }));
+  ws['!cols'] = [12, 22, 22, 28, 30, 14, 14].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Cargo Inválido');
   XLSX.writeFile(wb, 'trabajadores_cargo_invalido.xlsx');
@@ -746,10 +747,13 @@ window.aplicarCambiosDeCargo = async function () {
   let ok = 0, errores = 0;
 
   for (const { perfil, cargo, fila } of cambios) {
-    const cargoNombre = String(fila[3] || '').trim();
+    const emailFila   = String(fila[3] || '').trim();
+    const cargoNombre = String(fila[4] || '').trim();
+    const updateData  = { cargo_id: cargo?.id || null, cargo: cargoNombre };
+    if (emailFila && emailFila.includes('@')) updateData.email = emailFila;
     const { error } = await supabase
       .from('profiles')
-      .update({ cargo_id: cargo?.id || null, cargo: cargoNombre })
+      .update(updateData)
       .eq('id', perfil.id);
 
     if (error) errores++;
@@ -1529,6 +1533,158 @@ window.ejecutarActualizacion = async function () {
     XLSX.writeFile(wb, 'errores_actualizacion.xlsx');
     alert(`⚠️ Proceso completado con observaciones:\n✅ ${ok} actualizados\n❌ ${errores} con error\n⚠️ ${noEncontrados} DNI no encontrado\n\nSe descargó "errores_actualizacion.xlsx".`);
   }
+};
+
+// ═══════════════════════════════
+// ✏️ ACTUALIZACIÓN INDIVIDUAL DE TRABAJADOR
+// ═══════════════════════════════
+let _trabEncontrados = [];
+
+window.buscarTrabajador = async function () {
+  const q = document.getElementById('buscar-trab-input').value.trim();
+  if (!q) { alert('Ingresa un DNI o apellidos para buscar.'); return; }
+
+  const resultadoDiv = document.getElementById('resultado-busqueda-trab');
+  const resumenEl    = document.getElementById('resumen-busqueda-trab');
+  const listaEl      = document.getElementById('lista-busqueda-trab');
+
+  resumenEl.textContent = '⏳ Buscando...';
+  resultadoDiv.style.display = 'block';
+  listaEl.innerHTML = '';
+  document.getElementById('form-editar-trab').style.display = 'none';
+
+  let qb = supabase
+    .from('profiles')
+    .select('id, documento_numero, nombres, apellidos, email, telefono, cargo_id, cargo, fecha_ingreso')
+    .eq('empresa_id', empresaAdminId)
+    .order('apellidos')
+    .limit(10);
+
+  if (/^\d/.test(q)) {
+    qb = qb.ilike('documento_numero', `%${q}%`);
+  } else {
+    qb = qb.ilike('apellidos', `%${q}%`);
+  }
+
+  const { data, error } = await qb;
+
+  if (error || !data?.length) {
+    resumenEl.textContent = 'No se encontraron trabajadores.';
+    return;
+  }
+
+  _trabEncontrados = data;
+  resumenEl.textContent = `${data.length} trabajador(es) encontrado(s):`;
+
+  data.forEach((t, idx) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:white;border:1px solid #ddd;border-radius:7px;margin-bottom:8px;gap:12px;';
+    div.innerHTML = `
+      <div style="flex:1;min-width:0;">
+        <strong>${t.apellidos}, ${t.nombres}</strong>
+        <span style="color:#888;font-size:0.85rem;"> · DNI: ${t.documento_numero}</span>
+        ${t.cargo ? `<span style="color:#888;font-size:0.85rem;"> · ${t.cargo}</span>` : ''}
+        ${t.email ? `<br><span style="color:#aaa;font-size:0.82rem;">${t.email}</span>` : ''}
+      </div>
+      <button onclick="abrirFormEdicion(${idx})"
+              style="white-space:nowrap;padding:7px 14px;background:#002855;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;">
+        ✏️ Editar
+      </button>
+    `;
+    listaEl.appendChild(div);
+  });
+};
+
+window.abrirFormEdicion = async function (idx) {
+  const t = _trabEncontrados[idx];
+  document.getElementById('edit-trab-id').value            = t.id;
+  document.getElementById('edit-trab-dni').value           = t.documento_numero;
+  document.getElementById('edit-trab-apellidos').value     = t.apellidos    || '';
+  document.getElementById('edit-trab-nombres').value       = t.nombres      || '';
+  document.getElementById('edit-trab-email').value         = t.email        || '';
+  document.getElementById('edit-trab-telefono').value      = t.telefono     || '';
+  document.getElementById('edit-trab-fecha-ingreso').value = t.fecha_ingreso ? t.fecha_ingreso.slice(0, 10) : '';
+  document.getElementById('edit-trab-password').value      = '';
+  document.getElementById('estado-edicion-trab').textContent = '';
+  document.getElementById('estado-edicion-trab').style.color = '';
+
+  const sel = document.getElementById('edit-trab-cargo');
+  sel.innerHTML = '<option value="">— Sin cargo —</option>';
+  const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true).order('nombre');
+  (cargos || []).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.nombre;
+    if (c.id === t.cargo_id) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  document.getElementById('form-editar-trab').style.display = 'block';
+  document.getElementById('form-editar-trab').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+window.guardarActualizacionIndividual = async function () {
+  const usuarioId = document.getElementById('edit-trab-id').value;
+  if (!usuarioId) return;
+
+  const apellidos    = document.getElementById('edit-trab-apellidos').value.trim();
+  const nombres      = document.getElementById('edit-trab-nombres').value.trim();
+  const email        = document.getElementById('edit-trab-email').value.trim().toLowerCase();
+  const telefono     = document.getElementById('edit-trab-telefono').value.trim();
+  const cargo_id     = document.getElementById('edit-trab-cargo').value;
+  const fechaIngreso = document.getElementById('edit-trab-fecha-ingreso').value;
+  const password     = document.getElementById('edit-trab-password').value.trim();
+
+  const btn    = document.getElementById('btn-guardar-edicion');
+  const estado = document.getElementById('estado-edicion-trab');
+  btn.disabled    = true;
+  btn.textContent = '⏳ Guardando...';
+  estado.textContent = '';
+
+  const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true);
+  const cargoObj = cargos?.find(c => c.id === cargo_id);
+
+  const updates = {};
+  if (apellidos)    updates.apellidos     = apellidos;
+  if (nombres)      updates.nombres       = nombres;
+  if (email)        updates.email         = email;
+  if (telefono)     updates.telefono      = telefono;
+  if (cargo_id)   { updates.cargo_id      = cargo_id; updates.cargo = cargoObj?.nombre || null; }
+  if (fechaIngreso) updates.fecha_ingreso = fechaIngreso;
+
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
+
+  const body = { usuario_id: usuarioId, updates };
+  if (password) body.password = password;
+
+  const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${ANON_KEY}`,
+      'apikey': ANON_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+
+  let resData = {};
+  try { resData = await res.json(); } catch (_) {}
+
+  if (!res.ok || resData?.error) {
+    estado.style.color  = 'red';
+    estado.textContent  = '❌ ' + (resData?.error || `Error HTTP ${res.status}`);
+  } else {
+    estado.style.color  = 'green';
+    estado.textContent  = '✅ Actualizado correctamente.';
+    const idx = _trabEncontrados.findIndex(t => t.id === usuarioId);
+    if (idx !== -1) {
+      _trabEncontrados[idx] = { ..._trabEncontrados[idx], apellidos, nombres, email, telefono,
+        cargo_id, cargo: cargoObj?.nombre || _trabEncontrados[idx].cargo, fecha_ingreso: fechaIngreso };
+    }
+  }
+
+  btn.disabled    = false;
+  btn.textContent = '💾 Guardar cambios';
 };
 
 // ═══════════════════════════════

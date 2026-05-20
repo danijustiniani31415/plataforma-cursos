@@ -61,8 +61,11 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Auth siempre usa DNI@cvglobal.pe; el email personal solo va al perfil
+    const authEmail = `${documento_numero}@cvglobal.pe`
+
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: authEmail,
       password,
       email_confirm: true
     })
@@ -99,7 +102,7 @@ Deno.serve(async (req) => {
       .from('profiles')
       .insert({
         id:                    authData.user.id,
-        email,
+        email:                 email || null,
         nombres,
         apellidos,
         documento_tipo,

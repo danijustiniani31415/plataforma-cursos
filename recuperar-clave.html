@@ -46,14 +46,25 @@
     import { supabase } from './src/supabaseClient.js';
 
     async function enviarEnlace() {
-      const email = document.getElementById('email-recuperar').value.trim();
+      const emailIngresado = document.getElementById('email-recuperar').value.trim();
 
-      if (!email) {
+      if (!emailIngresado) {
         alert('❌ Ingresa tu correo.');
         return;
       }
 
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // Buscar el perfil por email personal para obtener el email de Auth (DNI@cvglobal.pe)
+      const { data: perfil } = await supabase
+        .from('profiles')
+        .select('documento_numero')
+        .eq('email', emailIngresado)
+        .maybeSingle();
+
+      const authEmail = perfil?.documento_numero
+        ? `${perfil.documento_numero}@cvglobal.pe`
+        : emailIngresado;
+
+      const { error } = await supabase.auth.resetPasswordForEmail(authEmail, {
         redirectTo: window.location.origin + '/cambiar-clave.html'
       });
 

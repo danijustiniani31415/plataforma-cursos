@@ -75,13 +75,7 @@ async function login() {
   } else {
     const dni = document.getElementById('dni-login').value.trim();
     errorMsg  = '❌ DNI o contraseña incorrectos.';
-    // Intentar obtener el email real del perfil (por si fue creado con email personal)
-    const { data: perfilLookup } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('documento_numero', dni)
-      .maybeSingle();
-    email = perfilLookup?.email || `${dni}@cvglobal.pe`;
+    email = `${dni}@cvglobal.pe`;
   }
   const password = document.getElementById('password').value;
 

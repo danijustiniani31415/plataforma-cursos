@@ -175,18 +175,16 @@ async function actualizarClave() {
     return;
   }
 
-  // Construir payload para updateUser
-  const updatePayload = {};
-  if (nuevoEmail)  updatePayload.email    = nuevoEmail;
-  if (nuevaClave)  updatePayload.password = nuevaClave;
-
-  const { error: authError } = await supabase.auth.updateUser(updatePayload);
-  if (authError) {
-    alert('❌ Error: ' + authError.message);
-    return;
+  // Auth solo actualiza contraseña; el email de Auth (DNI@cvglobal.pe) nunca cambia
+  if (nuevaClave) {
+    const { error: authError } = await supabase.auth.updateUser({ password: nuevaClave });
+    if (authError) {
+      alert('❌ Error: ' + authError.message);
+      return;
+    }
   }
 
-  // Actualizar profiles: debe_cambiar_password y email si aplica
+  // El email personal se guarda solo en profiles (para notificaciones/recuperación)
   const profileUpdate = { debe_cambiar_password: false };
   if (nuevoEmail) profileUpdate.email = nuevoEmail;
 

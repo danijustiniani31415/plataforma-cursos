@@ -235,7 +235,7 @@ window.crearUsuario = async function () {
     return;
   }
 
-  const emailFinal = email || `${dni}@cvglobal.pe`;
+  const emailFinal = email || null;
 
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     alert("❌ Ingresa un correo electrónico válido.");
@@ -307,7 +307,7 @@ window.crearGestor = async function () {
     return;
   }
 
-  const emailFinal = email || `${dni}@cvglobal.pe`;
+  const emailFinal = email || null;
 
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     alert("❌ Ingresa un correo electrónico válido.");
@@ -446,14 +446,25 @@ window.cargarRegistros = async function () {
 // 🔐 Resetear contraseña
 // ═══════════════════════════════
 window.resetearContrasena = async function () {
-  const email = document.getElementById("email-reset").value.trim();
+  const emailIngresado = document.getElementById("email-reset").value.trim();
 
-  if (!email) {
+  if (!emailIngresado) {
     alert("Ingresa el correo.");
     return;
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  // Buscar el perfil por email personal para obtener el email de Auth (DNI@cvglobal.pe)
+  const { data: perfil } = await supabase
+    .from('profiles')
+    .select('documento_numero')
+    .eq('email', emailIngresado)
+    .maybeSingle();
+
+  const authEmail = perfil?.documento_numero
+    ? `${perfil.documento_numero}@cvglobal.pe`
+    : emailIngresado;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(authEmail, {
     redirectTo: "https://cursossstcvglobal.netlify.app/cambiar-clave.html"
   });
 
@@ -980,7 +991,7 @@ window.importarAsignacion = async function () {
       ok++;
     } else if (apellidos && nombres) {
       // Trabajador nuevo — crear cuenta y asignar
-      const email  = emailRaw.includes('@') ? emailRaw : `${dni}@cvglobal.pe`;
+      const email  = emailRaw.includes('@') ? emailRaw : null;
       const cargo  = cargos?.find(c => c.nombre.toLowerCase() === cargoNombre.toLowerCase());
       if (tdEstado) { tdEstado.textContent = '⏳ Creando...'; tdEstado.style.color = '#888'; }
 
@@ -1277,7 +1288,7 @@ window.guardarEdicion = async function () {
 
   if (!nombres || !apellidos) { alert('❌ Nombres y apellidos son obligatorios.'); return; }
 
-  const emailFinal = email || `${documento}@cvglobal.pe`;
+  const emailFinal = email || null;
 
   // Obtener nombre del cargo y datos de empresa
   let cargoNombre = null;

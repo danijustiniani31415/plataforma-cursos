@@ -1503,7 +1503,7 @@ window.ejecutarActualizacion = async function () {
       continue;
     }
 
-    // Usar edge function para actualizar (actualiza profiles + Auth si cambia email)
+    // Usar edge function para actualizar profiles (auth.users.email nunca cambia)
     const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
       method: 'POST',
       headers: {

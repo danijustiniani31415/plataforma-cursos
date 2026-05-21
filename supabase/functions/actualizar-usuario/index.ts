@@ -33,10 +33,9 @@ Deno.serve(async (req) => {
       if (profileError) throw new Error(profileError.message)
     }
 
-    // Actualizar en Auth: email y/o password
+    // Actualizar en Auth: solo password (el email en Auth es siempre DNI@cvglobal.pe)
     const authUpdates: Record<string, string> = {}
-    if (updates?.email) authUpdates.email = updates.email
-    if (password)       authUpdates.password = password
+    if (password) authUpdates.password = password
 
     if (Object.keys(authUpdates).length > 0) {
       const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(

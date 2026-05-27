@@ -1302,6 +1302,127 @@ window.descargarReporteExcel = function () {
   XLSX.writeFile(wb, mes ? `Registro_Notas_${RN_MESES[mes - 1]}_${anio}.xlsx` : `Registro_Notas_${anio}.xlsx`);
 };
 
+window.reprocesarCertificadosPendientes = async function () {
+  const btn = document.getElementById('rn-btn-reproceso');
+  const log = document.getElementById('rn-reproceso-log');
+  btn.disabled = true;
+  log.style.display = 'block';
+  log.textContent = 'Analizando datos...';
+
+  try {
+    // 1. Perfiles de la empresa
+    const { data: profs, error: profErr } = await supabase
+      .from('profiles')
+      .select('id, email, nombres, apellidos, documento_numero, cargo_id')
+      .eq('empresa_id', empresaAdminId);
+    if (profErr) throw profErr;
+    if (!profs?.length) { log.textContent = 'No hay trabajadores en esta empresa.'; return; }
+
+    const profileEmails = profs.map(p => p.email).filter(Boolean);
+    const profileMap = {};
+    profs.forEach(p => { profileMap[p.id] = p; });
+
+    // 2. Cargos (para obtener nombre desde cargo_id)
+    const cargoIds = [...new Set(profs.map(p => p.cargo_id).filter(Boolean))];
+    const cargoMap = {};
+    if (cargoIds.length) {
+      const { data: cargosList } = await supabase.from('cargos').select('id, nombre').in('id', cargoIds);
+      (cargosList || []).forEach(c => { cargoMap[c.id] = c.nombre; });
+    }
+
+    // 3. IDs de formularios de evaluación (tipo examen o eficacia)
+    const { data: evalForms } = await supabase.from('formularios').select('id').in('tipo', ['examen', 'eficacia']);
+    const evalFormIds = new Set((evalForms || []).map(f => f.id));
+
+    // 4. Envíos aprobados para estos usuarios (chunked por email)
+    const { data: envios } = await chunkedInQuery(profileEmails, 150, chunk =>
+      supabase.from('envios_formulario')
+        .select('usuario_id, usuario_email, id_formulario, id_curso, puntaje')
+        .in('usuario_email', chunk)
+        .eq('aprobado', true)
+        .eq('estado', 'completado')
+    );
+
+    // Filtrar solo evaluaciones; quedar solo con el mejor puntaje por (usuario, curso)
+    const envioMap = {};
+    (envios || [])
+      .filter(e => evalFormIds.has(e.id_formulario))
+      .forEach(e => {
+        const k = `${e.usuario_id}:${e.id_curso}`;
+        if (!envioMap[k] || e.puntaje > envioMap[k].puntaje) envioMap[k] = e;
+      });
+
+    // 5. Certificados ya existentes para la empresa
+    const { data: certs } = await supabase.from('certificados').select('usuario_id, curso_id').eq('empresa', empresaAdminNombre);
+    const certSet = new Set((certs || []).map(c => `${c.usuario_id}:${c.curso_id}`));
+
+    // 6. Pendientes (aprobados sin certificado)
+    const pendientes = Object.values(envioMap).filter(e => !certSet.has(`${e.usuario_id}:${e.id_curso}`));
+
+    if (!pendientes.length) {
+      log.innerHTML = '✅ No hay certificados faltantes.';
+      btn.disabled = false;
+      return;
+    }
+
+    // 7. Datos de cursos
+    const cursoIds = [...new Set(pendientes.map(e => e.id_curso))];
+    const { data: cursosList } = await supabase.from('cursos').select('id, titulo, codigo_prefijo').in('id', cursoIds);
+    const cursoMap = {};
+    (cursosList || []).forEach(c => { cursoMap[c.id] = c; });
+
+    // 8. Token de sesión para llamar la edge function
+    const { data: sesion } = await supabase.auth.getSession();
+    const token = sesion.session?.access_token;
+    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
+
+    // 9. Procesar uno a uno
+    let ok = 0, fail = 0;
+    for (let i = 0; i < pendientes.length; i++) {
+      const e = pendientes[i];
+      const perfil = profileMap[e.usuario_id];
+      const curso  = cursoMap[e.id_curso];
+      log.textContent = `Procesando ${i + 1} de ${pendientes.length}...`;
+
+      if (!perfil || !curso) { fail++; continue; }
+
+      try {
+        const resp = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/enviar-certificado', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token || ANON_KEY}`,
+            'apikey': ANON_KEY,
+          },
+          body: JSON.stringify({
+            usuario_id:    perfil.id,
+            usuario_email: perfil.email || '',
+            nombres:       perfil.nombres || '',
+            apellidos:     perfil.apellidos || '',
+            dni:           perfil.documento_numero || '',
+            cargo:         cargoMap[perfil.cargo_id] || '',
+            empresa:       empresaAdminNombre || '',
+            id_curso:      curso.id,
+            curso_titulo:  curso.titulo,
+            curso_prefijo: curso.codigo_prefijo || 'CERT',
+            nota:          e.puntaje != null ? parseFloat(e.puntaje).toFixed(1) : '0.0',
+          }),
+        });
+        const result = await resp.json();
+        if (resp.ok && !result.error) ok++; else { fail++; console.warn('Cert fail:', result); }
+      } catch (err) { fail++; console.error('Cert error:', err); }
+    }
+
+    log.innerHTML = `✅ Completado: <strong>${ok} certificados generados</strong>${fail ? ` · ⚠️ ${fail} fallaron` : ''}.`;
+    toast(`Reproceso completo: ${ok} OK${fail ? `, ${fail} fallidos` : ''}`, ok > 0 && fail === 0 ? 'success' : 'warning', 6000);
+  } catch (err) {
+    log.innerHTML = `❌ Error: ${err.message}`;
+    toast('Error en reproceso: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+};
+
 // ═══════════════════════════════
 // 👥 Lista y edición de trabajadores
 // ═══════════════════════════════

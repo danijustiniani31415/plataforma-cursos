@@ -786,6 +786,11 @@ window.enviarFormulario = async function (tipoPaso) {
       await otorgarBadgePrimerIntento(usuarioActual.id);
     }
     await verificarBadges(usuarioActual.id);
+    // Auto-registrar certificado en BD al aprobar evaluación (edge function maneja duplicados)
+    if (tipoPaso === 'examen' || tipoPaso === 'eficacia') {
+      try { await generarCertificadoPDF(cursoSeleccionado, notaSobre20); }
+      catch (e) { console.error('Auto-cert:', e); }
+    }
   }
 
   await mostrarPasoActual();

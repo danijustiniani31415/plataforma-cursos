@@ -1310,60 +1310,53 @@ window.reprocesarCertificadosPendientes = async function () {
   log.textContent = 'Analizando datos...';
 
   try {
-    // 1. IDs de formularios tipo 'examen' únicamente (replica SQL: f.tipo = 'examen')
-    const { data: examForms, error: efErr } = await supabase
+    // 1. IDs de formularios tipo 'examen'
+    const { data: forms, error: fErr } = await supabase
       .from('formularios').select('id').eq('tipo', 'examen');
-    if (efErr) throw efErr;
-    const examFormIds = new Set((examForms || []).map(f => f.id));
-    if (!examFormIds.size) { log.textContent = 'No hay formularios de examen configurados.'; btn.disabled = false; return; }
+    if (fErr) throw fErr;
+    const formIds = (forms || []).map(f => f.id);
+    if (!formIds.length) { log.textContent = 'No hay formularios de examen configurados.'; btn.disabled = false; return; }
 
-    // 2. Perfiles de la empresa — workers usan campo texto `empresa`, no FK empresa_id
-    const { data: profs, error: pErr } = await supabase
-      .from('profiles')
-      .select('id, email, nombres, apellidos, documento_numero, cargo_id')
-      .eq('empresa', empresaAdminNombre);
-    if (pErr) throw pErr;
-    if (!profs?.length) { log.textContent = `No hay trabajadores con empresa="${empresaAdminNombre}".`; btn.disabled = false; return; }
-
-    const profileMap = {};
-    profs.forEach(p => { profileMap[p.id] = p; });
-    const profileEmails = profs.map(p => p.email).filter(Boolean);
-
-    // 3. Cargos (nombre del cargo vía cargo_id)
-    const cargoIds = [...new Set(profs.map(p => p.cargo_id).filter(Boolean))];
-    const cargoMap = {};
-    if (cargoIds.length) {
-      const { data: cargosList } = await supabase.from('cargos').select('id, nombre').in('id', cargoIds);
-      (cargosList || []).forEach(c => { cargoMap[c.id] = c.nombre; });
-    }
-
-    // 4. Envíos aprobados — SIN filtro de estado (replica SQL: solo ef.aprobado = true)
+    // 2. Todos los envíos aprobados de esos formularios (sin filtro de empresa aún)
     log.textContent = 'Cargando envíos aprobados...';
-    const { data: envios } = await chunkedInQuery(profileEmails, 150, chunk =>
-      supabase.from('envios_formulario')
-        .select('usuario_id, id_formulario, id_curso, puntaje')
-        .in('usuario_email', chunk)
-        .eq('aprobado', true)
-    );
+    const { data: envios, error: eErr } = await supabase
+      .from('envios_formulario')
+      .select('usuario_id, id_curso, puntaje, usuario_email')
+      .eq('aprobado', true)
+      .in('id_formulario', formIds);
+    if (eErr) throw eErr;
 
-    // Filtrar solo tipo 'examen'; mejor puntaje por (usuario_id, id_curso)
+    // 3. Perfiles de la empresa del admin con cargo via JOIN
+    log.textContent = 'Cargando trabajadores de la empresa...';
+    const { data: trabajadores, error: tErr } = await supabase
+      .from('profiles')
+      .select('id, nombres, apellidos, documento_numero, documento_tipo, email, empresa, cargos(nombre)')
+      .eq('empresa', empresaAdminNombre);
+    if (tErr) throw tErr;
+    if (!trabajadores?.length) { log.textContent = `No hay trabajadores con empresa="${empresaAdminNombre}".`; btn.disabled = false; return; }
+
+    const trabajadorMap = {};
+    const idsEmpresa = new Set();
+    trabajadores.forEach(t => { trabajadorMap[t.id] = t; idsEmpresa.add(t.id); });
+
+    // 4. Filtrar envíos de esta empresa y deduplicar por (usuario_id, id_curso) mejor puntaje
     const envioMap = {};
     (envios || [])
-      .filter(e => examFormIds.has(e.id_formulario))
+      .filter(e => idsEmpresa.has(e.usuario_id))
       .forEach(e => {
         const k = `${e.usuario_id}:${e.id_curso}`;
         if (!envioMap[k] || (e.puntaje ?? 0) > (envioMap[k].puntaje ?? 0)) envioMap[k] = e;
       });
 
-    // 5. Certificados ya existentes para esta empresa
+    // 5. Certificados ya existentes para la empresa
     const { data: certs } = await supabase
       .from('certificados').select('usuario_id, curso_id').eq('empresa', empresaAdminNombre);
     const certSet = new Set((certs || []).map(c => `${c.usuario_id}:${c.curso_id}`));
 
-    // 6. Pendientes = aprobados SIN certificado (replica SQL: NOT EXISTS en certificados)
+    // 6. Faltantes = aprobados sin certificado
     const pendientes = Object.values(envioMap).filter(e => !certSet.has(`${e.usuario_id}:${e.id_curso}`));
 
-    console.log(`[Reproceso] envios aprobados tipo examen: ${Object.keys(envioMap).length} | certs existentes: ${certSet.size} | faltantes: ${pendientes.length}`);
+    console.log(`[Reproceso] trabajadores: ${trabajadores.length} | envios empresa: ${Object.keys(envioMap).length} | certs existentes: ${certSet.size} | faltantes: ${pendientes.length}`);
 
     if (!pendientes.length) {
       log.innerHTML = '✅ No hay certificados faltantes.';
@@ -1394,9 +1387,9 @@ window.reprocesarCertificadosPendientes = async function () {
       log.textContent = `Procesando ${procesados} de ${pendientes.length}...`;
 
       await Promise.all(lote.map(async e => {
-        const perfil = profileMap[e.usuario_id];
-        const curso  = cursoMap[e.id_curso];
-        if (!perfil || !curso) { fail++; return; }
+        const t     = trabajadorMap[e.usuario_id];
+        const curso = cursoMap[e.id_curso];
+        if (!t || !curso) { fail++; return; }
         try {
           const resp = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/enviar-certificado', {
             method: 'POST',
@@ -1406,13 +1399,13 @@ window.reprocesarCertificadosPendientes = async function () {
               'apikey':        ANON_KEY,
             },
             body: JSON.stringify({
-              usuario_id:    perfil.id,
-              usuario_email: perfil.email || '',
-              nombres:       perfil.nombres || '',
-              apellidos:     perfil.apellidos || '',
-              dni:           perfil.documento_numero || '',
-              cargo:         cargoMap[perfil.cargo_id] || '',
-              empresa:       empresaAdminNombre || '',
+              usuario_id:    t.id,
+              usuario_email: t.email || '',
+              nombres:       t.nombres || '',
+              apellidos:     t.apellidos || '',
+              dni:           t.documento_numero || '',
+              cargo:         t.cargos?.nombre || '',
+              empresa:       t.empresa || empresaAdminNombre || '',
               id_curso:      curso.id,
               curso_titulo:  curso.titulo,
               curso_prefijo: curso.codigo_prefijo || 'CERT',
@@ -1421,10 +1414,10 @@ window.reprocesarCertificadosPendientes = async function () {
           });
           const result = await resp.json();
           if (resp.ok && !result.error) ok++;
-          else { fail++; console.warn('Cert fail:', result.error, perfil.email, curso.titulo); }
+          else { fail++; console.warn('Cert fail:', result.error, t.email, curso.titulo); }
         } catch (err) {
           fail++;
-          console.error('Cert error:', perfil.email, err.message);
+          console.error('Cert error:', t.email, err.message);
         }
       }));
 

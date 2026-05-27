@@ -702,21 +702,100 @@
   <!-- ═══ TAB: REPORTE ═══ -->
   <div id="tab-reporte" class="tab-panel">
     <div class="panel-card">
-      <h2>📊 Descargar reporte de notas</h2>
-      <p style="color:#666; font-size:0.88rem; margin-bottom:16px;">
-        Selecciona el mes y año para descargar el reporte en Excel de todos los trabajadores de tu empresa.
+      <h2>📊 Registro de Notas</h2>
+      <p style="color:var(--text-secondary); font-size:0.88rem; margin-bottom:20px;">
+        Filtra por período, curso y estado para visualizar y descargar el registro de evaluaciones de tu empresa.
       </p>
-      <div class="reporte-selects">
-        <select id="filtro-mes">
-          <option value="1">Enero</option><option value="2">Febrero</option>
-          <option value="3">Marzo</option><option value="4">Abril</option>
-          <option value="5">Mayo</option><option value="6">Junio</option>
-          <option value="7">Julio</option><option value="8">Agosto</option>
-          <option value="9">Septiembre</option><option value="10">Octubre</option>
-          <option value="11">Noviembre</option><option value="12">Diciembre</option>
-        </select>
-        <select id="filtro-anio"></select>
-        <button onclick="descargarReporteExcel()" class="btn-primary">⬇️ Descargar Excel</button>
+
+      <!-- Filtros -->
+      <div class="rn-filtros">
+        <div class="rn-filtro-grupo">
+          <label>Mes</label>
+          <select id="filtro-mes">
+            <option value="1">Enero</option><option value="2">Febrero</option>
+            <option value="3">Marzo</option><option value="4">Abril</option>
+            <option value="5">Mayo</option><option value="6">Junio</option>
+            <option value="7">Julio</option><option value="8">Agosto</option>
+            <option value="9">Septiembre</option><option value="10">Octubre</option>
+            <option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+        </div>
+        <div class="rn-filtro-grupo">
+          <label>Año</label>
+          <select id="filtro-anio"></select>
+        </div>
+        <div class="rn-filtro-grupo" style="flex:2 1 180px;">
+          <label>Curso</label>
+          <select id="filtro-curso"><option value="">Todos los cursos</option></select>
+        </div>
+        <div class="rn-filtro-grupo">
+          <label>Estado</label>
+          <select id="filtro-estado">
+            <option value="">Todos</option>
+            <option value="aprobado">Aprobado</option>
+            <option value="desaprobado">Desaprobado</option>
+            <option value="encuesta">Solo encuestas</option>
+          </select>
+        </div>
+        <div class="rn-filtro-accion">
+          <button id="btn-generar-reporte" onclick="generarReporteNotas()" class="btn-primary">
+            🔍 Generar reporte
+          </button>
+        </div>
+      </div>
+
+      <!-- KPIs (ocultos hasta generar) -->
+      <div id="rn-kpis" class="rn-kpis" style="display:none;">
+        <div class="rn-kpi">
+          <span class="rn-kpi-num" id="kpi-total">0</span>
+          <span class="rn-kpi-label">Total registros</span>
+        </div>
+        <div class="rn-kpi ok">
+          <span class="rn-kpi-num" id="kpi-aprobados">0</span>
+          <span class="rn-kpi-label">Aprobados</span>
+        </div>
+        <div class="rn-kpi mal">
+          <span class="rn-kpi-num" id="kpi-desaprobados">0</span>
+          <span class="rn-kpi-label">Desaprobados</span>
+        </div>
+        <div class="rn-kpi enc">
+          <span class="rn-kpi-num" id="kpi-encuestas">0</span>
+          <span class="rn-kpi-label">Encuestas</span>
+        </div>
+        <div class="rn-kpi avg">
+          <span class="rn-kpi-num" id="kpi-promedio">—</span>
+          <span class="rn-kpi-label">Nota promedio</span>
+        </div>
+      </div>
+
+      <!-- Tabla de resultados (oculta hasta generar) -->
+      <div id="rn-tabla-wrap" style="display:none;">
+        <div class="rn-tabla-header">
+          <span class="rn-subtitulo" id="rn-subtitulo"></span>
+          <button id="btn-descargar-reporte" onclick="descargarReporteExcel()" class="btn-primary" disabled>
+            ⬇️ Descargar Excel
+          </button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="rn-tabla">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Apellidos</th>
+                <th>Nombres</th>
+                <th>DNI</th>
+                <th>Cargo</th>
+                <th>Curso</th>
+                <th>Evaluación</th>
+                <th style="text-align:center;">Nota</th>
+                <th style="text-align:center;">%</th>
+                <th>Estado</th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody id="rn-tbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -1366,6 +1445,9 @@
     }
     if (tab === 'qr-asistencia') {
       initQRAsistencia();
+    }
+    if (tab === 'reporte') {
+      initReporteNotas();
     }
   }
 </script>

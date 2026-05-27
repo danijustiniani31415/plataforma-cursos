@@ -1079,89 +1079,194 @@ window.verAsignadosMes = async function () {
     </div>`;
 };
 
-window.descargarReporteExcel = async function () {
-  const mes  = parseInt(document.getElementById('filtro-mes').value);
-  const anio = parseInt(document.getElementById('filtro-anio').value);
+// ─── Caché de filas para el Excel (se llena en generarReporteNotas) ───
+let _reporteFilas = [];
 
-  // Rango en hora Perú (UTC-5)
+async function initReporteNotas() {
+  const sel = document.getElementById('filtro-curso');
+  if (!sel || sel.dataset.loaded) return;
+  const { data: cursos } = await supabase
+    .from('cursos')
+    .select('id, titulo')
+    .eq('activo', true)
+    .order('titulo');
+  cursos?.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.titulo;
+    sel.appendChild(opt);
+  });
+  sel.dataset.loaded = 'true';
+}
+
+window.generarReporteNotas = async function () {
+  const btn   = document.getElementById('btn-generar-reporte');
+  const tbody = document.getElementById('rn-tbody');
+  const wrap  = document.getElementById('rn-tabla-wrap');
+  const kpis  = document.getElementById('rn-kpis');
+  const btnDL = document.getElementById('btn-descargar-reporte');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Cargando...';
+  _reporteFilas = [];
+  wrap.style.display = 'none';
+  kpis.style.display = 'none';
+
+  const mes     = parseInt(document.getElementById('filtro-mes').value);
+  const anio    = parseInt(document.getElementById('filtro-anio').value);
+  const cursoId = document.getElementById('filtro-curso').value || null;
+  const estado  = document.getElementById('filtro-estado').value || null;
+
   const desde = new Date(Date.UTC(anio, mes - 1, 1, 5, 0, 0)).toISOString();
   const hasta = new Date(Date.UTC(anio, mes,     1, 5, 0, 0)).toISOString();
 
-  // 1. Perfiles de la empresa
-  const { data: perfiles, error: errPerfiles } = await supabase
-    .from('profiles')
-    .select('email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
-    .eq('empresa_id', empresaAdminId);
-
-  if (errPerfiles) { alert('❌ Error al cargar perfiles: ' + errPerfiles.message); return; }
-  if (!perfiles || perfiles.length === 0) { alert('No hay trabajadores en tu empresa.'); return; }
-
-  const perfilMap = {};
-  perfiles.forEach(p => { if (p.email) perfilMap[p.email] = p; });
-  // Filtrar emails null/vacios: si van en el .in() PostgREST responde 400.
-  const emails = perfiles.map(p => p.email).filter(Boolean);
-  if (emails.length === 0) { alert('No hay trabajadores con email registrado en tu empresa.'); return; }
-
-  // 2. Formularios y cursos (sin joins)
-  const [{ data: todosFormularios }, { data: todosCursos }] = await Promise.all([
-    supabase.from('formularios').select('id, tipo'),
-    supabase.from('cursos').select('id, titulo')
-  ]);
-  const tipoFormMap  = {};
-  todosFormularios?.forEach(f => { tipoFormMap[f.id]  = f.tipo; });
-  const cursoTitMap  = {};
-  todosCursos?.forEach(c => { cursoTitMap[c.id] = c.titulo; });
-
-  // 3. Envíos del período (chunked: con muchos emails la URL excederia el limite)
-  const { data: envios, error } = await chunkedInQuery(emails, 150, chunk =>
-    supabase
-      .from('envios_formulario')
-      .select('usuario_email, id_formulario, id_curso, puntaje, porcentaje, aprobado, created_at')
-      .in('usuario_email', chunk)
-      .eq('estado', 'completado')
-      .gte('created_at', desde)
-      .lt('created_at', hasta)
-  );
-  envios?.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-
-  if (error) { alert('❌ Error: ' + error.message); return; }
-  if (!envios || envios.length === 0) { alert('No hay registros de tu empresa para ese mes.'); return; }
-
   const mesesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                        'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const tipoLabel   = { encuesta: 'Encuesta', examen: 'Examen', eficacia: 'Evaluación de la eficacia' };
 
-  const tipoLabel = { encuesta: 'Encuesta', examen: 'Examen', eficacia: 'Evaluación de la eficacia' };
+  try {
+    // 1. Perfiles de la empresa
+    const { data: perfiles, error: errP } = await supabase
+      .from('profiles')
+      .select('email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
+      .eq('empresa_id', empresaAdminId);
+    if (errP) throw errP;
+    if (!perfiles?.length) { toast('No hay trabajadores en tu empresa.', 'warning'); return; }
 
-  const filas = [
-    ['Apellidos', 'Nombres', 'Documento', 'Tipo Doc', 'Cargo', 'Empresa', 'Curso', 'Tipo Evaluación', 'Nota (/20)', 'Porcentaje', 'Estado', 'Fecha']
-  ];
+    const perfilMap = {};
+    perfiles.forEach(p => { if (p.email) perfilMap[p.email] = p; });
+    const emails = perfiles.map(p => p.email).filter(Boolean);
+    if (!emails.length) { toast('No hay trabajadores con email registrado.', 'warning'); return; }
 
-  envios.forEach(r => {
-    const p = perfilMap[r.usuario_email];
-    const tipo = tipoFormMap[r.id_formulario] || '';
-    const esEncuesta = tipo === 'encuesta';
-    filas.push([
-      p?.apellidos || '',
-      p?.nombres || '',
-      p?.documento_numero || r.usuario_email,
-      p?.documento_tipo || '',
-      p?.cargo || '',
-      p?.empresa || '',
-      cursoTitMap[r.id_curso] || '',
-      tipoLabel[tipo] || tipo,
-      esEncuesta ? '—' : (r.puntaje ?? '—'),
-      esEncuesta ? '—' : (r.porcentaje != null ? r.porcentaje.toFixed(1) + '%' : '—'),
-      esEncuesta ? 'Completada' : (r.aprobado ? 'Aprobado' : 'Desaprobado'),
-      new Date(r.created_at).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })
+    // 2. Formularios y cursos
+    const [{ data: todosFormularios }, { data: todosCursos }] = await Promise.all([
+      supabase.from('formularios').select('id, tipo'),
+      supabase.from('cursos').select('id, titulo')
     ]);
-  });
+    const tipoFormMap = {};
+    todosFormularios?.forEach(f => { tipoFormMap[f.id] = f.tipo; });
+    const cursoTitMap = {};
+    todosCursos?.forEach(c => { cursoTitMap[c.id] = c.titulo; });
 
+    // 3. Envíos del período (chunked para evitar URL larga)
+    let { data: envios, error: errE } = await chunkedInQuery(emails, 150, chunk => {
+      let q = supabase
+        .from('envios_formulario')
+        .select('usuario_email, id_formulario, id_curso, puntaje, porcentaje, aprobado, created_at')
+        .in('usuario_email', chunk)
+        .eq('estado', 'completado')
+        .gte('created_at', desde)
+        .lt('created_at', hasta);
+      if (cursoId) q = q.eq('id_curso', cursoId);
+      return q;
+    });
+    if (errE) throw errE;
+    envios = (envios || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    // 4. Filtro de estado (client-side, depende del tipo de formulario)
+    if (estado === 'aprobado')    envios = envios.filter(r => tipoFormMap[r.id_formulario] !== 'encuesta' && r.aprobado);
+    if (estado === 'desaprobado') envios = envios.filter(r => tipoFormMap[r.id_formulario] !== 'encuesta' && !r.aprobado);
+    if (estado === 'encuesta')    envios = envios.filter(r => tipoFormMap[r.id_formulario] === 'encuesta');
+
+    // 5. KPIs
+    const nAprobados    = envios.filter(r => tipoFormMap[r.id_formulario] !== 'encuesta' && r.aprobado).length;
+    const nDesaprobados = envios.filter(r => tipoFormMap[r.id_formulario] !== 'encuesta' && !r.aprobado).length;
+    const nEncuestas    = envios.filter(r => tipoFormMap[r.id_formulario] === 'encuesta').length;
+    const notasArr      = envios.filter(r => tipoFormMap[r.id_formulario] !== 'encuesta' && r.puntaje != null).map(r => r.puntaje);
+    const promedio      = notasArr.length ? (notasArr.reduce((a, b) => a + b, 0) / notasArr.length).toFixed(1) : '—';
+
+    document.getElementById('kpi-total').textContent       = envios.length;
+    document.getElementById('kpi-aprobados').textContent   = nAprobados;
+    document.getElementById('kpi-desaprobados').textContent = nDesaprobados;
+    document.getElementById('kpi-encuestas').textContent   = nEncuestas;
+    document.getElementById('kpi-promedio').textContent    = promedio;
+    kpis.style.display = 'flex';
+
+    // 6. Tabla HTML + caché Excel
+    _reporteFilas = [
+      ['Apellidos','Nombres','DNI','Tipo Doc','Cargo','Empresa','Curso','Evaluación','Nota (/20)','Porcentaje','Estado','Fecha']
+    ];
+
+    tbody.innerHTML = '';
+
+    if (!envios.length) {
+      tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--text-muted);">Sin resultados para los filtros seleccionados.</td></tr>';
+      document.getElementById('rn-subtitulo').textContent = '0 registros encontrados';
+      btnDL.disabled = true;
+      wrap.style.display = 'block';
+      return;
+    }
+
+    envios.forEach((r, i) => {
+      const p     = perfilMap[r.usuario_email] || {};
+      const tipo  = tipoFormMap[r.id_formulario] || '';
+      const esEnc = tipo === 'encuesta';
+      const nota  = esEnc ? '—' : (r.puntaje ?? '—');
+      const porc  = esEnc ? '—' : (r.porcentaje != null ? r.porcentaje.toFixed(1) + '%' : '—');
+      const fecha = new Date(r.created_at).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+      let estadoTxt, badgeClass;
+      if (esEnc)        { estadoTxt = 'Completada';  badgeClass = 'badge-enc'; }
+      else if (r.aprobado) { estadoTxt = 'Aprobado'; badgeClass = 'badge-ok';  }
+      else               { estadoTxt = 'Desaprobado'; badgeClass = 'badge-mal'; }
+
+      _reporteFilas.push([
+        p.apellidos || '', p.nombres || '',
+        p.documento_numero || r.usuario_email, p.documento_tipo || '',
+        p.cargo || '', p.empresa || '',
+        cursoTitMap[r.id_curso] || '', tipoLabel[tipo] || tipo,
+        nota, porc, estadoTxt, fecha
+      ]);
+
+      tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td style="color:var(--text-muted);font-size:0.78rem;">${i + 1}</td>
+          <td><strong>${p.apellidos || ''}</strong></td>
+          <td>${p.nombres || ''}</td>
+          <td style="font-family:monospace;">${p.documento_numero || '<span style="color:var(--text-muted);font-size:0.78rem;">' + r.usuario_email + '</span>'}</td>
+          <td style="color:var(--text-secondary);">${p.cargo || ''}</td>
+          <td>${cursoTitMap[r.id_curso] || ''}</td>
+          <td style="color:var(--text-muted);font-size:0.82rem;">${tipoLabel[tipo] || tipo}</td>
+          <td style="text-align:center;font-weight:700;">${nota}</td>
+          <td style="text-align:center;color:var(--text-secondary);">${porc}</td>
+          <td><span class="${badgeClass}">${estadoTxt}</span></td>
+          <td style="color:var(--text-muted);font-size:0.8rem;white-space:nowrap;">${fecha}</td>
+        </tr>`);
+    });
+
+    const selCurso = document.getElementById('filtro-curso');
+    const cursoNombre = cursoId ? (selCurso.options[selCurso.selectedIndex]?.text || '') : 'Todos los cursos';
+    document.getElementById('rn-subtitulo').textContent =
+      `${envios.length} registro${envios.length !== 1 ? 's' : ''} · ${mesesNombre[mes - 1]} ${anio} · ${cursoNombre}`;
+    btnDL.disabled = false;
+    wrap.style.display = 'block';
+
+  } catch (err) {
+    toast('Error al generar reporte: ' + (err.message || err), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔍 Generar reporte';
+  }
+};
+
+window.descargarReporteExcel = function () {
+  if (!_reporteFilas.length) { toast('Primero genera el reporte.', 'warning'); return; }
+  const mes  = parseInt(document.getElementById('filtro-mes').value);
+  const anio = parseInt(document.getElementById('filtro-anio').value);
+  const mesesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                       'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const XLSX = window.XLSX;
-  const ws = XLSX.utils.aoa_to_sheet(filas);
-  ws['!cols'] = [20,20,15,10,20,20,30,16,10,12,12,12].map(w => ({ wch: w }));
+  const ws = XLSX.utils.aoa_to_sheet(_reporteFilas);
+  // Estilos de cabecera
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let C = range.s.c; C <= range.e.c; C++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+    if (!ws[addr]) continue;
+    ws[addr].s = { font: { bold: true }, fill: { fgColor: { rgb: '002855' } }, alignment: { horizontal: 'center' } };
+  }
+  ws['!cols'] = [20,20,15,10,20,20,32,14,10,12,14,14].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Resultados');
-  XLSX.writeFile(wb, `Reporte_Capacitaciones_${mesesNombre[mes-1]}_${anio}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, 'Registro de Notas');
+  XLSX.writeFile(wb, `Registro_Notas_${mesesNombre[mes - 1]}_${anio}.xlsx`);
 };
 
 // ═══════════════════════════════

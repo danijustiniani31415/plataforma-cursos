@@ -1507,3 +1507,134 @@ body {
   font-weight: 600;
   font-size: 0.85rem;
 }
+
+/* ══════════════════════════════════════════
+   REGISTRO DE NOTAS — Filtros + KPIs + Tabla
+══════════════════════════════════════════ */
+.rn-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 22px;
+}
+.rn-filtro-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1 1 130px;
+}
+.rn-filtro-grupo label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.rn-filtro-grupo select {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  background: var(--white);
+  color: var(--text-primary);
+  transition: border-color var(--transition);
+}
+.rn-filtro-grupo select:focus {
+  outline: none;
+  border-color: var(--navy);
+}
+.rn-filtro-accion {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* KPI cards */
+.rn-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.rn-kpi {
+  flex: 1 1 110px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 14px 12px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition);
+}
+.rn-kpi:hover { box-shadow: var(--shadow-md); }
+.rn-kpi-num {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 5px;
+  color: var(--navy);
+}
+.rn-kpi-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+.rn-kpi.ok  .rn-kpi-num { color: var(--success); }
+.rn-kpi.mal .rn-kpi-num { color: var(--danger); }
+.rn-kpi.enc .rn-kpi-num { color: #0284c7; }
+.rn-kpi.avg .rn-kpi-num { color: var(--gold); }
+
+/* Cabecera antes de la tabla */
+.rn-tabla-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.rn-subtitulo {
+  font-weight: 600;
+  color: var(--navy);
+  font-size: 0.95rem;
+}
+
+/* Tabla de resultados */
+.rn-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+.rn-tabla th {
+  background: var(--navy);
+  color: #fff;
+  padding: 10px 13px;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.rn-tabla th:first-child { border-radius: 0; }
+.rn-tabla td {
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--surface-2);
+  vertical-align: middle;
+}
+.rn-tabla tbody tr:hover { background: #f0f4f9; }
+.rn-tabla tbody tr:nth-child(even) { background: #fafbfc; }
+.rn-tabla tbody tr:nth-child(even):hover { background: #edf2f8; }
+
+/* Badges de estado */
+.badge-ok  { background:#dcfce7; color:#15803d; padding:3px 9px; border-radius:20px; font-size:0.75rem; font-weight:700; white-space:nowrap; }
+.badge-mal { background:#fee2e2; color:#dc2626; padding:3px 9px; border-radius:20px; font-size:0.75rem; font-weight:700; white-space:nowrap; }
+.badge-enc { background:#e0f2fe; color:#0369a1; padding:3px 9px; border-radius:20px; font-size:0.75rem; font-weight:700; white-space:nowrap; }

@@ -1348,11 +1348,19 @@ window.reprocesarCertificadosPendientes = async function () {
         if (!envioMap[k] || (e.puntaje ?? 0) > (envioMap[k].puntaje ?? 0)) envioMap[k] = e;
       });
 
-    // 5. Certificados ya existentes para trabajadores de esta empresa (chunked para evitar URL larga)
-    const { data: certs } = await chunkedInQuery([...idsEmpresa], 100, chunk =>
-      supabase.from('certificados').select('usuario_id, curso_id').in('usuario_id', chunk)
-    );
-    const certSet = new Set((certs || []).map(c => `${c.usuario_id}:${c.curso_id}`));
+    // 5. Certificados existentes — paginación para superar límite 1000 de PostgREST
+    const allCerts = [];
+    let page = 0;
+    while (true) {
+      const { data: pageData } = await supabase
+        .from('certificados')
+        .select('usuario_id, curso_id')
+        .range(page * 1000, (page + 1) * 1000 - 1);
+      if (!pageData?.length) break;
+      allCerts.push(...pageData);
+      page++;
+    }
+    const certSet = new Set(allCerts.map(c => `${c.usuario_id}:${c.curso_id}`));
 
     // 6. Faltantes = aprobados sin certificado
     const pendientes = Object.values(envioMap).filter(e => !certSet.has(`${e.usuario_id}:${e.id_curso}`));

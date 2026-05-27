@@ -1348,9 +1348,10 @@ window.reprocesarCertificadosPendientes = async function () {
         if (!envioMap[k] || (e.puntaje ?? 0) > (envioMap[k].puntaje ?? 0)) envioMap[k] = e;
       });
 
-    // 5. Certificados ya existentes para la empresa
-    const { data: certs } = await supabase
-      .from('certificados').select('usuario_id, curso_id').limit(10000);
+    // 5. Certificados ya existentes para trabajadores de esta empresa (chunked para evitar URL larga)
+    const { data: certs } = await chunkedInQuery([...idsEmpresa], 100, chunk =>
+      supabase.from('certificados').select('usuario_id, curso_id').in('usuario_id', chunk)
+    );
     const certSet = new Set((certs || []).map(c => `${c.usuario_id}:${c.curso_id}`));
 
     // 6. Faltantes = aprobados sin certificado

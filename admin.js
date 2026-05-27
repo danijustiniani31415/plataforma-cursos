@@ -1117,6 +1117,7 @@ async function initReporteNotas() {
   });
   sel.dataset.loaded = 'true';
 }
+window.initReporteNotas = initReporteNotas;
 
 window.generarReporteNotas = async function () {
   const btn  = document.getElementById('rn-btn-generar');
@@ -1143,9 +1144,9 @@ window.generarReporteNotas = async function () {
     let q = supabase
       .from('certificados')
       .select('dni, nombres, apellidos, cargo, empresa, curso_id, nota, codigo, created_at, cursos(titulo)')
-      .gte('created_at', desde)
-      .lt('created_at', hasta)
-      .order('created_at', { ascending: false });
+      .gte('fecha', desde)
+      .lt('fecha', hasta)
+      .order('fecha', { ascending: false });
 
     if (empresaAdminNombre) q = q.eq('empresa', empresaAdminNombre);
     if (cursoId) q = q.eq('curso_id', cursoId);

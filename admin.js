@@ -1316,24 +1316,42 @@ window.reprocesarCertificadosPendientes = async function () {
     if (fErr) throw fErr;
     const formIds = (forms || []).map(f => f.id);
     if (!formIds.length) { log.textContent = 'No hay formularios de examen configurados.'; btn.disabled = false; return; }
+    console.log('[Reproceso] formIds:', formIds.length, formIds);
 
-    // 2. Todos los envíos aprobados de esos formularios (sin filtro de empresa aún)
+    // 2. Todos los envíos aprobados de esos formularios — paginado
     log.textContent = 'Cargando envíos aprobados...';
-    const { data: envios, error: eErr } = await supabase
-      .from('envios_formulario')
-      .select('usuario_id, id_curso, puntaje, usuario_email')
-      .eq('aprobado', true)
-      .in('id_formulario', formIds);
-    if (eErr) throw eErr;
+    const allEnvios = [];
+    let pageE = 0;
+    while (true) {
+      const { data: envPage, error: eErr } = await supabase
+        .from('envios_formulario')
+        .select('usuario_id, id_curso, puntaje, usuario_email')
+        .eq('aprobado', true)
+        .in('id_formulario', formIds)
+        .range(pageE * 1000, (pageE + 1) * 1000 - 1);
+      if (eErr) throw eErr;
+      if (!envPage?.length) break;
+      allEnvios.push(...envPage);
+      pageE++;
+    }
 
-    // 3. Perfiles de la empresa del admin con cargo via JOIN
+    // 3. Perfiles de la empresa del admin con cargo via JOIN — paginado
     log.textContent = 'Cargando trabajadores de la empresa...';
-    const { data: trabajadores, error: tErr } = await supabase
-      .from('profiles')
-      .select('id, nombres, apellidos, documento_numero, documento_tipo, email, empresa, cargos(nombre)')
-      .eq('empresa', empresaAdminNombre);
-    if (tErr) throw tErr;
-    if (!trabajadores?.length) { log.textContent = `No hay trabajadores con empresa="${empresaAdminNombre}".`; btn.disabled = false; return; }
+    const allTrabajadores = [];
+    let pageT = 0;
+    while (true) {
+      const { data: tPage, error: tErr } = await supabase
+        .from('profiles')
+        .select('id, nombres, apellidos, documento_numero, documento_tipo, email, empresa, cargos(nombre)')
+        .eq('empresa', empresaAdminNombre)
+        .range(pageT * 1000, (pageT + 1) * 1000 - 1);
+      if (tErr) throw tErr;
+      if (!tPage?.length) break;
+      allTrabajadores.push(...tPage);
+      pageT++;
+    }
+    const trabajadores = allTrabajadores;
+    if (!trabajadores.length) { log.textContent = `No hay trabajadores con empresa="${empresaAdminNombre}".`; btn.disabled = false; return; }
 
     const trabajadorMap = {};
     const idsEmpresa = new Set();
@@ -1341,7 +1359,7 @@ window.reprocesarCertificadosPendientes = async function () {
 
     // 4. Filtrar envíos de esta empresa y deduplicar por (usuario_id, id_curso) mejor puntaje
     const envioMap = {};
-    (envios || [])
+    allEnvios
       .filter(e => idsEmpresa.has(e.usuario_id))
       .forEach(e => {
         const k = `${e.usuario_id}:${e.id_curso}`;
@@ -1365,7 +1383,7 @@ window.reprocesarCertificadosPendientes = async function () {
     // 6. Faltantes = aprobados sin certificado
     const pendientes = Object.values(envioMap).filter(e => !certSet.has(`${e.usuario_id}:${e.id_curso}`));
 
-    console.log(`[Reproceso] trabajadores: ${trabajadores.length} | envios empresa: ${Object.keys(envioMap).length} | certs existentes: ${certSet.size} | faltantes: ${pendientes.length}`);
+    console.log(`[Reproceso] trabajadores: ${trabajadores.length} | envios total: ${allEnvios.length} | envios empresa: ${Object.keys(envioMap).length} | certs existentes: ${certSet.size} | faltantes: ${pendientes.length}`);
 
     if (!pendientes.length) {
       log.innerHTML = '✅ No hay certificados faltantes.';

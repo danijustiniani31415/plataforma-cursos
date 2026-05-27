@@ -1135,14 +1135,19 @@ window.generarReporteNotas = async function () {
   wrap.style.display  = 'none';
   document.getElementById('rn-busqueda').value = '';
 
-  const mes     = parseInt(document.getElementById('filtro-mes').value);
+  const mesVal  = document.getElementById('filtro-mes').value;
+  const mes     = mesVal ? parseInt(mesVal) : null;
   const anio    = parseInt(document.getElementById('filtro-anio').value);
   const cursoId = document.getElementById('rn-curso').value   || null;
   const estado  = document.getElementById('rn-estado').value  || null;
 
   // Rango en hora Perú (UTC-5)
-  const desde = new Date(Date.UTC(anio, mes - 1, 1, 5, 0, 0)).toISOString();
-  const hasta = new Date(Date.UTC(anio, mes,     1, 5, 0, 0)).toISOString();
+  const desde = mes
+    ? new Date(Date.UTC(anio, mes - 1, 1, 5, 0, 0)).toISOString()
+    : new Date(Date.UTC(anio, 0, 1, 5, 0, 0)).toISOString();
+  const hasta = mes
+    ? new Date(Date.UTC(anio, mes, 1, 5, 0, 0)).toISOString()
+    : new Date(Date.UTC(anio + 1, 0, 1, 5, 0, 0)).toISOString();
 
   try {
     let q = supabase
@@ -1269,8 +1274,9 @@ window.rn_cambiarPagina = function (delta) {
 
 window.descargarReporteExcel = function () {
   if (!_rn_filtrados.length) { toast('Primero genera el reporte.', 'warning'); return; }
-  const mes  = parseInt(document.getElementById('filtro-mes').value);
-  const anio = parseInt(document.getElementById('filtro-anio').value);
+  const mesVal = document.getElementById('filtro-mes').value;
+  const mes    = mesVal ? parseInt(mesVal) : null;
+  const anio   = parseInt(document.getElementById('filtro-anio').value);
   const cab  = ['DNI','Apellidos','Nombres','Empresa','Cargo','Curso','Fecha','Nota','%','Estado','Código certificado'];
   const filas = _rn_filtrados.map(r => {
     const nota = Number(r.nota ?? 0);
@@ -1293,7 +1299,7 @@ window.descargarReporteExcel = function () {
   ws['!cols'] = [12,20,20,24,20,32,12,8,8,14,20].map(w => ({ wch: w }));
   const wb   = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Registro de Notas');
-  XLSX.writeFile(wb, `Registro_Notas_${RN_MESES[mes - 1]}_${anio}.xlsx`);
+  XLSX.writeFile(wb, mes ? `Registro_Notas_${RN_MESES[mes - 1]}_${anio}.xlsx` : `Registro_Notas_${anio}.xlsx`);
 };
 
 // ═══════════════════════════════

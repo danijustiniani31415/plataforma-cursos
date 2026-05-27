@@ -1227,8 +1227,8 @@ function rn_renderTabla() {
       const porcTxt  = r.nota != null ? (nota / 20 * 100).toFixed(0) + '%' : '—';
       const barW     = r.nota != null ? Math.min(100, nota / 20 * 100).toFixed(1) : 0;
       const color    = aprobado ? '#1D9E75' : '#A32D2D';
-      const fecha    = r.created_at
-        ? new Date(r.created_at).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
+      const fecha    = (r.fecha || r.created_at)
+        ? new Date(r.fecha || r.created_at).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
         : '—';
       const badge    = aprobado
         ? `<span class="rn2-badge rn2-badge-ap">${RN_SVG_CHECK} Aprobado</span>`
@@ -1289,8 +1289,8 @@ window.descargarReporteExcel = function () {
   const filas = _rn_filtrados.map(r => {
     const nota = Number(r.nota ?? 0);
     const ap   = nota >= NOTA_APROBATORIA;
-    const fecha = r.created_at
-      ? new Date(r.created_at).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
+    const fecha = (r.fecha || r.created_at)
+      ? new Date(r.fecha || r.created_at).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
       : '';
     return [
       r.dni || '', r.apellidos || '', r.nombres || '',

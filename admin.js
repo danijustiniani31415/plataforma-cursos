@@ -1317,13 +1317,13 @@ window.reprocesarCertificadosPendientes = async function () {
     const examFormIds = new Set((examForms || []).map(f => f.id));
     if (!examFormIds.size) { log.textContent = 'No hay formularios de examen configurados.'; btn.disabled = false; return; }
 
-    // 2. Perfiles de la empresa del admin (con cargo_id para JOIN posterior)
+    // 2. Perfiles de la empresa — workers usan campo texto `empresa`, no FK empresa_id
     const { data: profs, error: pErr } = await supabase
       .from('profiles')
       .select('id, email, nombres, apellidos, documento_numero, cargo_id')
-      .eq('empresa_id', empresaAdminId);
+      .eq('empresa', empresaAdminNombre);
     if (pErr) throw pErr;
-    if (!profs?.length) { log.textContent = 'No hay trabajadores en esta empresa.'; btn.disabled = false; return; }
+    if (!profs?.length) { log.textContent = `No hay trabajadores con empresa="${empresaAdminNombre}".`; btn.disabled = false; return; }
 
     const profileMap = {};
     profs.forEach(p => { profileMap[p.id] = p; });
@@ -1362,6 +1362,8 @@ window.reprocesarCertificadosPendientes = async function () {
 
     // 6. Pendientes = aprobados SIN certificado (replica SQL: NOT EXISTS en certificados)
     const pendientes = Object.values(envioMap).filter(e => !certSet.has(`${e.usuario_id}:${e.id_curso}`));
+
+    console.log(`[Reproceso] envios aprobados tipo examen: ${Object.keys(envioMap).length} | certs existentes: ${certSet.size} | faltantes: ${pendientes.length}`);
 
     if (!pendientes.length) {
       log.innerHTML = '✅ No hay certificados faltantes.';

@@ -1350,7 +1350,7 @@ window.reprocesarCertificadosPendientes = async function () {
 
     // 5. Certificados ya existentes para la empresa
     const { data: certs } = await supabase
-      .from('certificados').select('usuario_id, curso_id').eq('empresa', empresaAdminNombre);
+      .from('certificados').select('usuario_id, curso_id').limit(10000);
     const certSet = new Set((certs || []).map(c => `${c.usuario_id}:${c.curso_id}`));
 
     // 6. Faltantes = aprobados sin certificado

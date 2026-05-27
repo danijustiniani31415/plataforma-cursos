@@ -1378,7 +1378,8 @@ window.reprocesarCertificadosPendientes = async function () {
     const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
 
     // 9. Procesar en lotes de 10 con delay de 500ms entre lotes
-    let ok = 0, fail = 0;
+    let ok = 0;
+    const errores = [];
     const BATCH = 10;
 
     for (let i = 0; i < pendientes.length; i += BATCH) {
@@ -1389,7 +1390,7 @@ window.reprocesarCertificadosPendientes = async function () {
       await Promise.all(lote.map(async e => {
         const t     = trabajadorMap[e.usuario_id];
         const curso = cursoMap[e.id_curso];
-        if (!t || !curso) { fail++; return; }
+        if (!t || !curso) { errores.push({ nombre: e.usuario_id, curso: e.id_curso, msg: 'Datos no encontrados' }); return; }
         try {
           const resp = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/enviar-certificado', {
             method: 'POST',
@@ -1413,10 +1414,15 @@ window.reprocesarCertificadosPendientes = async function () {
             }),
           });
           const result = await resp.json();
-          if (resp.ok && !result.error) ok++;
-          else { fail++; console.warn('Cert fail:', result.error, t.email, curso.titulo); }
+          if (resp.ok && !result.error) {
+            ok++;
+          } else {
+            const msg = result.error || `HTTP ${resp.status}`;
+            errores.push({ nombre: `${t.apellidos} ${t.nombres}`.trim(), curso: curso.titulo, msg });
+            console.warn('Cert fail:', msg, t.email, curso.titulo);
+          }
         } catch (err) {
-          fail++;
+          errores.push({ nombre: `${t.apellidos} ${t.nombres}`.trim(), curso: curso.titulo, msg: err.message });
           console.error('Cert error:', t.email, err.message);
         }
       }));
@@ -1424,8 +1430,12 @@ window.reprocesarCertificadosPendientes = async function () {
       if (i + BATCH < pendientes.length) await new Promise(r => setTimeout(r, 500));
     }
 
-    log.innerHTML = `✅ <strong>${ok} generados</strong> · ${fail ? `❌ <strong>${fail} errores</strong>` : '0 errores'}.`;
-    toast(`Reproceso completo: ${ok} OK${fail ? `, ${fail} fallidos` : ''}`, ok > 0 && fail === 0 ? 'success' : 'warning', 6000);
+    const detalleErrores = errores.length
+      ? `<details style="margin-top:8px;"><summary style="cursor:pointer;color:#a32d2d;font-size:12px;">Ver ${errores.length} errores ▾</summary><ul style="margin:6px 0 0 14px;font-size:12px;line-height:1.6;">${errores.map(e => `<li><strong>${e.nombre}</strong> — ${e.curso}: ${e.msg}</li>`).join('')}</ul></details>`
+      : '';
+    const msgReintento = errores.length ? `<div style="margin-top:6px;color:#854f0b;font-size:12px;">🔄 Puedes volver a ejecutar para reintentar los errores.</div>` : '';
+    log.innerHTML = `✅ <strong>${ok} generados</strong> · ${errores.length ? `❌ <strong>${errores.length} errores</strong>` : '0 errores'}${detalleErrores}${msgReintento}`;
+    toast(`Reproceso completo: ${ok} OK${errores.length ? `, ${errores.length} fallidos` : ''}`, ok > 0 && !errores.length ? 'success' : 'warning', 6000);
   } catch (err) {
     log.innerHTML = `❌ Error: ${err.message}`;
     toast('Error en reproceso: ' + err.message, 'error');

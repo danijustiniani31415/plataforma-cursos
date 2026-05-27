@@ -1150,26 +1150,34 @@ window.generarReporteNotas = async function () {
     : new Date(Date.UTC(anio + 1, 0, 1, 5, 0, 0)).toISOString();
 
   try {
-    let q = supabase
-      .from('certificados')
-      .select('*')
-      .gte('fecha', desde)
-      .lt('fecha', hasta)
-      .order('fecha', { ascending: false });
+    const allData = [];
+    let pageR = 0;
+    while (true) {
+      let q = supabase
+        .from('certificados')
+        .select('*')
+        .gte('fecha', desde)
+        .lt('fecha', hasta)
+        .order('fecha', { ascending: false })
+        .range(pageR * 1000, (pageR + 1) * 1000 - 1);
 
-    if (empresaAdminNombre) q = q.eq('empresa', empresaAdminNombre);
-    if (cursoId) q = q.eq('curso_id', cursoId);
-    if (estado === 'aprobado')    q = q.gte('nota', NOTA_APROBATORIA);
-    if (estado === 'desaprobado') q = q.lt('nota',  NOTA_APROBATORIA);
+      if (empresaAdminNombre) q = q.eq('empresa', empresaAdminNombre);
+      if (cursoId) q = q.eq('curso_id', cursoId);
+      if (estado === 'aprobado')    q = q.gte('nota', NOTA_APROBATORIA);
+      if (estado === 'desaprobado') q = q.lt('nota',  NOTA_APROBATORIA);
 
-    const { data, error } = await q;
-    if (error) throw error;
+      const { data, error } = await q;
+      if (error) throw error;
+      if (!data?.length) break;
+      allData.push(...data);
+      pageR++;
+    }
 
     const { data: cursos } = await supabase.from('cursos').select('id, titulo');
     const mapCursos = {};
     (cursos || []).forEach(c => { mapCursos[c.id] = c.titulo; });
 
-    _rn_datos = (data || []).map(r => ({ ...r, curso_nombre: mapCursos[r.curso_id] || '—' }));
+    _rn_datos = allData.map(r => ({ ...r, curso_nombre: mapCursos[r.curso_id] || '—' }));
     _rn_filtrados = [..._rn_datos];
 
     rn_renderKpis();

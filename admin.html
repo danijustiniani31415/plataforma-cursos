@@ -700,18 +700,14 @@
   </div>
 
   <!-- ═══ TAB: REPORTE ═══ -->
-  <div id="tab-reporte" class="tab-panel">
-    <div class="panel-card">
-      <h2>📊 Registro de Notas</h2>
-      <p style="color:var(--text-secondary); font-size:0.88rem; margin-bottom:20px;">
-        Filtra por período, curso y estado para visualizar y descargar el registro de evaluaciones de tu empresa.
-      </p>
+  <div id="tab-reporte" class="tab-panel" style="padding:4px 0;">
 
-      <!-- Filtros -->
-      <div class="rn-filtros">
-        <div class="rn-filtro-grupo">
-          <label>Mes</label>
-          <select id="filtro-mes">
+    <!-- Filtros -->
+    <div class="rn2-card rn2-filtros">
+      <div class="rn2-filtros-grid">
+        <div class="rn2-fg">
+          <label class="rn2-lbl">Mes</label>
+          <select id="filtro-mes" class="rn2-ctrl">
             <option value="1">Enero</option><option value="2">Febrero</option>
             <option value="3">Marzo</option><option value="4">Abril</option>
             <option value="5">Mayo</option><option value="6">Junio</option>
@@ -720,81 +716,89 @@
             <option value="11">Noviembre</option><option value="12">Diciembre</option>
           </select>
         </div>
-        <div class="rn-filtro-grupo">
-          <label>Año</label>
-          <select id="filtro-anio"></select>
+        <div class="rn2-fg">
+          <label class="rn2-lbl">Año</label>
+          <select id="filtro-anio" class="rn2-ctrl"></select>
         </div>
-        <div class="rn-filtro-grupo" style="flex:2 1 180px;">
-          <label>Curso</label>
-          <select id="filtro-curso"><option value="">Todos los cursos</option></select>
+        <div class="rn2-fg">
+          <label class="rn2-lbl">Curso</label>
+          <select id="rn-curso" class="rn2-ctrl"><option value="">Todos los cursos</option></select>
         </div>
-        <div class="rn-filtro-grupo">
-          <label>Estado</label>
-          <select id="filtro-estado">
+        <div class="rn2-fg">
+          <label class="rn2-lbl">Estado</label>
+          <select id="rn-estado" class="rn2-ctrl">
             <option value="">Todos</option>
             <option value="aprobado">Aprobado</option>
             <option value="desaprobado">Desaprobado</option>
-            <option value="encuesta">Solo encuestas</option>
           </select>
         </div>
-        <div class="rn-filtro-accion">
-          <button id="btn-generar-reporte" onclick="generarReporteNotas()" class="btn-primary">
-            🔍 Generar reporte
+        <div class="rn2-fg">
+          <label class="rn2-lbl">Buscar</label>
+          <input id="rn-busqueda" type="text" class="rn2-ctrl" placeholder="DNI o nombre…" oninput="rn_filtrarTabla()">
+        </div>
+        <div class="rn2-fg">
+          <button id="rn-btn-generar" class="rn2-btn-gen" onclick="generarReporteNotas()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            Generar reporte
           </button>
         </div>
       </div>
+    </div>
 
-      <!-- KPIs (ocultos hasta generar) -->
-      <div id="rn-kpis" class="rn-kpis" style="display:none;">
-        <div class="rn-kpi">
-          <span class="rn-kpi-num" id="kpi-total">0</span>
-          <span class="rn-kpi-label">Total registros</span>
-        </div>
-        <div class="rn-kpi ok">
-          <span class="rn-kpi-num" id="kpi-aprobados">0</span>
-          <span class="rn-kpi-label">Aprobados</span>
-        </div>
-        <div class="rn-kpi mal">
-          <span class="rn-kpi-num" id="kpi-desaprobados">0</span>
-          <span class="rn-kpi-label">Desaprobados</span>
-        </div>
-        <div class="rn-kpi enc">
-          <span class="rn-kpi-num" id="kpi-encuestas">0</span>
-          <span class="rn-kpi-label">Encuestas</span>
-        </div>
-        <div class="rn-kpi avg">
-          <span class="rn-kpi-num" id="kpi-promedio">—</span>
-          <span class="rn-kpi-label">Nota promedio</span>
-        </div>
+    <!-- KPIs -->
+    <div id="rn-kpis" class="rn2-kpis-grid" style="display:none;">
+      <div class="rn2-kpi">
+        <span class="rn2-kpi-v rn2-v-normal" id="rn-kpi-total">—</span>
+        <span class="rn2-kpi-l">Total registros</span>
       </div>
+      <div class="rn2-kpi">
+        <span class="rn2-kpi-v rn2-v-green" id="rn-kpi-ap">—</span>
+        <span class="rn2-kpi-l">Aprobados</span>
+      </div>
+      <div class="rn2-kpi">
+        <span class="rn2-kpi-v rn2-v-red" id="rn-kpi-des">—</span>
+        <span class="rn2-kpi-l">Desaprobados</span>
+      </div>
+      <div class="rn2-kpi">
+        <span class="rn2-kpi-v rn2-v-amber" id="rn-kpi-prom">—</span>
+        <span class="rn2-kpi-l">Nota promedio</span>
+      </div>
+      <div class="rn2-kpi">
+        <span class="rn2-kpi-v rn2-v-green" id="rn-kpi-porc">—</span>
+        <span class="rn2-kpi-l">% Aprobación</span>
+      </div>
+    </div>
 
-      <!-- Tabla de resultados (oculta hasta generar) -->
-      <div id="rn-tabla-wrap" style="display:none;">
-        <div class="rn-tabla-header">
-          <span class="rn-subtitulo" id="rn-subtitulo"></span>
-          <button id="btn-descargar-reporte" onclick="descargarReporteExcel()" class="btn-primary" disabled>
-            ⬇️ Descargar Excel
+    <!-- Tabla + paginación -->
+    <div id="rn-tabla-wrap" class="rn2-card" style="display:none; overflow:hidden; margin-bottom:0;">
+      <div style="overflow-x:auto;">
+        <table class="rn2-tabla">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>DNI</th>
+              <th>Apellidos y nombres</th>
+              <th>Cargo</th>
+              <th>Curso</th>
+              <th>Nota / %</th>
+              <th>Estado</th>
+              <th>Fecha</th>
+              <th>Código cert.</th>
+            </tr>
+          </thead>
+          <tbody id="rn-tbody"></tbody>
+        </table>
+      </div>
+      <div class="rn2-footer">
+        <span class="rn2-pag-inf" id="rn-pag-info"></span>
+        <div class="rn2-pag-ctrls">
+          <button class="rn2-btn-pag" id="rn-btn-prev" onclick="rn_cambiarPagina(-1)">&#8249;</button>
+          <span class="rn2-pag-num" id="rn-pag-num"></span>
+          <button class="rn2-btn-pag" id="rn-btn-next" onclick="rn_cambiarPagina(1)">&#8250;</button>
+          <button class="rn2-btn-excel" id="rn-btn-excel" onclick="descargarReporteExcel()" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Descargar Excel
           </button>
-        </div>
-        <div style="overflow-x:auto;">
-          <table class="rn-tabla">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Apellidos</th>
-                <th>Nombres</th>
-                <th>DNI</th>
-                <th>Cargo</th>
-                <th>Curso</th>
-                <th>Evaluación</th>
-                <th style="text-align:center;">Nota</th>
-                <th style="text-align:center;">%</th>
-                <th>Estado</th>
-                <th>Fecha</th>
-              </tr>
-            </thead>
-            <tbody id="rn-tbody"></tbody>
-          </table>
         </div>
       </div>
     </div>

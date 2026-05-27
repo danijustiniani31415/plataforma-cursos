@@ -1079,194 +1079,212 @@ window.verAsignadosMes = async function () {
     </div>`;
 };
 
-// ─── Caché de filas para el Excel (se llena en generarReporteNotas) ───
-let _reporteFilas = [];
+// ═══════════════════════════════════════════════════
+// 📊 REGISTRO DE NOTAS — v2 (fuente: certificados)
+// ═══════════════════════════════════════════════════
+const RN_POR_PAGINA    = 10;
+const NOTA_APROBATORIA = 16;
+const RN_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const RN_SVG_CHECK = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+const RN_SVG_X     = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+const RN_SVG_SEARCH = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>`;
 
+let _rn_datos     = [];   // registros completos desde BD
+let _rn_filtrados = [];   // después de búsqueda libre
+let _rn_pagina    = 0;
+
+// Carga cursos del dropdown al abrir la tab (solo los que tienen certificados reales)
 async function initReporteNotas() {
-  const sel = document.getElementById('filtro-curso');
+  const sel = document.getElementById('rn-curso');
   if (!sel || sel.dataset.loaded) return;
-  const { data: cursos } = await supabase
-    .from('cursos')
-    .select('id, titulo')
-    .eq('activo', true)
-    .order('titulo');
-  cursos?.forEach(c => {
+  let q = supabase.from('certificados').select('curso_id, cursos(id, titulo)');
+  if (empresaAdminNombre) q = q.eq('empresa', empresaAdminNombre);
+  const { data } = await q;
+  const seen = new Set();
+  const lista = [];
+  for (const c of (data || [])) {
+    if (c.cursos && !seen.has(c.curso_id)) {
+      seen.add(c.curso_id);
+      lista.push({ id: c.curso_id, titulo: c.cursos.titulo });
+    }
+  }
+  lista.sort((a, b) => a.titulo.localeCompare(b.titulo, 'es'));
+  lista.forEach(c => {
     const opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.titulo;
+    opt.value = c.id; opt.textContent = c.titulo;
     sel.appendChild(opt);
   });
   sel.dataset.loaded = 'true';
 }
 
 window.generarReporteNotas = async function () {
-  const btn   = document.getElementById('btn-generar-reporte');
-  const tbody = document.getElementById('rn-tbody');
-  const wrap  = document.getElementById('rn-tabla-wrap');
-  const kpis  = document.getElementById('rn-kpis');
-  const btnDL = document.getElementById('btn-descargar-reporte');
+  const btn  = document.getElementById('rn-btn-generar');
+  const kpis = document.getElementById('rn-kpis');
+  const wrap = document.getElementById('rn-tabla-wrap');
 
   btn.disabled = true;
-  btn.textContent = '⏳ Cargando...';
-  _reporteFilas = [];
-  wrap.style.display = 'none';
-  kpis.style.display = 'none';
+  btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Cargando...`;
+  _rn_datos = []; _rn_filtrados = []; _rn_pagina = 0;
+  kpis.style.display  = 'none';
+  wrap.style.display  = 'none';
+  document.getElementById('rn-busqueda').value = '';
 
   const mes     = parseInt(document.getElementById('filtro-mes').value);
   const anio    = parseInt(document.getElementById('filtro-anio').value);
-  const cursoId = document.getElementById('filtro-curso').value || null;
-  const estado  = document.getElementById('filtro-estado').value || null;
+  const cursoId = document.getElementById('rn-curso').value   || null;
+  const estado  = document.getElementById('rn-estado').value  || null;
 
+  // Rango en hora Perú (UTC-5)
   const desde = new Date(Date.UTC(anio, mes - 1, 1, 5, 0, 0)).toISOString();
   const hasta = new Date(Date.UTC(anio, mes,     1, 5, 0, 0)).toISOString();
 
-  const mesesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-                       'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const tipoLabel   = { encuesta: 'Encuesta', examen: 'Examen', eficacia: 'Evaluación de la eficacia' };
-
   try {
-    // 1. Perfiles de la empresa
-    const { data: perfiles, error: errP } = await supabase
-      .from('profiles')
-      .select('email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
-      .eq('empresa_id', empresaAdminId);
-    if (errP) throw errP;
-    if (!perfiles?.length) { toast('No hay trabajadores en tu empresa.', 'warning'); return; }
+    let q = supabase
+      .from('certificados')
+      .select('dni, nombres, apellidos, cargo, empresa, curso_id, nota, codigo, created_at, cursos(titulo)')
+      .gte('created_at', desde)
+      .lt('created_at', hasta)
+      .order('created_at', { ascending: false });
 
-    const perfilMap = {};
-    perfiles.forEach(p => { if (p.email) perfilMap[p.email] = p; });
-    const emails = perfiles.map(p => p.email).filter(Boolean);
-    if (!emails.length) { toast('No hay trabajadores con email registrado.', 'warning'); return; }
+    if (empresaAdminNombre) q = q.eq('empresa', empresaAdminNombre);
+    if (cursoId) q = q.eq('curso_id', cursoId);
+    if (estado === 'aprobado')    q = q.gte('nota', NOTA_APROBATORIA);
+    if (estado === 'desaprobado') q = q.lt('nota',  NOTA_APROBATORIA);
 
-    // 2. Formularios y cursos
-    const [{ data: todosFormularios }, { data: todosCursos }] = await Promise.all([
-      supabase.from('formularios').select('id, tipo'),
-      supabase.from('cursos').select('id, titulo')
-    ]);
-    const tipoFormMap = {};
-    todosFormularios?.forEach(f => { tipoFormMap[f.id] = f.tipo; });
-    const cursoTitMap = {};
-    todosCursos?.forEach(c => { cursoTitMap[c.id] = c.titulo; });
+    const { data, error } = await q;
+    if (error) throw error;
 
-    // 3. Envíos del período (chunked para evitar URL larga)
-    let { data: envios, error: errE } = await chunkedInQuery(emails, 150, chunk => {
-      let q = supabase
-        .from('envios_formulario')
-        .select('usuario_email, id_formulario, id_curso, puntaje, porcentaje, aprobado, created_at')
-        .in('usuario_email', chunk)
-        .eq('estado', 'completado')
-        .gte('created_at', desde)
-        .lt('created_at', hasta);
-      if (cursoId) q = q.eq('id_curso', cursoId);
-      return q;
-    });
-    if (errE) throw errE;
-    envios = (envios || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    _rn_datos = (data || []).map(r => ({ ...r, curso_nombre: r.cursos?.titulo || '—' }));
+    _rn_filtrados = [..._rn_datos];
 
-    // 4. Filtro de estado (client-side, depende del tipo de formulario)
-    if (estado === 'aprobado')    envios = envios.filter(r => tipoFormMap[r.id_formulario] !== 'encuesta' && r.aprobado);
-    if (estado === 'desaprobado') envios = envios.filter(r => tipoFormMap[r.id_formulario] !== 'encuesta' && !r.aprobado);
-    if (estado === 'encuesta')    envios = envios.filter(r => tipoFormMap[r.id_formulario] === 'encuesta');
+    rn_renderKpis();
+    rn_renderTabla();
 
-    // 5. KPIs
-    const nAprobados    = envios.filter(r => tipoFormMap[r.id_formulario] !== 'encuesta' && r.aprobado).length;
-    const nDesaprobados = envios.filter(r => tipoFormMap[r.id_formulario] !== 'encuesta' && !r.aprobado).length;
-    const nEncuestas    = envios.filter(r => tipoFormMap[r.id_formulario] === 'encuesta').length;
-    const notasArr      = envios.filter(r => tipoFormMap[r.id_formulario] !== 'encuesta' && r.puntaje != null).map(r => r.puntaje);
-    const promedio      = notasArr.length ? (notasArr.reduce((a, b) => a + b, 0) / notasArr.length).toFixed(1) : '—';
-
-    document.getElementById('kpi-total').textContent       = envios.length;
-    document.getElementById('kpi-aprobados').textContent   = nAprobados;
-    document.getElementById('kpi-desaprobados').textContent = nDesaprobados;
-    document.getElementById('kpi-encuestas').textContent   = nEncuestas;
-    document.getElementById('kpi-promedio').textContent    = promedio;
-    kpis.style.display = 'flex';
-
-    // 6. Tabla HTML + caché Excel
-    _reporteFilas = [
-      ['Apellidos','Nombres','DNI','Tipo Doc','Cargo','Empresa','Curso','Evaluación','Nota (/20)','Porcentaje','Estado','Fecha']
-    ];
-
-    tbody.innerHTML = '';
-
-    if (!envios.length) {
-      tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--text-muted);">Sin resultados para los filtros seleccionados.</td></tr>';
-      document.getElementById('rn-subtitulo').textContent = '0 registros encontrados';
-      btnDL.disabled = true;
-      wrap.style.display = 'block';
-      return;
-    }
-
-    envios.forEach((r, i) => {
-      const p     = perfilMap[r.usuario_email] || {};
-      const tipo  = tipoFormMap[r.id_formulario] || '';
-      const esEnc = tipo === 'encuesta';
-      const nota  = esEnc ? '—' : (r.puntaje ?? '—');
-      const porc  = esEnc ? '—' : (r.porcentaje != null ? r.porcentaje.toFixed(1) + '%' : '—');
-      const fecha = new Date(r.created_at).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
-      let estadoTxt, badgeClass;
-      if (esEnc)        { estadoTxt = 'Completada';  badgeClass = 'badge-enc'; }
-      else if (r.aprobado) { estadoTxt = 'Aprobado'; badgeClass = 'badge-ok';  }
-      else               { estadoTxt = 'Desaprobado'; badgeClass = 'badge-mal'; }
-
-      _reporteFilas.push([
-        p.apellidos || '', p.nombres || '',
-        p.documento_numero || r.usuario_email, p.documento_tipo || '',
-        p.cargo || '', p.empresa || '',
-        cursoTitMap[r.id_curso] || '', tipoLabel[tipo] || tipo,
-        nota, porc, estadoTxt, fecha
-      ]);
-
-      tbody.insertAdjacentHTML('beforeend', `
-        <tr>
-          <td style="color:var(--text-muted);font-size:0.78rem;">${i + 1}</td>
-          <td><strong>${p.apellidos || ''}</strong></td>
-          <td>${p.nombres || ''}</td>
-          <td style="font-family:monospace;">${p.documento_numero || '<span style="color:var(--text-muted);font-size:0.78rem;">' + r.usuario_email + '</span>'}</td>
-          <td style="color:var(--text-secondary);">${p.cargo || ''}</td>
-          <td>${cursoTitMap[r.id_curso] || ''}</td>
-          <td style="color:var(--text-muted);font-size:0.82rem;">${tipoLabel[tipo] || tipo}</td>
-          <td style="text-align:center;font-weight:700;">${nota}</td>
-          <td style="text-align:center;color:var(--text-secondary);">${porc}</td>
-          <td><span class="${badgeClass}">${estadoTxt}</span></td>
-          <td style="color:var(--text-muted);font-size:0.8rem;white-space:nowrap;">${fecha}</td>
-        </tr>`);
-    });
-
-    const selCurso = document.getElementById('filtro-curso');
-    const cursoNombre = cursoId ? (selCurso.options[selCurso.selectedIndex]?.text || '') : 'Todos los cursos';
-    document.getElementById('rn-subtitulo').textContent =
-      `${envios.length} registro${envios.length !== 1 ? 's' : ''} · ${mesesNombre[mes - 1]} ${anio} · ${cursoNombre}`;
-    btnDL.disabled = false;
+    kpis.style.display = 'grid';
     wrap.style.display = 'block';
+    document.getElementById('rn-btn-excel').disabled = (_rn_datos.length === 0);
 
   } catch (err) {
     toast('Error al generar reporte: ' + (err.message || err), 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = '🔍 Generar reporte';
+    btn.innerHTML = RN_SVG_SEARCH + ' Generar reporte';
   }
 };
 
+function rn_renderKpis() {
+  const total  = _rn_filtrados.length;
+  const ap     = _rn_filtrados.filter(r => Number(r.nota ?? 0) >= NOTA_APROBATORIA).length;
+  const des    = total - ap;
+  const notas  = _rn_filtrados.map(r => Number(r.nota)).filter(n => !isNaN(n) && n > 0);
+  const prom   = notas.length ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1) : '—';
+  const porcAp = total > 0 ? ((ap / total) * 100).toFixed(0) + ' %' : '—';
+  document.getElementById('rn-kpi-total').textContent = total;
+  document.getElementById('rn-kpi-ap').textContent    = ap;
+  document.getElementById('rn-kpi-des').textContent   = des;
+  document.getElementById('rn-kpi-prom').textContent  = prom;
+  document.getElementById('rn-kpi-porc').textContent  = porcAp;
+}
+
+function rn_renderTabla() {
+  const tbody    = document.getElementById('rn-tbody');
+  const total    = _rn_filtrados.length;
+  const totalPag = Math.max(1, Math.ceil(total / RN_POR_PAGINA));
+  _rn_pagina     = Math.min(_rn_pagina, totalPag - 1);
+  const inicio   = _rn_pagina * RN_POR_PAGINA;
+  const fin      = Math.min(inicio + RN_POR_PAGINA, total);
+
+  if (!total) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted);">Sin resultados para los filtros seleccionados.</td></tr>`;
+  } else {
+    tbody.innerHTML = _rn_filtrados.slice(inicio, fin).map((r, idx) => {
+      const nota     = Number(r.nota ?? 0);
+      const aprobado = nota >= NOTA_APROBATORIA;
+      const notaTxt  = r.nota != null ? nota.toFixed(1) : '—';
+      const porcTxt  = r.nota != null ? (nota / 20 * 100).toFixed(0) + '%' : '—';
+      const barW     = r.nota != null ? Math.min(100, nota / 20 * 100).toFixed(1) : 0;
+      const color    = aprobado ? '#1D9E75' : '#A32D2D';
+      const fecha    = r.created_at
+        ? new Date(r.created_at).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
+        : '—';
+      const badge    = aprobado
+        ? `<span class="rn2-badge rn2-badge-ap">${RN_SVG_CHECK} Aprobado</span>`
+        : `<span class="rn2-badge rn2-badge-des">${RN_SVG_X} Desaprobado</span>`;
+      return `<tr>
+        <td style="color:var(--text-muted);font-size:0.78rem;">${inicio + idx + 1}</td>
+        <td style="font-family:monospace;font-size:0.84rem;">${r.dni || '—'}</td>
+        <td><strong>${r.apellidos || ''}</strong>${r.nombres ? ' ' + r.nombres : ''}</td>
+        <td style="color:var(--text-secondary);font-size:0.83rem;">${r.cargo || '—'}</td>
+        <td style="font-size:0.84rem;">${r.curso_nombre}</td>
+        <td>
+          <div class="rn2-nota-wrap">
+            <span class="rn2-nota-num" style="color:${color}">${notaTxt}/20</span>
+            <div class="rn2-nota-bar"><div class="rn2-nota-fill" style="width:${barW}%;background:${color}"></div></div>
+            <span class="rn2-nota-pct">${porcTxt}</span>
+          </div>
+        </td>
+        <td>${badge}</td>
+        <td style="color:var(--text-muted);font-size:0.82rem;white-space:nowrap;">${fecha}</td>
+        <td style="font-family:monospace;font-size:0.79rem;color:var(--text-muted);">${r.codigo || '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('rn-pag-info').textContent =
+    total ? `${inicio + 1}–${fin} de ${total} registros` : '0 registros';
+  document.getElementById('rn-pag-num').textContent =
+    total ? `Pág. ${_rn_pagina + 1} / ${totalPag}` : '';
+  document.getElementById('rn-btn-prev').disabled = (_rn_pagina === 0);
+  document.getElementById('rn-btn-next').disabled = (_rn_pagina >= totalPag - 1);
+}
+
+window.rn_filtrarTabla = function () {
+  const q = document.getElementById('rn-busqueda').value.trim().toLowerCase();
+  _rn_filtrados = q
+    ? _rn_datos.filter(r =>
+        (r.dni       || '').toLowerCase().includes(q) ||
+        (r.nombres   || '').toLowerCase().includes(q) ||
+        (r.apellidos || '').toLowerCase().includes(q))
+    : [..._rn_datos];
+  _rn_pagina = 0;
+  rn_renderKpis();
+  rn_renderTabla();
+};
+
+window.rn_cambiarPagina = function (delta) {
+  const totalPag = Math.ceil(_rn_filtrados.length / RN_POR_PAGINA);
+  _rn_pagina = Math.max(0, Math.min(_rn_pagina + delta, totalPag - 1));
+  rn_renderTabla();
+};
+
 window.descargarReporteExcel = function () {
-  if (!_reporteFilas.length) { toast('Primero genera el reporte.', 'warning'); return; }
+  if (!_rn_filtrados.length) { toast('Primero genera el reporte.', 'warning'); return; }
   const mes  = parseInt(document.getElementById('filtro-mes').value);
   const anio = parseInt(document.getElementById('filtro-anio').value);
-  const mesesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-                       'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const cab  = ['DNI','Apellidos','Nombres','Empresa','Cargo','Curso','Fecha','Nota','%','Estado','Código certificado'];
+  const filas = _rn_filtrados.map(r => {
+    const nota = Number(r.nota ?? 0);
+    const ap   = nota >= NOTA_APROBATORIA;
+    const fecha = r.created_at
+      ? new Date(r.created_at).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
+      : '';
+    return [
+      r.dni || '', r.apellidos || '', r.nombres || '',
+      r.empresa || '', r.cargo || '', r.curso_nombre || '',
+      fecha,
+      r.nota != null ? nota : '',
+      r.nota != null ? parseFloat((nota / 20 * 100).toFixed(1)) : '',
+      ap ? 'Aprobado' : 'Desaprobado',
+      r.codigo || ''
+    ];
+  });
   const XLSX = window.XLSX;
-  const ws = XLSX.utils.aoa_to_sheet(_reporteFilas);
-  // Estilos de cabecera
-  const range = XLSX.utils.decode_range(ws['!ref']);
-  for (let C = range.s.c; C <= range.e.c; C++) {
-    const addr = XLSX.utils.encode_cell({ r: 0, c: C });
-    if (!ws[addr]) continue;
-    ws[addr].s = { font: { bold: true }, fill: { fgColor: { rgb: '002855' } }, alignment: { horizontal: 'center' } };
-  }
-  ws['!cols'] = [20,20,15,10,20,20,32,14,10,12,14,14].map(w => ({ wch: w }));
-  const wb = XLSX.utils.book_new();
+  const ws   = XLSX.utils.aoa_to_sheet([cab, ...filas]);
+  ws['!cols'] = [12,20,20,24,20,32,12,8,8,14,20].map(w => ({ wch: w }));
+  const wb   = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Registro de Notas');
-  XLSX.writeFile(wb, `Registro_Notas_${mesesNombre[mes - 1]}_${anio}.xlsx`);
+  XLSX.writeFile(wb, `Registro_Notas_${RN_MESES[mes - 1]}_${anio}.xlsx`);
 };
 
 // ═══════════════════════════════

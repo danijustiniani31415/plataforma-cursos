@@ -1098,15 +1098,19 @@ let _rn_pagina    = 0;
 async function initReporteNotas() {
   const sel = document.getElementById('rn-curso');
   if (!sel || sel.dataset.loaded) return;
-  let q = supabase.from('certificados').select('curso_id, cursos(id, titulo)');
+  let q = supabase.from('certificados').select('curso_id');
   if (empresaAdminNombre) q = q.eq('empresa', empresaAdminNombre);
   const { data } = await q;
+  const ids = [...new Set((data || []).map(c => c.curso_id).filter(Boolean))];
+  const { data: cursoData } = ids.length
+    ? await supabase.from('cursos').select('id, titulo').in('id', ids)
+    : { data: [] };
   const seen = new Set();
   const lista = [];
-  for (const c of (data || [])) {
-    if (c.cursos && !seen.has(c.curso_id)) {
-      seen.add(c.curso_id);
-      lista.push({ id: c.curso_id, titulo: c.cursos.titulo });
+  for (const c of (cursoData || [])) {
+    if (!seen.has(c.id)) {
+      seen.add(c.id);
+      lista.push({ id: c.id, titulo: c.titulo });
     }
   }
   lista.sort((a, b) => a.titulo.localeCompare(b.titulo, 'es'));
@@ -1143,7 +1147,7 @@ window.generarReporteNotas = async function () {
   try {
     let q = supabase
       .from('certificados')
-      .select('dni, nombres, apellidos, cargo, empresa, curso_id, nota, codigo, created_at, cursos(titulo)')
+      .select('*')
       .gte('fecha', desde)
       .lt('fecha', hasta)
       .order('fecha', { ascending: false });
@@ -1156,7 +1160,11 @@ window.generarReporteNotas = async function () {
     const { data, error } = await q;
     if (error) throw error;
 
-    _rn_datos = (data || []).map(r => ({ ...r, curso_nombre: r.cursos?.titulo || '—' }));
+    const { data: cursos } = await supabase.from('cursos').select('id, titulo');
+    const mapCursos = {};
+    (cursos || []).forEach(c => { mapCursos[c.id] = c.titulo; });
+
+    _rn_datos = (data || []).map(r => ({ ...r, curso_nombre: mapCursos[r.curso_id] || '—' }));
     _rn_filtrados = [..._rn_datos];
 
     rn_renderKpis();

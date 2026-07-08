@@ -398,7 +398,7 @@ async function mostrarPasoActual() {
       let videoEmbed = '';
 
       if (urlVideo.includes('youtube') || urlVideo.includes('youtu.be')) {
-        const videoUrl = urlVideo.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/");
+        const videoUrl = urlVideo.replace("watch?v=", "embed/").replace("youtu.be/", "www.youtube.com/embed/");
         videoEmbed = `
           <div class="video-wrap">
             <iframe width="100%" height="360" src="${videoUrl}" frameborder="0"

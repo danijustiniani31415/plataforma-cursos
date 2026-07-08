@@ -1404,6 +1404,25 @@
   </div>
 </div>
 
+<!-- Modal editar curso -->
+<div id="modal-editar-curso" class="modal-overlay">
+  <div class="modal-box">
+    <h3>✏️ Editar curso</h3>
+    <input type="hidden" id="editar-curso-id" />
+    <input type="text"   id="editar-curso-titulo"         placeholder="Título *" />
+    <input type="text"   id="editar-curso-codigo-prefijo" placeholder="Prefijo de código *" />
+    <input type="text"   id="editar-curso-codigo"         placeholder="Código completo (ej. SAL-2026-0001)" />
+    <input type="number" id="editar-curso-duracion"       placeholder="Duración (horas) *" />
+    <input type="number" id="editar-curso-vigencia"       placeholder="Vigencia (meses)" />
+    <input type="text"   id="editar-curso-url-video"      placeholder="URL del video (https://youtu.be/ID)" />
+    <input type="text"   id="editar-curso-url-material"   placeholder="URL del material (PDF)" />
+    <div class="modal-actions">
+      <button onclick="guardarEdicionCurso()" class="btn-primary">Guardar cambios</button>
+      <button onclick="cerrarModalCurso()" class="btn-secondary">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>

@@ -2490,7 +2490,9 @@ window.cargarListaCursos = async function () {
   contenedor.innerHTML = '<p style="color:#888;font-size:0.88rem;">Cargando...</p>';
 
   const { data: cursos, error: errCursos } = await supabase
-    .from('cursos').select('id, titulo, duracion, activo').order('titulo');
+    .from('cursos')
+    .select('id, titulo, codigo, codigo_prefijo, duracion, vigencia_meses, url_video, url_material, activo')
+    .order('titulo');
 
   if (errCursos) {
     contenedor.innerHTML = `<p style="color:red;">❌ Error: ${errCursos.message}</p>`;
@@ -2504,6 +2506,9 @@ window.cargarListaCursos = async function () {
   const activos   = cursos.filter(c => c.activo);
   const inactivos = cursos.filter(c => !c.activo);
 
+  window.cursosCache = {};
+  cursos.forEach(c => { window.cursosCache[c.id] = c; });
+
   const renderFila = c => `
     <tr>
       <td style="padding:10px 12px; font-weight:500;">${c.titulo}</td>
@@ -2511,7 +2516,12 @@ window.cargarListaCursos = async function () {
       <td style="padding:10px 12px;">
         <span class="${c.activo ? 'badge-activo' : 'badge-inactivo'}">${c.activo ? '✅ Activo' : '⏸ Inactivo'}</span>
       </td>
-      <td style="padding:10px 12px;">
+      <td style="padding:10px 12px; white-space:nowrap;">
+        <button onclick="abrirEdicionCurso('${c.id}')"
+                style="padding:6px 14px; border:none; border-radius:6px; cursor:pointer; font-size:0.82rem;
+                       background:#0d6efd; color:white; margin-right:6px;">
+          Editar
+        </button>
         <button onclick="toggleActivoCurso('${c.id}', ${c.activo})"
                 style="padding:6px 14px; border:none; border-radius:6px; cursor:pointer; font-size:0.82rem;
                        background:${c.activo ? '#dc3545' : '#198754'}; color:white;">
@@ -2545,6 +2555,58 @@ window.cargarListaCursos = async function () {
 window.toggleActivoCurso = async function (id, activo) {
   const { error } = await supabase.from('cursos').update({ activo: !activo }).eq('id', id);
   if (error) { alert('❌ ' + error.message); return; }
+  cargarListaCursos();
+};
+
+window.abrirEdicionCurso = function (id) {
+  const c = window.cursosCache?.[id];
+  if (!c) { alert('❌ No se encontró el curso.'); return; }
+
+  document.getElementById('editar-curso-id').value           = c.id;
+  document.getElementById('editar-curso-titulo').value        = c.titulo || '';
+  document.getElementById('editar-curso-codigo-prefijo').value= c.codigo_prefijo || '';
+  document.getElementById('editar-curso-codigo').value        = c.codigo || '';
+  document.getElementById('editar-curso-duracion').value      = c.duracion ?? '';
+  document.getElementById('editar-curso-vigencia').value      = c.vigencia_meses ?? '';
+  document.getElementById('editar-curso-url-video').value     = c.url_video || '';
+  document.getElementById('editar-curso-url-material').value  = c.url_material || '';
+
+  document.getElementById('modal-editar-curso').style.display = 'flex';
+};
+
+window.cerrarModalCurso = function () {
+  document.getElementById('modal-editar-curso').style.display = 'none';
+};
+
+window.guardarEdicionCurso = async function () {
+  const id            = document.getElementById('editar-curso-id').value;
+  const titulo        = document.getElementById('editar-curso-titulo').value.trim();
+  const codigo_prefijo= document.getElementById('editar-curso-codigo-prefijo').value.trim().toUpperCase();
+  const codigo        = document.getElementById('editar-curso-codigo').value.trim();
+  const duracion      = parseInt(document.getElementById('editar-curso-duracion').value);
+  const vigenciaRaw   = document.getElementById('editar-curso-vigencia').value;
+  const vigencia_meses= vigenciaRaw ? parseInt(vigenciaRaw) : null;
+  const url_video     = document.getElementById('editar-curso-url-video').value.trim();
+  const url_material  = document.getElementById('editar-curso-url-material').value.trim();
+
+  if (!titulo || !codigo_prefijo || !duracion) {
+    alert('❌ Completa los campos obligatorios: título, prefijo y duración.');
+    return;
+  }
+
+  const { error } = await supabase.from('cursos').update({
+    titulo,
+    codigo_prefijo,
+    codigo:       codigo       || null,
+    duracion,
+    vigencia_meses,
+    url_video:    url_video    || null,
+    url_material: url_material || null,
+  }).eq('id', id);
+
+  if (error) { alert('❌ Error al guardar: ' + error.message); return; }
+
+  cerrarModalCurso();
   cargarListaCursos();
 };
 

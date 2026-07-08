@@ -2584,7 +2584,7 @@ window.cargarFormulariosCurso = async function () {
       bloque.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <h3 style="margin:0;color:${color};">${label}</h3>
-          <button onclick="crearFormulario(${cursoId},'${tipo}')" class="btn-primary" style="font-size:0.85rem;">+ Crear ${tipo}</button>
+          <button onclick="crearFormulario('${cursoId}','${tipo}')" class="btn-primary" style="font-size:0.85rem;">+ Crear ${tipo}</button>
         </div>
         <p style="color:#888;font-size:0.85rem;margin-top:8px;">No existe aún para este curso.</p>`;
     } else {

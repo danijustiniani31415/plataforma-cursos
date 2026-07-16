@@ -2554,7 +2554,9 @@ window.cargarListaCursos = async function () {
   contenedor.innerHTML = '<p style="color:#888;font-size:0.88rem;">Cargando...</p>';
 
   const { data: cursos, error: errCursos } = await supabase
-    .from('cursos').select('id, titulo, duracion, activo').order('titulo');
+    .from('cursos')
+    .select('id, titulo, codigo, codigo_prefijo, duracion, vigencia_meses, url_video, url_material, activo')
+    .order('titulo');
 
   if (errCursos) {
     contenedor.innerHTML = `<p style="color:red;">❌ Error: ${errCursos.message}</p>`;
@@ -2568,6 +2570,9 @@ window.cargarListaCursos = async function () {
   const activos   = cursos.filter(c => c.activo);
   const inactivos = cursos.filter(c => !c.activo);
 
+  window.cursosCache = {};
+  cursos.forEach(c => { window.cursosCache[c.id] = c; });
+
   const renderFila = c => `
     <tr>
       <td style="padding:10px 12px; font-weight:500;">${c.titulo}</td>
@@ -2575,7 +2580,12 @@ window.cargarListaCursos = async function () {
       <td style="padding:10px 12px;">
         <span class="${c.activo ? 'badge-activo' : 'badge-inactivo'}">${c.activo ? '✅ Activo' : '⏸ Inactivo'}</span>
       </td>
-      <td style="padding:10px 12px;">
+      <td style="padding:10px 12px; white-space:nowrap;">
+        <button onclick="abrirEdicionCurso('${c.id}')"
+                style="padding:6px 14px; border:none; border-radius:6px; cursor:pointer; font-size:0.82rem;
+                       background:#0d6efd; color:white; margin-right:6px;">
+          Editar
+        </button>
         <button onclick="toggleActivoCurso('${c.id}', ${c.activo})"
                 style="padding:6px 14px; border:none; border-radius:6px; cursor:pointer; font-size:0.82rem;
                        background:${c.activo ? '#dc3545' : '#198754'}; color:white;">
@@ -2610,6 +2620,139 @@ window.toggleActivoCurso = async function (id, activo) {
   const { error } = await supabase.from('cursos').update({ activo: !activo }).eq('id', id);
   if (error) { alert('❌ ' + error.message); return; }
   cargarListaCursos();
+};
+
+window.abrirEdicionCurso = function (id) {
+  const c = window.cursosCache?.[id];
+  if (!c) { alert('❌ No se encontró el curso.'); return; }
+
+  document.getElementById('editar-curso-id').value           = c.id;
+  document.getElementById('editar-curso-titulo').value        = c.titulo || '';
+  document.getElementById('editar-curso-codigo-prefijo').value= c.codigo_prefijo || '';
+  document.getElementById('editar-curso-codigo').value        = c.codigo || '';
+  document.getElementById('editar-curso-duracion').value      = c.duracion ?? '';
+  document.getElementById('editar-curso-vigencia').value      = c.vigencia_meses ?? '';
+  document.getElementById('editar-curso-url-material').value  = c.url_material || '';
+  document.getElementById('editar-curso-pdf-file').value      = '';
+
+  document.getElementById('modal-editar-curso').style.display = 'flex';
+  cargarVideosCurso(c.id);
+};
+
+window.cerrarModalCurso = function () {
+  document.getElementById('modal-editar-curso').style.display = 'none';
+};
+
+window.subirPdfCurso = async function () {
+  const cursoId    = document.getElementById('editar-curso-id').value;
+  const fileInput  = document.getElementById('editar-curso-pdf-file');
+  const file       = fileInput.files[0];
+
+  if (!cursoId) { alert('❌ Primero abre un curso para editar.'); return; }
+  if (!file)    { alert('❌ Selecciona un archivo PDF.'); return; }
+  if (file.type !== 'application/pdf') { alert('❌ El archivo debe ser un PDF.'); return; }
+
+  const nombreArchivo = `${cursoId}-${file.name}`.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+  const { error: errUpload } = await supabase.storage
+    .from('materiales')
+    .upload(nombreArchivo, file, { upsert: true, contentType: 'application/pdf' });
+
+  if (errUpload) { alert('❌ Error al subir el PDF: ' + errUpload.message); return; }
+
+  const { data: pub } = supabase.storage.from('materiales').getPublicUrl(nombreArchivo);
+  const url_material = pub.publicUrl;
+
+  const { error: errUpdate } = await supabase.from('cursos')
+    .update({ url_material }).eq('id', cursoId);
+
+  if (errUpdate) { alert('❌ El PDF se subió pero no se pudo guardar la URL: ' + errUpdate.message); return; }
+
+  document.getElementById('editar-curso-url-material').value = url_material;
+  fileInput.value = '';
+  alert('✅ PDF subido y guardado correctamente.');
+};
+
+window.guardarEdicionCurso = async function () {
+  const id            = document.getElementById('editar-curso-id').value;
+  const titulo        = document.getElementById('editar-curso-titulo').value.trim();
+  const codigo_prefijo= document.getElementById('editar-curso-codigo-prefijo').value.trim().toUpperCase();
+  const codigo        = document.getElementById('editar-curso-codigo').value.trim();
+  const duracion      = parseInt(document.getElementById('editar-curso-duracion').value);
+  const vigenciaRaw   = document.getElementById('editar-curso-vigencia').value;
+  const vigencia_meses= vigenciaRaw ? parseInt(vigenciaRaw) : null;
+  const url_material  = document.getElementById('editar-curso-url-material').value.trim();
+
+  if (!titulo || !codigo_prefijo || !duracion) {
+    alert('❌ Completa los campos obligatorios: título, prefijo y duración.');
+    return;
+  }
+
+  const { error } = await supabase.from('cursos').update({
+    titulo,
+    codigo_prefijo,
+    codigo:       codigo       || null,
+    duracion,
+    vigencia_meses,
+    url_material: url_material || null,
+  }).eq('id', id);
+
+  if (error) { alert('❌ Error al guardar: ' + error.message); return; }
+
+  cerrarModalCurso();
+  cargarListaCursos();
+};
+
+// ═══════════════════════════════
+// 🎬 Videos del curso (videos_curso)
+// ═══════════════════════════════
+window.cargarVideosCurso = async function (cursoId) {
+  const cont = document.getElementById('lista-videos-curso');
+  cont.innerHTML = '<p style="color:#888;font-size:0.82rem;">Cargando videos...</p>';
+
+  const { data: videos, error } = await supabase
+    .from('videos_curso').select('*')
+    .eq('id_curso', cursoId).order('orden');
+
+  if (error) { cont.innerHTML = `<p style="color:red;font-size:0.82rem;">❌ ${error.message}</p>`; return; }
+  if (!videos?.length) { cont.innerHTML = '<p style="color:#888;font-size:0.82rem;">Este curso no tiene videos aún.</p>'; return; }
+
+  cont.innerHTML = videos.map(v => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border:1px solid #eee;border-radius:6px;margin-bottom:6px;font-size:0.82rem;">
+      <a href="${v.url}" target="_blank" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;">${v.url}</a>
+      <button onclick="eliminarVideoCurso(${v.id}, '${cursoId}')"
+              style="background:#dc3545;color:white;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.78rem;">
+        Eliminar
+      </button>
+    </div>`).join('');
+};
+
+window.agregarVideoCurso = async function () {
+  const cursoId = document.getElementById('editar-curso-id').value;
+  const url     = document.getElementById('nuevo-video-url').value.trim();
+
+  if (!cursoId) { alert('❌ Primero guarda o abre un curso.'); return; }
+  if (!url)     { alert('❌ Ingresa el link de YouTube.'); return; }
+
+  const { data: existentes } = await supabase
+    .from('videos_curso').select('orden')
+    .eq('id_curso', cursoId).order('orden', { ascending: false }).limit(1);
+  const orden = (existentes?.[0]?.orden || 0) + 1;
+
+  const { error } = await supabase.from('videos_curso')
+    .insert([{ id_curso: cursoId, url, orden, activo: true }]);
+
+  if (error) { alert('❌ Error al agregar video: ' + error.message); return; }
+
+  document.getElementById('nuevo-video-url').value = '';
+  cargarVideosCurso(cursoId);
+};
+
+window.eliminarVideoCurso = async function (id, cursoId) {
+  if (!confirm('¿Eliminar este video del curso?')) return;
+  const { error } = await supabase.from('videos_curso').delete().eq('id', id);
+  if (error) { alert('❌ Error al eliminar: ' + error.message); return; }
+  cargarVideosCurso(cursoId);
 };
 
 // ═══════════════════════════════════════════════
@@ -2648,7 +2791,7 @@ window.cargarFormulariosCurso = async function () {
       bloque.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <h3 style="margin:0;color:${color};">${label}</h3>
-          <button onclick="crearFormulario(${cursoId},'${tipo}')" class="btn-primary" style="font-size:0.85rem;">+ Crear ${tipo}</button>
+          <button onclick="crearFormulario('${cursoId}','${tipo}')" class="btn-primary" style="font-size:0.85rem;">+ Crear ${tipo}</button>
         </div>
         <p style="color:#888;font-size:0.85rem;margin-top:8px;">No existe aún para este curso.</p>`;
     } else {

@@ -229,6 +229,7 @@
     .modal-box {
       background: white; padding: 30px; border-radius: 14px;
       width: 90%; max-width: 480px; box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+      max-height: 88vh; overflow-y: auto;
     }
     .modal-box h3 { color: #002855; margin-bottom: 18px; font-size: 1.05rem; }
     .modal-box input, .modal-box select {
@@ -236,6 +237,8 @@
       border-radius: 7px; font-size: 0.9rem; margin-bottom: 10px;
     }
     .modal-actions { display: flex; gap: 10px; margin-top: 6px; }
+    .campo-label { display: block; font-size: 0.82rem; font-weight: 600; color: #333; margin-bottom: 4px; }
+    .campo-ayuda { font-size: 0.76rem; color: #888; margin: 0 0 6px; }
 
     .stat-card {
       background: white;
@@ -1400,6 +1403,55 @@
     <div class="modal-actions">
       <button onclick="guardarEdicion()" class="btn-primary">Guardar cambios</button>
       <button onclick="cerrarModal()" class="btn-secondary">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal editar curso -->
+<div id="modal-editar-curso" class="modal-overlay">
+  <div class="modal-box">
+    <h3>✏️ Editar curso</h3>
+    <input type="hidden" id="editar-curso-id" />
+
+    <label class="campo-label" for="editar-curso-titulo">Título del curso *</label>
+    <input type="text"   id="editar-curso-titulo"         placeholder="Ej. Trabajo en altura" />
+
+    <label class="campo-label" for="editar-curso-codigo-prefijo">Prefijo de código *</label>
+    <p class="campo-ayuda">Siglas cortas que identifican al curso (ej. "TRAB"). Se usa para generar el código automático.</p>
+    <input type="text"   id="editar-curso-codigo-prefijo" placeholder="Ej. TRAB" />
+
+    <label class="campo-label" for="editar-curso-codigo">Código completo del curso</label>
+    <p class="campo-ayuda">Formato PREFIJO-AÑO-CORRELATIVO. Se genera solo al crear el curso; normalmente no hace falta tocarlo.</p>
+    <input type="text"   id="editar-curso-codigo"         placeholder="Ej. TRAB-2026-0001" />
+
+    <label class="campo-label" for="editar-curso-duracion">Duración *</label>
+    <p class="campo-ayuda">Duración del curso en horas.</p>
+    <input type="number" id="editar-curso-duracion"       placeholder="Ej. 2" />
+
+    <label class="campo-label" for="editar-curso-vigencia">Vigencia del certificado</label>
+    <p class="campo-ayuda">Meses que dura vigente el certificado antes de que el trabajador deba retomar el curso.</p>
+    <input type="number" id="editar-curso-vigencia"       placeholder="Ej. 12" />
+
+    <label class="campo-label" for="editar-curso-url-material">Material del curso (PDF)</label>
+    <p class="campo-ayuda">Enlace público al PDF que verá el trabajador. Súbelo con el botón de abajo o pega la URL manualmente.</p>
+    <input type="text"   id="editar-curso-url-material"   placeholder="https://.../materiales/archivo.pdf" />
+    <div style="display:flex;gap:6px;align-items:center;margin:-8px 0 12px;">
+      <input type="file" id="editar-curso-pdf-file" accept="application/pdf" style="flex:1;font-size:0.82rem;" />
+      <button onclick="subirPdfCurso()" class="btn-secondary" style="white-space:nowrap;">📤 Subir PDF</button>
+    </div>
+
+    <div class="modal-actions">
+      <button onclick="guardarEdicionCurso()" class="btn-primary">Guardar cambios</button>
+      <button onclick="cerrarModalCurso()" class="btn-secondary">Cancelar</button>
+    </div>
+
+    <hr style="margin:16px 0;border:none;border-top:1px solid #eee;" />
+    <p style="font-weight:600;margin:0 0 4px;color:#002855;">🎬 Videos del curso</p>
+    <p class="campo-ayuda" style="margin-top:0;">Videos que el trabajador debe ver, en orden. Pega el link corto de YouTube (ej. https://youtu.be/8b7cby43dg4, sin nada después del ID).</p>
+    <div id="lista-videos-curso" style="margin-bottom:10px;"></div>
+    <div style="display:flex;gap:6px;">
+      <input type="text" id="nuevo-video-url" placeholder="https://youtu.be/ID" style="flex:1;" />
+      <button onclick="agregarVideoCurso()" class="btn-primary" style="white-space:nowrap;">+ Agregar</button>
     </div>
   </div>
 </div>

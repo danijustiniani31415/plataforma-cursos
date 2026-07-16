@@ -36,6 +36,18 @@ let empresaAdminId = null;
 let empresaAdminNombre = null;
 let empresaAdminRuc = null;
 let sedeAdminActiva = null;
+let sedesAdminDisponibles = [];
+
+function pintarCheckboxesSedes() {
+  const cont = document.getElementById('nuevo-sedes-checks');
+  if (!cont) return;
+  const lista = sedesAdminDisponibles.length ? sedesAdminDisponibles : ['ANTAMINA'];
+  cont.innerHTML = lista.map(s => `
+    <label style="margin-right:16px; font-size:0.9rem;">
+      <input type="checkbox" class="chk-nuevo-sede" value="${s}" ${s === sedeAdminActiva ? 'checked' : ''} />
+      ${s}
+    </label>`).join('');
+}
 
 // ═══════════════════════════════
 // 🏢 Resolver sede activa del admin (una o varias)
@@ -51,8 +63,12 @@ async function resolverSedeAdmin(userId) {
 
   if (!sedes || sedes.length === 0) {
     sedeAdminActiva = sedeGuardada || 'ANTAMINA';
+    sedesAdminDisponibles = [sedeAdminActiva];
+    pintarCheckboxesSedes();
     return;
   }
+
+  sedesAdminDisponibles = sedes.map(s => s.sede);
 
   if (sedeGuardada && sedes.some(s => s.sede === sedeGuardada)) {
     sedeAdminActiva = sedeGuardada;
@@ -60,6 +76,8 @@ async function resolverSedeAdmin(userId) {
     sedeAdminActiva = sedes[0].sede;
     sessionStorage.setItem('sedeAdminActiva', sedeAdminActiva);
   }
+
+  pintarCheckboxesSedes();
 
   // Si el admin gestiona más de una sede, mostrar selector en el header
   if (sedes.length > 1) {
@@ -298,6 +316,12 @@ window.crearUsuario = async function () {
     return;
   }
 
+  const sedesElegidas = Array.from(document.querySelectorAll('.chk-nuevo-sede:checked')).map(c => c.value);
+  if (sedesElegidas.length === 0) {
+    alert("❌ Selecciona al menos una sede.");
+    return;
+  }
+
   // Obtener token de sesión
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
@@ -326,7 +350,8 @@ window.crearUsuario = async function () {
       empresa_id:       empresaAdminId,
       cargo_id:         cargo_id || null,
       fecha_ingreso:    fecha_ingreso || null,
-      rol:              'trabajador'
+      rol:              'trabajador',
+      sedes:            sedesElegidas
     })
   });
 

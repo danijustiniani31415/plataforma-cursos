@@ -46,8 +46,10 @@ Deno.serve(async (req) => {
     const {
       email, password, nombres, apellidos,
       documento_tipo, documento_numero, telefono,
-      empresa_id, cargo_id, fecha_ingreso, rol
+      empresa_id, cargo_id, fecha_ingreso, rol, sedes
     } = await req.json()
+
+    const sedesFinal = Array.isArray(sedes) && sedes.length > 0 ? sedes : ['ANTAMINA']
 
     const { data: existe } = await supabaseAdmin
       .from('profiles')
@@ -123,6 +125,25 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: perfilError.message }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
+    }
+
+    if (empresa_id) {
+      const { error: sedeError } = await supabaseAdmin
+        .from('perfil_sede')
+        .insert(sedesFinal.map((sede: string) => ({
+          profile_id: authData.user.id,
+          empresa_id,
+          sede,
+          cargo_id: cargo_id || null,
+          fecha_ingreso: fecha_ingreso || null,
+          activo: true,
+        })))
+
+      if (sedeError) {
+        return new Response(JSON.stringify({ error: 'Usuario creado, pero falló al asignar sede: ' + sedeError.message }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {

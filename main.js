@@ -18,6 +18,74 @@ let pasosCurso        = [];
 let formularios       = {};
 let materialVisto     = false;
 let cursosAprobados   = {}; // { [curso_id]: true }
+let sedeActiva        = null;
+
+// ═══════════════════════════════
+// 🏢 SEDE — detectar y, si hace falta, pedir que elija
+// ═══════════════════════════════
+const sedeSection = document.getElementById('sede-section');
+
+async function resolverSedeYContinuar(user) {
+  const sedeGuardada = sessionStorage.getItem('sedeActiva');
+
+  const { data: sedes, error } = await supabase
+    .from('perfil_sede')
+    .select('sede, empresa_id, activo')
+    .eq('profile_id', user.id)
+    .eq('activo', true);
+
+  if (error || !sedes || sedes.length === 0) {
+    // Sin filas en perfil_sede (perfil antiguo no migrado, o error) — seguir sin bloquear
+    sedeActiva = sedeGuardada || null;
+    await continuarLuegoDeSede(user);
+    return;
+  }
+
+  if (sedes.length === 1) {
+    sedeActiva = sedes[0].sede;
+    sessionStorage.setItem('sedeActiva', sedeActiva);
+    await continuarLuegoDeSede(user);
+    return;
+  }
+
+  // Más de una sede: si ya había una elegida en esta sesión y sigue siendo válida, úsala
+  if (sedeGuardada && sedes.some(s => s.sede === sedeGuardada)) {
+    sedeActiva = sedeGuardada;
+    await continuarLuegoDeSede(user);
+    return;
+  }
+
+  // Mostrar selector
+  loginSection.style.display = 'none';
+  consultaSection.style.display = 'none';
+  sedeSection.style.display = 'block';
+
+  const lista = document.getElementById('lista-sedes');
+  lista.innerHTML = '';
+  sedes.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-primary';
+    btn.style.marginBottom = '10px';
+    btn.textContent = s.sede;
+    btn.onclick = async () => {
+      sedeActiva = s.sede;
+      sessionStorage.setItem('sedeActiva', sedeActiva);
+      sedeSection.style.display = 'none';
+      await continuarLuegoDeSede(user);
+    };
+    lista.appendChild(btn);
+  });
+}
+
+async function continuarLuegoDeSede(user) {
+  usuarioActual = user;
+  document.getElementById('btn-logout').style.display = 'flex';
+  loginSection.style.display = 'none';
+  consultaSection.style.display = 'none';
+  sedeSection.style.display = 'none';
+  cursosDisponiblesSection.style.display = 'block';
+  await Promise.all([cargarCursos(), verificarAdmin(user.id)]);
+}
 
 // ═══════════════════════════════
 // 🚀 INIT
@@ -37,12 +105,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    usuarioActual = session.user;
-    document.getElementById('btn-logout').style.display = 'flex';
-    loginSection.style.display = 'none';
-    consultaSection.style.display = 'none';
-    cursosDisponiblesSection.style.display = 'block';
-    await Promise.all([cargarCursos(), verificarAdmin(session.user.id)]);
+    await resolverSedeYContinuar(session.user);
   }
 });
 
@@ -102,12 +165,7 @@ async function login() {
     return;
   }
 
-  usuarioActual = data.user;
-  document.getElementById('btn-logout').style.display = 'flex';
-  loginSection.style.display = 'none';
-  consultaSection.style.display = 'none';
-  cursosDisponiblesSection.style.display = 'block';
-  await Promise.all([cargarCursos(), verificarAdmin(data.user.id)]);
+  await resolverSedeYContinuar(data.user);
 }
 window.login = login;
 
@@ -116,6 +174,7 @@ window.login = login;
 // ═══════════════════════════════
 async function logout() {
   await supabase.auth.signOut();
+  sessionStorage.removeItem('sedeActiva');
   location.reload();
 }
 window.logout = logout;

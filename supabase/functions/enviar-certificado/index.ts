@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     const anio = new Date().getFullYear().toString().slice(-2)
     const { data: cursoData } = await supabaseAdmin
       .from('cursos')
-      .select('correlativo, codigo_prefijo')
+      .select('correlativo, codigo_prefijo, sede')
       .eq('id', id_curso)
       .single()
 
@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
       dni,
       cargo,
       empresa,
+      sede: cursoData?.sede || 'ANTAMINA',
     }])
 
     // DESHABILITADO: solo admins pueden ver certificados, no se notifica al trabajador

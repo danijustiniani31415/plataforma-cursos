@@ -240,6 +240,7 @@ async function cargarCursos() {
     .from('cursos')
     .select('*')
     .eq('activo', true)
+    .eq('sede', sedeActiva || 'ANTAMINA')
     .order('titulo');
 
   if (error) { alert("❌ Error al cargar cursos: " + error.message); return; }
@@ -502,7 +503,8 @@ async function mostrarPasoActual() {
           await supabase.from('asistencias').insert([{
             email:      usuarioActual.email,
             usuario_id: usuarioActual.id,
-            curso_id:   cursoSeleccionado.id
+            curso_id:   cursoSeleccionado.id,
+            sede:       sedeActiva || 'ANTAMINA'
           }]);
         }
       }
@@ -768,7 +770,8 @@ window.enviarFormulario = async function (tipoPaso) {
       usuario_id:    usuarioActual.id,
       usuario_email: usuarioActual.email,
       id_curso:      cursoSeleccionado.id,
-      estado:        'completado'
+      estado:        'completado',
+      sede:          sedeActiva || 'ANTAMINA'
     }])
     .select()
     .single();

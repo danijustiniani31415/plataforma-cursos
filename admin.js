@@ -35,6 +35,56 @@ function initSelectBuscable(id) {
 let empresaAdminId = null;
 let empresaAdminNombre = null;
 let empresaAdminRuc = null;
+let sedeAdminActiva = null;
+
+// ═══════════════════════════════
+// 🏢 Resolver sede activa del admin (una o varias)
+// ═══════════════════════════════
+async function resolverSedeAdmin(userId) {
+  const sedeGuardada = sessionStorage.getItem('sedeAdminActiva');
+
+  const { data: sedes } = await supabase
+    .from('perfil_sede')
+    .select('sede')
+    .eq('profile_id', userId)
+    .eq('activo', true);
+
+  if (!sedes || sedes.length === 0) {
+    sedeAdminActiva = sedeGuardada || 'ANTAMINA';
+    return;
+  }
+
+  if (sedeGuardada && sedes.some(s => s.sede === sedeGuardada)) {
+    sedeAdminActiva = sedeGuardada;
+  } else {
+    sedeAdminActiva = sedes[0].sede;
+    sessionStorage.setItem('sedeAdminActiva', sedeAdminActiva);
+  }
+
+  // Si el admin gestiona más de una sede, mostrar selector en el header
+  if (sedes.length > 1) {
+    const cont = document.getElementById('info-empresa-header');
+    if (cont && !document.getElementById('selector-sede-admin')) {
+      const sel = document.createElement('select');
+      sel.id = 'selector-sede-admin';
+      sel.style.marginLeft = '10px';
+      sel.style.padding = '4px 8px';
+      sel.style.borderRadius = '6px';
+      sedes.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.sede;
+        opt.textContent = s.sede;
+        opt.selected = s.sede === sedeAdminActiva;
+        sel.appendChild(opt);
+      });
+      sel.onchange = () => {
+        sessionStorage.setItem('sedeAdminActiva', sel.value);
+        location.reload();
+      };
+      cont.appendChild(sel);
+    }
+  }
+}
 
 // ═══════════════════════════════
 // 🔐 Validar admin + cargar datos
@@ -105,6 +155,7 @@ async function cargarDatosAdmin() {
     empresaAdminRuc = perfil.empresas?.ruc;
 
     document.getElementById('info-empresa-header').textContent = `🏢 ${empresaAdminNombre}`;
+    await resolverSedeAdmin(user.id);
     document.getElementById('info-empresa').innerHTML = `
       <div class="info-box" style="margin-bottom:16px;">
         🏢 <strong>${empresaAdminNombre}</strong> — RUC: ${empresaAdminRuc}
@@ -137,7 +188,7 @@ async function cargarDatosAdmin() {
 
   // Cargar cursos en los selects que los necesitan (Forms import + bulk cert)
   const { data: cursosForSelect } = await supabase
-    .from('cursos').select('id, titulo').order('titulo');
+    .from('cursos').select('id, titulo').eq('sede', sedeAdminActiva).order('titulo');
   const selFormsCurso = document.getElementById('forms-curso');
   if (selFormsCurso) {
     (cursosForSelect || []).forEach(c => {
@@ -391,7 +442,8 @@ window.subirCurso = async function () {
     vigencia_meses,
     url_video:    url_video    || null,
     url_material: url_material || null,
-    activo:       true
+    activo:       true,
+    sede:         sedeAdminActiva
   }]);
 
   if (error) {
@@ -2176,7 +2228,7 @@ async function cargarDatosDashboard() {
   const [{ data: trabajadores }, { data: cursos }] = await Promise.all([
     supabase.from('profiles').select('id, nombres, apellidos, email, documento_numero, cargo')
       .eq('empresa_id', empresaAdminId).eq('rol', 'trabajador').eq('activo', true).order('apellidos'),
-    supabase.from('cursos').select('id, titulo').eq('activo', true)
+    supabase.from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva)
   ]);
   todosTrabajadoresDash = trabajadores || [];
   todosCursosDash = cursos || [];
@@ -2556,6 +2608,7 @@ window.cargarListaCursos = async function () {
   const { data: cursos, error: errCursos } = await supabase
     .from('cursos')
     .select('id, titulo, codigo, codigo_prefijo, duracion, vigencia_meses, url_video, url_material, activo')
+    .eq('sede', sedeAdminActiva)
     .order('titulo');
 
   if (errCursos) {
@@ -2762,7 +2815,7 @@ window.eliminarVideoCurso = async function (id, cursoId) {
 window.initSelectCursoForm = async function initSelectCursoForm() {
   const sel = document.getElementById('select-curso-form');
   if (!sel || sel.options.length > 1) return;
-  const { data } = await supabase.from('cursos').select('id, titulo').eq('activo', true).order('titulo');
+  const { data } = await supabase.from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva).order('titulo');
   data?.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.titulo}</option>`; });
   initSelectBuscable('select-curso-form');
 }
@@ -3546,7 +3599,7 @@ let datosCumplimiento = [];
 
 window.initCumplimiento = async function () {
   // Poblar selector de cursos
-  const { data: cursos } = await supabase.from('cursos').select('id, titulo').eq('activo', true).order('titulo');
+  const { data: cursos } = await supabase.from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva).order('titulo');
   const sel = document.getElementById('select-curso-cumpl');
   if (sel) {
     sel.innerHTML = '<option value="">-- Selecciona un curso --</option>';
@@ -3563,7 +3616,7 @@ async function cargarResumenCumplimiento() {
 
   const [{ data: workers }, { data: cursos }] = await Promise.all([
     supabase.from('profiles').select('id, nombres, apellidos, email, documento_numero, cargo').eq('empresa_id', empresaAdminId).eq('activo', true).order('apellidos'),
-    supabase.from('cursos').select('id, titulo, vigencia_meses').eq('activo', true),
+    supabase.from('cursos').select('id, titulo, vigencia_meses').eq('activo', true).eq('sede', sedeAdminActiva),
   ]);
 
   if (!workers?.length || !cursos?.length) {
@@ -4138,7 +4191,7 @@ let sesionQRActual = null;
 let intervalAsistentes = null;
 
 window.initQRAsistencia = async function () {
-  const { data: cursos } = await supabase.from('cursos').select('id, titulo').eq('activo', true).order('titulo');
+  const { data: cursos } = await supabase.from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva).order('titulo');
   ['qr-curso', 'qr-filtro-curso'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -4388,7 +4441,7 @@ window.descargarPlantillaEvaluaciones = async function (e) {
     const XLSX = window.XLSX;
 
     const { data: cursos } = await supabase
-      .from('cursos').select('titulo').eq('activo', true).order('titulo');
+      .from('cursos').select('titulo').eq('activo', true).eq('sede', sedeAdminActiva).order('titulo');
     const listaCursos = cursos?.map(c => c.titulo) || [];
 
     const ws = XLSX.utils.aoa_to_sheet([
@@ -4503,7 +4556,7 @@ window.importarEvaluaciones = async function () {
   perfiles?.forEach(p => { perfilMap[p.documento_numero] = p; });
 
   const { data: cursos } = await supabase
-    .from('cursos').select('id, titulo').eq('activo', true);
+    .from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva);
   const cursoMap = {};
   cursos?.forEach(c => { cursoMap[c.titulo.toLowerCase()] = c; });
 
@@ -4612,7 +4665,7 @@ window.cargarCursosSelectForms = async function () {
   const sel = document.getElementById('forms-curso');
   if (!sel || sel.options.length > 1) return; // ya cargado
   const { data: cursos } = await supabase
-    .from('cursos').select('id, titulo').eq('activo', true).order('titulo');
+    .from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva).order('titulo');
   (cursos || []).forEach(c => {
     sel.innerHTML += `<option value="${c.id}">${c.titulo}</option>`;
   });

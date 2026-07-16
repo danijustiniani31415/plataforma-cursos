@@ -4151,6 +4151,7 @@ window.generarReporteSUNAFIL = async function () {
     .from('envios_formulario')
     .select('usuario_email, id_curso, puntaje, porcentaje, aprobado, created_at, formularios(tipo, titulo), cursos(titulo, duracion)')
     .eq('estado', 'completado')
+    .eq('sede', sedeAdminActiva)
     .gte('created_at', inicioAnio)
     .lte('created_at', finAnio);
 

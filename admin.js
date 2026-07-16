@@ -1150,34 +1150,98 @@ window.generarReporteNotas = async function () {
     : new Date(Date.UTC(anio + 1, 0, 1, 5, 0, 0)).toISOString();
 
   try {
-    const allData = [];
-    let pageR = 0;
-    while (true) {
-      let q = supabase
-        .from('certificados')
-        .select('*')
-        .gte('fecha', desde)
-        .lt('fecha', hasta)
-        .order('fecha', { ascending: false })
-        .range(pageR * 1000, (pageR + 1) * 1000 - 1);
-
-      if (empresaAdminNombre) q = q.eq('empresa', empresaAdminNombre);
-      if (cursoId) q = q.eq('curso_id', cursoId);
-      if (estado === 'aprobado')    q = q.gte('nota', NOTA_APROBATORIA);
-      if (estado === 'desaprobado') q = q.lt('nota',  NOTA_APROBATORIA);
-
-      const { data, error } = await q;
-      if (error) throw error;
-      if (!data?.length) break;
-      allData.push(...data);
-      pageR++;
+    // Paso 1: IDs de formularios tipo 'examen' (filtrado opcional por curso)
+    const examFormIds = [];
+    {
+      let pg = 0;
+      while (true) {
+        let qf = supabase.from('formularios').select('id').eq('tipo', 'examen')
+          .range(pg * 1000, (pg + 1) * 1000 - 1);
+        if (cursoId) qf = qf.eq('id_curso', cursoId);
+        const { data: fd, error: fe } = await qf;
+        if (fe) throw fe;
+        if (!fd?.length) break;
+        examFormIds.push(...fd.map(f => f.id));
+        pg++;
+      }
     }
 
+    console.log('[RN] examFormIds:', examFormIds.length, examFormIds.slice(0, 5));
+
+    // Paso 2: envíos aprobados en el rango → mapa 'userId|cursoId' y 'email|cursoId' → fecha_examen
+    const enviosMapById    = {};  // usuario_id|id_curso → fecha
+    const enviosMapByEmail = {};  // usuario_email|id_curso → fecha
+    if (examFormIds.length) {
+      let pg = 0;
+      while (true) {
+        const { data: envios, error: ee } = await supabase
+          .from('envios_formulario')
+          .select('usuario_id, usuario_email, id_curso, created_at')
+          .in('id_formulario', examFormIds)
+          .eq('aprobado', true)
+          .gte('created_at', desde)
+          .lt('created_at', hasta)
+          .range(pg * 1000, (pg + 1) * 1000 - 1);
+        if (ee) throw ee;
+        if (!envios?.length) break;
+        for (const e of envios) {
+          if (e.usuario_id) {
+            const k = `${e.usuario_id}|${e.id_curso}`;
+            if (!enviosMapById[k] || e.created_at < enviosMapById[k]) enviosMapById[k] = e.created_at;
+          }
+          if (e.usuario_email) {
+            const k = `${e.usuario_email}|${e.id_curso}`;
+            if (!enviosMapByEmail[k] || e.created_at < enviosMapByEmail[k]) enviosMapByEmail[k] = e.created_at;
+          }
+        }
+        pg++;
+      }
+    }
+    console.log('[RN] enviosMap por id:', Object.keys(enviosMapById).length,
+      '| por email:', Object.keys(enviosMapByEmail).length,
+      '| muestra id:', Object.entries(enviosMapById).slice(0, 3),
+      '| muestra email:', Object.entries(enviosMapByEmail).slice(0, 3));
+
+    // Paso 3: certificados de la empresa (sin filtro de fecha — se filtra por fecha_examen)
+    const allCerts = [];
+    {
+      let pg = 0;
+      while (true) {
+        let q = supabase.from('certificados').select('*')
+          .range(pg * 1000, (pg + 1) * 1000 - 1);
+        if (empresaAdminNombre) q = q.eq('empresa', empresaAdminNombre);
+        if (cursoId) q = q.eq('curso_id', cursoId);
+        if (estado === 'aprobado')    q = q.gte('nota', NOTA_APROBATORIA);
+        if (estado === 'desaprobado') q = q.lt('nota',  NOTA_APROBATORIA);
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data?.length) break;
+        allCerts.push(...data);
+        pg++;
+      }
+    }
+    console.log('[RN] certs totales empresa:', allCerts.length,
+      '| muestra usuario_id:', allCerts.slice(0, 2).map(r => r.usuario_id),
+      '| muestra curso_id:', allCerts.slice(0, 2).map(r => r.curso_id));
+
+    // Paso 4: cruzar — solo certs con examen en el rango, agregar fecha_examen
     const { data: cursos } = await supabase.from('cursos').select('id, titulo');
     const mapCursos = {};
     (cursos || []).forEach(c => { mapCursos[c.id] = c.titulo; });
 
-    _rn_datos = allData.map(r => ({ ...r, curso_nombre: mapCursos[r.curso_id] || '—' }));
+    _rn_datos = allCerts
+      .map(r => {
+        const kId    = `${r.usuario_id}|${r.curso_id}`;
+        const kEmail = `${r.usuario_email}|${r.curso_id}`;
+        const fecha_examen = enviosMapById[kId] || enviosMapByEmail[kEmail] || null;
+        return { ...r, fecha_examen, curso_nombre: mapCursos[r.curso_id] || '—' };
+      })
+      .filter(r => r.fecha_examen !== null)
+      .sort((a, b) => b.fecha_examen.localeCompare(a.fecha_examen));
+
+    console.log('[RN] resultado final:', _rn_datos.length,
+      '| muestra fechas:', _rn_datos.slice(0, 5).map(r => r.fecha_examen));
+
     _rn_filtrados = [..._rn_datos];
 
     rn_renderKpis();
@@ -1227,8 +1291,8 @@ function rn_renderTabla() {
       const porcTxt  = r.nota != null ? (nota / 20 * 100).toFixed(0) + '%' : '—';
       const barW     = r.nota != null ? Math.min(100, nota / 20 * 100).toFixed(1) : 0;
       const color    = aprobado ? '#1D9E75' : '#A32D2D';
-      const fecha    = (r.fecha || r.created_at)
-        ? new Date(r.fecha || r.created_at).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
+      const fecha    = r.fecha_examen
+        ? new Date(r.fecha_examen).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
         : '—';
       const badge    = aprobado
         ? `<span class="rn2-badge rn2-badge-ap">${RN_SVG_CHECK} Aprobado</span>`
@@ -1289,8 +1353,8 @@ window.descargarReporteExcel = function () {
   const filas = _rn_filtrados.map(r => {
     const nota = Number(r.nota ?? 0);
     const ap   = nota >= NOTA_APROBATORIA;
-    const fecha = (r.fecha || r.created_at)
-      ? new Date(r.fecha || r.created_at).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
+    const fecha = r.fecha_examen
+      ? new Date(r.fecha_examen).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
       : '';
     return [
       r.dni || '', r.apellidos || '', r.nombres || '',

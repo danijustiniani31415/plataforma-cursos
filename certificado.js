@@ -260,3 +260,46 @@ export async function generarCertificadoPDF(curso, nota) {
 
   await descargarCertificadoPDF(html, `Certificado_${nombreCompleto}_${curso.titulo}.pdf`);
 }
+
+// ─── Solo registra en BD, sin generar PDF ────────────────────────────────────
+async function registrarCertificadoBD(curso, nota) {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: perfil } = await supabase
+    .from('profiles')
+    .select('nombres, apellidos, documento_numero, documento_tipo, cargo_id, empresa_id, cargos(nombre), empresas(nombre)')
+    .eq('id', user.id)
+    .single();
+
+  const notaTexto = nota?.toFixed ? nota.toFixed(1) : String(nota);
+
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token || ANON_KEY;
+
+  const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/enviar-certificado', {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${token}`,
+      'apikey':        ANON_KEY,
+    },
+    body: JSON.stringify({
+      usuario_id:    user.id,
+      usuario_email: user.email,
+      nombres:       perfil?.nombres || '',
+      apellidos:     perfil?.apellidos || '',
+      dni:           perfil?.documento_numero || '',
+      cargo:         perfil?.cargos?.nombre || '',
+      empresa:       perfil?.empresas?.nombre || '',
+      id_curso:      curso.id,
+      curso_titulo:  curso.titulo,
+      curso_prefijo: curso.codigo_prefijo || 'CERT',
+      nota:          notaTexto,
+    }),
+  });
+
+  const data = await res.json();
+  console.log('Certificado registrado en BD:', data.codigo);
+}
+window.registrarCertificadoBD = registrarCertificadoBD;

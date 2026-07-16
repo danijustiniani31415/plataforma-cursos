@@ -1062,7 +1062,8 @@ window.importarAsignacion = async function () {
         empresa_id: empresaAdminId,
         usuario_id: perfilMap[dni].id,
         usuario_email: perfilMap[dni].email,
-        documento_numero: dni, mes, anio
+        documento_numero: dni, mes, anio,
+        sede: sedeAdminActiva
       });
       if (tdEstado) { tdEstado.textContent = '✅ Asignado'; tdEstado.style.color = 'green'; }
       ok++;
@@ -1083,7 +1084,8 @@ window.importarAsignacion = async function () {
           email, password: dni, nombres, apellidos,
           documento_tipo: 'DNI', documento_numero: dni,
           telefono: telefono || null, empresa_id: empresaAdminId,
-          cargo_id: cargo?.id || null, fecha_ingreso: fechaIngreso || null, rol: 'trabajador'
+          cargo_id: cargo?.id || null, fecha_ingreso: fechaIngreso || null, rol: 'trabajador',
+          sedes: [sedeAdminActiva]
         })
       });
       const data = await res.json();
@@ -1099,7 +1101,8 @@ window.importarAsignacion = async function () {
             empresa_id: empresaAdminId,
             usuario_id: nuevoPerfil.id,
             usuario_email: nuevoPerfil.email,
-            documento_numero: dni, mes, anio
+            documento_numero: dni, mes, anio,
+            sede: sedeAdminActiva
           });
         }
         if (tdEstado) { tdEstado.textContent = '✅ Creado y asignado'; tdEstado.style.color = 'green'; }
@@ -1115,7 +1118,7 @@ window.importarAsignacion = async function () {
   // Insertar todas las asignaciones de una vez
   if (registros.length) {
     await supabase.from('asignaciones_mes')
-      .upsert(registros, { onConflict: 'empresa_id,documento_numero,mes,anio' });
+      .upsert(registros, { onConflict: 'empresa_id,sede,documento_numero,mes,anio' });
   }
 
   progreso.textContent += ` — ¡Completado! ${registros.length} asignados al ${mes}/${anio}.`;
@@ -1131,6 +1134,7 @@ window.verAsignadosMes = async function () {
     .from('asignaciones_mes')
     .select('documento_numero, usuario_email, profiles(nombres, apellidos, cargo)')
     .eq('empresa_id', empresaAdminId)
+    .eq('sede', sedeAdminActiva)
     .eq('mes', mes)
     .eq('anio', anio)
     .order('documento_numero');
@@ -2155,6 +2159,7 @@ window.cargarDashboardMes = async function () {
     .from('asignaciones_mes')
     .select('usuario_email, documento_numero')
     .eq('empresa_id', empresaAdminId)
+    .eq('sede', sedeAdminActiva)
     .eq('mes', mes)
     .eq('anio', anio);
 

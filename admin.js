@@ -1795,11 +1795,12 @@ window.ejecutarActualizacion = async function () {
     }
 
     // Usar edge function para actualizar profiles (auth.users.email nunca cambia)
+    const { data: sessionDataAct } = await supabase.auth.getSession();
     const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ANON_KEY}`,
+        'Authorization': `Bearer ${sessionDataAct.session?.access_token}`,
         'apikey': ANON_KEY,
       },
       body: JSON.stringify({ usuario_id: usuarioId, updates }),
@@ -1959,11 +1960,12 @@ window.guardarActualizacionIndividual = async function () {
   const body = { usuario_id: usuarioId, updates };
   if (password) body.password = password;
 
+  const { data: sessionDataAct2 } = await supabase.auth.getSession();
   const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${ANON_KEY}`,
+      'Authorization': `Bearer ${sessionDataAct2.session?.access_token}`,
       'apikey': ANON_KEY,
     },
     body: JSON.stringify(body),
@@ -2015,13 +2017,14 @@ window.corregirPasswordsDNI = async function () {
 
   const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
 
+  const { data: sessionDataAct3 } = await supabase.auth.getSession();
   let ok = 0, errores = 0;
   for (const u of afectados) {
     const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ANON_KEY}`,
+        'Authorization': `Bearer ${sessionDataAct3.session?.access_token}`,
         'apikey': ANON_KEY,
       },
       body: JSON.stringify({

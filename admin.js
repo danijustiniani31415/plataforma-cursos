@@ -1922,6 +1922,19 @@ window.abrirFormEdicion = async function (idx) {
     sel.appendChild(opt);
   });
 
+  const { data: sedesTrab } = await supabase
+    .from('perfil_sede')
+    .select('sede, activo')
+    .eq('profile_id', t.id);
+
+  const sedesActivas = (sedesTrab || []).filter(s => s.activo).map(s => s.sede);
+  const contSedes = document.getElementById('edit-trab-sedes-checks');
+  contSedes.innerHTML = sedesAdminDisponibles.map(s => `
+    <label style="margin-right:16px; font-size:0.9rem;">
+      <input type="checkbox" class="chk-edit-trab-sede" value="${s}" ${sedesActivas.includes(s) ? 'checked' : ''} />
+      ${s}
+    </label>`).join('');
+
   document.getElementById('form-editar-trab').style.display = 'block';
   document.getElementById('form-editar-trab').scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
@@ -1957,7 +1970,10 @@ window.guardarActualizacionIndividual = async function () {
 
   const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
 
-  const body = { usuario_id: usuarioId, updates };
+  const sedesMarcadas = Array.from(document.querySelectorAll('.chk-edit-trab-sede:checked')).map(c => c.value);
+  const sedesNoMarcadas = sedesAdminDisponibles.filter(s => !sedesMarcadas.includes(s));
+
+  const body = { usuario_id: usuarioId, updates, agregarSedes: sedesMarcadas, quitarSedes: sedesNoMarcadas };
   if (password) body.password = password;
 
   const { data: sessionDataAct2 } = await supabase.auth.getSession();

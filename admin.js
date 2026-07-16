@@ -1260,6 +1260,7 @@ window.generarReporteNotas = async function () {
           .select('usuario_id, usuario_email, id_curso, created_at')
           .in('id_formulario', examFormIds)
           .eq('aprobado', true)
+          .eq('sede', sedeAdminActiva)
           .gte('created_at', desde)
           .lt('created_at', hasta)
           .range(pg * 1000, (pg + 1) * 1000 - 1);
@@ -1289,6 +1290,7 @@ window.generarReporteNotas = async function () {
       let pg = 0;
       while (true) {
         let q = supabase.from('certificados').select('*')
+          .eq('sede', sedeAdminActiva)
           .range(pg * 1000, (pg + 1) * 1000 - 1);
         if (empresaAdminNombre) q = q.eq('empresa', empresaAdminNombre);
         if (cursoId) q = q.eq('curso_id', cursoId);

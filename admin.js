@@ -2091,8 +2091,6 @@ window.generarInformeRBD = async function () {
     const gruposCursos = Object.values(cursosMap);
     const certs = gruposCursos.flatMap(g => g.filas);
 
-    const UMBRAL_COMBINAR = 600; // hasta este número de certificados, va todo en un solo PDF
-
     if (certs.length > 400) {
       const seguir = await showConfirm(
         `Este período tiene ${certs.length} certificados. Puede tardar varios minutos sin cerrar la pestaña. ¿Continuar?`,
@@ -2292,70 +2290,31 @@ window.generarInformeRBD = async function () {
     escribirParrafo('Especialista SSOMA', { size: 8.5, align: 'right', gap: 1 });
     escribirParrafo('Ingeniero Metalurgista CIP:181200', { size: 8.5, align: 'right', gap: 4 });
 
-    // ── Certificados individuales (logo y membrete RBD) ──
-    // Si entran pocos, van en el mismo PDF (como pediste: si es liviano, un solo
-    // archivo). Si son muchos, el informe se guarda aparte y los certificados van
-    // en un ZIP — combinar miles en un solo PDF cuelga el navegador.
-    if (certs.length <= UMBRAL_COMBINAR) {
-      status.textContent = `🖨️ Generando 0 / ${certs.length} certificados...`;
-      for (let i = 0; i < certs.length; i++) {
-        const f = certs[i];
-        const c = f.curso;
-        const duracionTxt = c.duracion ? `${c.duracion} hora${c.duracion > 1 ? 's' : ''}` : '';
-        const nombreCompleto = `${f.apellidos || ''} ${f.nombres || ''}`.trim().toUpperCase();
-        const notaTexto = Number.isFinite(Number(f.nota)) ? Number(f.nota).toFixed(1) : String(f.nota || '');
-        const fechaCert = new Date(f.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+    // ── Certificados individuales (logo y membrete RBD) — siempre en el mismo PDF.
+    // Con la compresión liviana cada certificado pesa ~45-50KB, así que incluso
+    // varios cientos entran sin problema en un solo archivo.
+    status.textContent = `🖨️ Generando 0 / ${certs.length} certificados...`;
+    for (let i = 0; i < certs.length; i++) {
+      const f = certs[i];
+      const c = f.curso;
+      const duracionTxt = c.duracion ? `${c.duracion} hora${c.duracion > 1 ? 's' : ''}` : '';
+      const nombreCompleto = `${f.apellidos || ''} ${f.nombres || ''}`.trim().toUpperCase();
+      const notaTexto = Number.isFinite(Number(f.nota)) ? Number(f.nota).toFixed(1) : String(f.nota || '');
+      const fechaCert = new Date(f.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
 
-        const htmlCert = buildHtmlCertificado({
-          nombreCompleto, dni: f.dni, documentoTipo: 'DNI', cargo: f.cargo,
-          cursotitulo: c.titulo, duracion: duracionTxt, notaTexto, fechaHoy: fechaCert,
-          codigo: f.codigo, logoUrl: RBD_LOGO_URL, empresaNombre: RBD_NOMBRE,
-        });
-        const canvas = await generarCertificadoCanvas(htmlCert, true); // liviano
-        doc.addPage([CERT_W, CERT_H], 'landscape');
-        doc.addImage(canvas.toDataURL('image/jpeg', 0.55), 'JPEG', 0, 0, CERT_W, CERT_H);
-        status.textContent = `🖨️ Generando ${i + 1} / ${certs.length} certificados...`;
-      }
-
-      status.textContent = '💾 Guardando PDF...';
-      doc.save(`Informe_RBD_${sedeAdminActiva}_${RN_MESES[mes - 1]}_${anio}.pdf`);
-    } else {
-      status.textContent = '💾 Guardando informe (portada y tablas)...';
-      doc.save(`Informe_RBD_${sedeAdminActiva}_${RN_MESES[mes - 1]}_${anio}_resumen.pdf`);
-
-      if (!window.JSZip) throw new Error('No se cargó JSZip (necesario para el ZIP de certificados).');
-      const zip = new window.JSZip();
-      const folder = zip.folder('Certificados');
-
-      status.textContent = `🖨️ Generando 0 / ${certs.length} certificados...`;
-      for (let i = 0; i < certs.length; i++) {
-        const f = certs[i];
-        const c = f.curso;
-        const duracionTxt = c.duracion ? `${c.duracion} hora${c.duracion > 1 ? 's' : ''}` : '';
-        const nombreCompleto = `${f.apellidos || ''} ${f.nombres || ''}`.trim().toUpperCase();
-        const notaTexto = Number.isFinite(Number(f.nota)) ? Number(f.nota).toFixed(1) : String(f.nota || '');
-        const fechaCert = new Date(f.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
-
-        const htmlCert = buildHtmlCertificado({
-          nombreCompleto, dni: f.dni, documentoTipo: 'DNI', cargo: f.cargo,
-          cursotitulo: c.titulo, duracion: duracionTxt, notaTexto, fechaHoy: fechaCert,
-          codigo: f.codigo, logoUrl: RBD_LOGO_URL, empresaNombre: RBD_NOMBRE,
-        });
-        const pdfBlob = await generarCertificadoPDFBlob(htmlCert, true); // liviano
-        const nombreSeguro = nombreCompleto.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_');
-        folder.file(`${f.dni || 'sin_dni'}_${nombreSeguro}_${f.codigo}.pdf`, pdfBlob);
-        status.textContent = `🖨️ Generando ${i + 1} / ${certs.length} certificados...`;
-      }
-
-      status.textContent = '📦 Empaquetando ZIP...';
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const urlZip = URL.createObjectURL(zipBlob);
-      const a = document.createElement('a');
-      a.href = urlZip;
-      a.download = `Certificados_RBD_${sedeAdminActiva}_${RN_MESES[mes - 1]}_${anio}.zip`;
-      a.click();
-      URL.revokeObjectURL(urlZip);
+      const htmlCert = buildHtmlCertificado({
+        nombreCompleto, dni: f.dni, documentoTipo: 'DNI', cargo: f.cargo,
+        cursotitulo: c.titulo, duracion: duracionTxt, notaTexto, fechaHoy: fechaCert,
+        codigo: f.codigo, logoUrl: RBD_LOGO_URL, empresaNombre: RBD_NOMBRE,
+      });
+      const canvas = await generarCertificadoCanvas(htmlCert, true); // liviano
+      doc.addPage([CERT_W, CERT_H], 'landscape');
+      doc.addImage(canvas.toDataURL('image/jpeg', 0.55), 'JPEG', 0, 0, CERT_W, CERT_H);
+      status.textContent = `🖨️ Generando ${i + 1} / ${certs.length} certificados...`;
     }
+
+    status.textContent = '💾 Guardando PDF...';
+    doc.save(`Informe_RBD_${sedeAdminActiva}_${RN_MESES[mes - 1]}_${anio}.pdf`);
 
     await supabase.from('informes_rbd_contador').upsert({ sede: sedeAdminActiva, ultimo_numero: numeroInforme });
 

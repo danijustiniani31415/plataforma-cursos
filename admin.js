@@ -1,6 +1,6 @@
 import { supabase } from './src/supabaseClient.js';
 import { alertToToast, withLoading, showConfirm, fieldValidation } from './toast.js';
-import { buildHtmlCertificado, generarCertificadoPDFBlob } from './certificado.js';
+import { buildHtmlCertificado, generarCertificadoPDFBlob, generarCertificadoCanvas, RBD_LOGO_URL, FIRMA_RBD_URL } from './certificado.js';
 const alert = alertToToast;
 
 // Normaliza DNI: elimina espacios/saltos y padea a 8 dígitos con 0 a la izquierda
@@ -29,6 +29,22 @@ async function chunkedInQuery(values, chunkSize, queryFn) {
     if (r?.error) return { data: null, error: r.error };
   }
   return { data: results.flatMap(r => r?.data || []), error: null };
+}
+
+// Trae TODAS las filas de un query paginando de a 1000 (límite por defecto de
+// PostgREST) — buildQuery debe devolver un query builder NUEVO cada vez que se
+// invoca (no reutilizar uno ya encadenado con .range()).
+async function fetchAllRows(buildQuery, pageSize = 1000) {
+  let all = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+    if (error) return { data: null, error };
+    all = all.concat(data || []);
+    if (!data || data.length < pageSize) break;
+    from += pageSize;
+  }
+  return { data: all, error: null };
 }
 
 // Select buscable con Tom Select
@@ -887,6 +903,18 @@ window.aplicarCambiosDeCargo = async function () {
     document.getElementById('filtro-mes').value = mesActual;
   }
 
+  // Informe RBD
+  const selRbd = document.getElementById('rbd-anio');
+  if (selRbd) {
+    for (let y = anioActual; y >= 2024; y--) {
+      const opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      selRbd.appendChild(opt);
+    }
+    document.getElementById('rbd-mes').value  = mesActual;
+    document.getElementById('rbd-anio').value = anioActual;
+  }
+
   // Dashboard
   const selDash = document.getElementById('dash-anio');
   if (selDash) {
@@ -1243,29 +1271,15 @@ window.cargarTrabajadores = async function (page = 0) {
   const filtroEstado = document.getElementById('filtro-estado-trab')?.value || '';
 
   // Solo trabajadores asignados a la sede activa (perfil_sede) — si está en varias sedes,
-  // aparece igual en cualquiera de ellas.
-  const { data: sedeRows, error: errSede } = await supabase
-    .from('perfil_sede')
-    .select('profile_id')
-    .eq('empresa_id', empresaAdminId)
-    .eq('sede', sedeAdminActiva)
-    .eq('activo', true);
-  if (errSede) { alert('❌ ' + errSede.message); return; }
-
-  const idsEnSede = (sedeRows || []).map(r => r.profile_id);
-  if (!idsEnSede.length) {
-    document.getElementById('galeria-trabajadores').innerHTML =
-      `<p style="color:#888;padding:12px;">No hay trabajadores asignados a la sede ${sedeAdminActiva}.</p>`;
-    document.getElementById('paginacion-trabajadores')?.remove();
-    return;
-  }
-
+  // aparece igual en cualquiera de ellas. Filtro con join embebido (no con .in() de IDs:
+  // con sedes grandes generaba URLs de miles de caracteres y el servidor respondía 400).
   let query = supabase
     .from('profiles')
-    .select('id, nombres, apellidos, email, documento_numero, telefono, cargo_id, cargo, fecha_ingreso, activo', { count: 'exact' })
+    .select('id, nombres, apellidos, email, documento_numero, telefono, cargo_id, cargo, fecha_ingreso, activo, perfil_sede!inner(sede)', { count: 'exact' })
     .eq('empresa_id', empresaAdminId)
     .eq('rol', 'trabajador')
-    .in('id', idsEnSede)
+    .eq('perfil_sede.sede', sedeAdminActiva)
+    .eq('perfil_sede.activo', true)
     .order('apellidos')
     .range(desde, desde + PAGE_SIZE - 1);
 
@@ -1386,27 +1400,15 @@ window.cargarStaff = async function () {
   const busqueda = document.getElementById('buscar-staff')?.value.trim() || '';
   const filtroRol = document.getElementById('filtro-rol-staff')?.value || '';
 
-  const { data: sedeRows, error: errSede } = await supabase
-    .from('perfil_sede')
-    .select('profile_id')
-    .eq('empresa_id', empresaAdminId)
-    .eq('sede', sedeAdminActiva)
-    .eq('activo', true);
-  if (errSede) { alert('❌ ' + errSede.message); return; }
-
-  const idsEnSede = (sedeRows || []).map(r => r.profile_id);
-  if (!idsEnSede.length) {
-    document.getElementById('galeria-staff').innerHTML =
-      `<p style="color:#888;padding:12px;">No hay administradores ni gestores asignados a la sede ${sedeAdminActiva}.</p>`;
-    return;
-  }
-
+  // Join embebido en vez de .in() de IDs (con sedes grandes esa URL superaba el
+  // límite del servidor y devolvía 400).
   let query = supabase
     .from('profiles')
-    .select('id, nombres, apellidos, email, documento_numero, rol, activo')
+    .select('id, nombres, apellidos, email, documento_numero, rol, activo, perfil_sede!inner(sede)')
     .eq('empresa_id', empresaAdminId)
     .in('rol', filtroRol ? [filtroRol] : ['admin', 'gestor'])
-    .in('id', idsEnSede)
+    .eq('perfil_sede.sede', sedeAdminActiva)
+    .eq('perfil_sede.activo', true)
     .order('apellidos');
 
   if (busqueda) {
@@ -1776,7 +1778,7 @@ window.cargarListaCursos = async function () {
 
   const { data: cursos, error: errCursos } = await supabase
     .from('cursos')
-    .select('id, titulo, codigo, codigo_prefijo, duracion, vigencia_meses, url_video, url_material, activo')
+    .select('id, titulo, codigo, codigo_prefijo, duracion, vigencia_meses, url_video, url_material, objetivo, activo')
     .eq('sede', sedeAdminActiva)
     .order('titulo');
 
@@ -1806,10 +1808,562 @@ window.abrirEdicionCurso = function (id) {
   document.getElementById('editar-curso-duracion').value      = c.duracion ?? '';
   document.getElementById('editar-curso-vigencia').value      = c.vigencia_meses ?? '';
   document.getElementById('editar-curso-url-material').value  = c.url_material || '';
+  document.getElementById('editar-curso-objetivo').value      = c.objetivo || '';
   document.getElementById('editar-curso-pdf-file').value      = '';
 
   document.getElementById('panel-editar-curso').style.display = 'block';
   cargarVideosCurso(c.id);
+  cargarCursosReferencia(c.id);
+};
+
+// ═══════════════════════════════
+// 🔁 Reusar PDF/videos de otro curso (cualquier sede del admin)
+// ═══════════════════════════════
+window.cursosReferenciaCache = {};
+
+async function cargarCursosReferencia(cursoActualId) {
+  const sel = document.getElementById('reusar-curso-select');
+  sel.innerHTML = '<option value="">-- Selecciona un curso de referencia --</option>';
+
+  const { data: cursos, error } = await supabase
+    .from('cursos')
+    .select('id, titulo, sede, url_material, objetivo')
+    .in('sede', sedesAdminDisponibles.length ? sedesAdminDisponibles : ['ANTAMINA'])
+    .order('sede').order('titulo');
+
+  if (error) return;
+
+  window.cursosReferenciaCache = {};
+  (cursos || []).filter(c => c.id !== cursoActualId).forEach(c => {
+    window.cursosReferenciaCache[c.id] = c;
+    sel.innerHTML += `<option value="${c.id}">${c.titulo} (${c.sede})</option>`;
+  });
+}
+
+window.usarPdfDeReferencia = function () {
+  const refId = document.getElementById('reusar-curso-select').value;
+  if (!refId) { alert('❌ Selecciona primero un curso de referencia.'); return; }
+  const ref = window.cursosReferenciaCache[refId];
+  if (!ref?.url_material) { alert('❌ Ese curso no tiene un PDF cargado.'); return; }
+  document.getElementById('editar-curso-url-material').value = ref.url_material;
+  alert('✅ PDF copiado. No olvides hacer clic en "Guardar cambios" para aplicarlo.');
+};
+
+window.usarObjetivoDeReferencia = function () {
+  const refId = document.getElementById('reusar-curso-select').value;
+  if (!refId) { alert('❌ Selecciona primero un curso de referencia.'); return; }
+  const ref = window.cursosReferenciaCache[refId];
+  if (!ref?.objetivo) { alert('❌ Ese curso no tiene un objetivo cargado.'); return; }
+  document.getElementById('editar-curso-objetivo').value = ref.objetivo;
+  alert('✅ Objetivo copiado. No olvides hacer clic en "Guardar cambios" para aplicarlo.');
+};
+
+window.copiarVideosDeReferencia = async function () {
+  const cursoId = document.getElementById('editar-curso-id').value;
+  const refId   = document.getElementById('reusar-curso-select').value;
+  if (!cursoId) { alert('❌ Primero abre un curso para editar.'); return; }
+  if (!refId)   { alert('❌ Selecciona primero un curso de referencia.'); return; }
+
+  const ref = window.cursosReferenciaCache[refId];
+  if (!await showConfirm(
+    `¿Copiar todos los videos de "${ref.titulo} (${ref.sede})" a este curso? Se agregarán al final de la lista actual.`,
+    { confirmText: 'Sí, copiar' }
+  )) return;
+
+  const { data: videosRef, error: errRef } = await supabase
+    .from('videos_curso').select('url, orden')
+    .eq('id_curso', refId).order('orden');
+  if (errRef) { alert('❌ ' + errRef.message); return; }
+  if (!videosRef?.length) { alert('❌ Ese curso no tiene videos.'); return; }
+
+  const { data: existentes } = await supabase
+    .from('videos_curso').select('orden')
+    .eq('id_curso', cursoId).order('orden', { ascending: false }).limit(1);
+  let orden = existentes?.[0]?.orden || 0;
+
+  const nuevos = videosRef.map(v => ({ id_curso: cursoId, url: v.url, orden: ++orden, activo: true }));
+  const { error } = await supabase.from('videos_curso').insert(nuevos);
+  if (error) { alert('❌ Error al copiar videos: ' + error.message); return; }
+
+  alert(`✅ ${nuevos.length} video(s) copiado(s).`);
+  cargarVideosCurso(cursoId);
+};
+
+// ═══════════════════════════════
+// 📑 Informe externo de capacitaciones (RBD) — mensual, por sede
+// ═══════════════════════════════
+const RBD_NOMBRE = 'RBD CONSULTORIA EMPRESARIAL E.I.R.L.';
+const RBD_RESPONSABLE = 'Ing. Samuel Justiniani – Consultor SSOMA';
+const RBD_MODALIDAD = 'Virtual-asincrónico';
+
+window.generarInformeRBD = async function () {
+  const mes    = parseInt(document.getElementById('rbd-mes').value);
+  const anio   = parseInt(document.getElementById('rbd-anio').value);
+  const status = document.getElementById('rbd-status');
+
+  if (!mes || !anio) { alert('❌ Selecciona mes y año.'); return; }
+  if (!window.html2canvas) { alert('❌ No se cargó html2canvas (necesario para generar el informe). Recarga la página.'); return; }
+
+  status.textContent = '⏳ Preparando datos...';
+
+  try {
+    const desde = new Date(Date.UTC(anio, mes - 1, 1)).toISOString();
+    const hasta = new Date(Date.UTC(mes === 12 ? anio + 1 : anio, mes === 12 ? 0 : mes, 1)).toISOString();
+
+    const { data: empresa } = await supabase
+      .from('empresas').select('nombre, ruc').eq('id', empresaAdminId).single();
+
+    let { data: sedeCfg } = await supabase
+      .from('sede_config').select('cliente_final').eq('sede', sedeAdminActiva).maybeSingle();
+
+    if (!sedeCfg?.cliente_final) {
+      const clienteFinal = prompt(`No tengo el "Proyecto/Cliente final" para la sede ${sedeAdminActiva}. Escríbelo (se guardará para la próxima vez):`);
+      if (!clienteFinal) { status.textContent = ''; return; }
+      const { error: errCfg } = await supabase.from('sede_config').upsert({ sede: sedeAdminActiva, cliente_final: clienteFinal });
+      if (errCfg) { alert('❌ ' + errCfg.message); return; }
+      sedeCfg = { cliente_final: clienteFinal };
+    }
+
+    // Cursos de la sede
+    const { data: cursosSede, error: errCursosSede } = await supabase
+      .from('cursos')
+      .select('id, titulo, objetivo, duracion, codigo_prefijo, correlativo')
+      .eq('sede', sedeAdminActiva);
+    if (errCursosSede) throw errCursosSede;
+    if (!cursosSede?.length) {
+      status.textContent = `⚠️ No hay cursos registrados en la sede ${sedeAdminActiva}.`;
+      return;
+    }
+    const cursoIds = cursosSede.map(c => c.id);
+    const cursoById = {};
+    cursosSede.forEach(c => cursoById[c.id] = c);
+
+    // Se cuenta por fecha de APROBACIÓN DEL EXAMEN (envios_formulario), no por fecha
+    // de emisión del certificado — el certificado puede generarse/descargarse después.
+    // Paginado: meses con miles de aprobados (ej. jornadas de inducción masiva)
+    // superan el límite de 1000 filas por consulta.
+    const { data: envios, error: errEnvios } = await fetchAllRows(() => supabase
+      .from('envios_formulario')
+      .select('usuario_id, usuario_email, id_curso, puntaje, created_at, formularios(tipo)')
+      .in('id_curso', cursoIds)
+      .eq('aprobado', true)
+      .eq('estado', 'completado')
+      .gte('created_at', desde)
+      .lt('created_at', hasta)
+      .order('created_at'));
+    if (errEnvios) throw errEnvios;
+
+    // Mejor evaluación final (examen o eficacia) por usuario + curso
+    const mapaMejor = {};
+    for (const e of (envios || [])) {
+      const tipo = e.formularios?.tipo;
+      if (tipo !== 'examen' && tipo !== 'eficacia') continue;
+      const key = `${e.usuario_id}__${e.id_curso}`;
+      const previo = mapaMejor[key];
+      if (!previo || new Date(e.created_at) > new Date(previo.created_at)) mapaMejor[key] = e;
+    }
+    const aprobados = Object.values(mapaMejor);
+
+    if (!aprobados.length) {
+      status.textContent = `⚠️ No hay exámenes aprobados en ${RN_MESES[mes - 1]} ${anio} para la sede ${sedeAdminActiva}.`;
+      return;
+    }
+
+    const usuarioIds = [...new Set(aprobados.map(a => a.usuario_id).filter(Boolean))];
+    const { data: perfiles, error: errPerfiles } = await supabase
+      .from('profiles')
+      .select('id, email, nombres, apellidos, documento_numero, cargos(nombre)')
+      .in('id', usuarioIds);
+    if (errPerfiles) throw errPerfiles;
+    const mapaPerfiles = {};
+    (perfiles || []).forEach(p => mapaPerfiles[p.id] = p);
+
+    // Filtrado también por usuario_id (no solo curso_id) y en chunks + paginado:
+    // con miles de certificados en la sede, sin esto la consulta se corta en las
+    // primeras 1000 filas (límite por defecto de PostgREST) y certificados ya
+    // existentes quedaban afuera del mapa, haciendo que el código intentara
+    // crearlos de nuevo (chocando con la restricción UNIQUE).
+    const { data: certsExistentes, error: errCertsEx } = await chunkedInQuery(
+      usuarioIds, 150,
+      (chunk) => fetchAllRows(() => supabase
+        .from('certificados')
+        .select('usuario_id, curso_id, codigo, nota, nombres, apellidos, dni, cargo')
+        .in('curso_id', cursoIds)
+        .in('usuario_id', chunk))
+    );
+    if (errCertsEx) throw errCertsEx;
+    const mapaCert = {};
+    (certsExistentes || []).forEach(c => mapaCert[`${c.usuario_id}__${c.curso_id}`] = c);
+
+    // Regularizar (crear) los certificados que falten para los aprobados del periodo
+    status.textContent = '🔄 Regularizando certificados faltantes...';
+    const correlativosPorCurso = {};
+    cursosSede.forEach(c => correlativosPorCurso[c.id] = Number(c.correlativo || 0));
+    const nuevosCertificados = [];
+
+    for (const a of aprobados) {
+      const key = `${a.usuario_id}__${a.id_curso}`;
+      if (mapaCert[key]) continue;
+      const perfil = mapaPerfiles[a.usuario_id];
+      if (!perfil) continue;
+      const curso = cursoById[a.id_curso];
+      correlativosPorCurso[curso.id] += 1;
+      const anioCert = new Date(a.created_at).getFullYear().toString().slice(-2);
+      const prefijo = curso.codigo_prefijo || 'CERT';
+      const codigo = `${prefijo}-${anioCert}-${String(correlativosPorCurso[curso.id]).padStart(4, '0')}`;
+      nuevosCertificados.push({
+        usuario_id: a.usuario_id,
+        usuario_email: a.usuario_email || perfil.email || '',
+        curso_id: curso.id,
+        sede: sedeAdminActiva,
+        codigo,
+        nota: Number(a.puntaje || 0),
+        nombres: perfil.nombres || '',
+        apellidos: perfil.apellidos || '',
+        dni: perfil.documento_numero || '',
+        cargo: perfil.cargos?.nombre || '',
+        empresa: empresa?.nombre || '',
+        fecha: a.created_at,
+      });
+    }
+
+    if (nuevosCertificados.length) {
+      status.textContent = `🔄 Regularizando ${nuevosCertificados.length} certificado(s) faltante(s)...`;
+
+      // En lotes de 500 (jornadas masivas pueden generar miles de filas nuevas de golpe).
+      // upsert + ignoreDuplicates: si por una condición de carrera (dos generaciones
+      // del informe a la vez, o el trabajador generando su certificado en ese momento)
+      // alguno ya fue creado por otro lado, no revienta el informe entero.
+      const LOTE_INSERT = 500;
+      for (let i = 0; i < nuevosCertificados.length; i += LOTE_INSERT) {
+        const lote = nuevosCertificados.slice(i, i + LOTE_INSERT);
+        const { data: insertados, error: errInsert } = await supabase
+          .from('certificados')
+          .upsert(lote, { onConflict: 'usuario_id,curso_id', ignoreDuplicates: true })
+          .select('usuario_id, curso_id, codigo, nota, nombres, apellidos, dni, cargo');
+        if (errInsert) throw errInsert;
+        (insertados || []).forEach(c => mapaCert[`${c.usuario_id}__${c.curso_id}`] = c);
+      }
+
+      // Si algún conflicto quedó sin traer sus datos (ignoreDuplicates no los devuelve),
+      // los completamos con una segunda consulta puntual.
+      const faltantes = nuevosCertificados
+        .map(n => `${n.usuario_id}__${n.curso_id}`)
+        .filter(k => !mapaCert[k]);
+      if (faltantes.length) {
+        const idsFaltantes = [...new Set(faltantes.map(k => k.split('__')[0]))];
+        const { data: recuperados } = await chunkedInQuery(
+          idsFaltantes, 150,
+          (chunk) => fetchAllRows(() => supabase
+            .from('certificados')
+            .select('usuario_id, curso_id, codigo, nota, nombres, apellidos, dni, cargo')
+            .in('usuario_id', chunk)
+            .in('curso_id', cursoIds))
+        );
+        (recuperados || []).forEach(c => mapaCert[`${c.usuario_id}__${c.curso_id}`] = c);
+      }
+
+      for (const [cid, correlativo] of Object.entries(correlativosPorCurso)) {
+        if (correlativo !== Number(cursoById[cid].correlativo || 0)) {
+          await supabase.from('cursos').update({ correlativo }).eq('id', cid);
+        }
+      }
+    }
+
+    // Agrupar por curso, usando la fecha real de aprobación del examen
+    const cursosMap = {};
+    for (const a of aprobados) {
+      const cert = mapaCert[`${a.usuario_id}__${a.id_curso}`];
+      if (!cert) continue;
+      const curso = cursoById[a.id_curso];
+      if (!cursosMap[curso.id]) cursosMap[curso.id] = { curso, filas: [] };
+      cursosMap[curso.id].filas.push({
+        dni: cert.dni,
+        apellidos: cert.apellidos,
+        nombres: cert.nombres,
+        cargo: cert.cargo,
+        nota: cert.nota,
+        codigo: cert.codigo,
+        fecha: a.created_at,
+        curso,
+      });
+    }
+    const gruposCursos = Object.values(cursosMap);
+    const certs = gruposCursos.flatMap(g => g.filas);
+
+    const UMBRAL_COMBINAR = 600; // hasta este número de certificados, va todo en un solo PDF
+
+    if (certs.length > 400) {
+      const seguir = await showConfirm(
+        `Este período tiene ${certs.length} certificados. Puede tardar varios minutos sin cerrar la pestaña. ¿Continuar?`,
+        { confirmText: 'Sí, generar' }
+      );
+      if (!seguir) { status.textContent = ''; return; }
+    }
+
+    const { data: contadorRow } = await supabase
+      .from('informes_rbd_contador').select('ultimo_numero').eq('sede', sedeAdminActiva).maybeSingle();
+    const numeroInforme = (contadorRow?.ultimo_numero || 0) + 1;
+
+    status.textContent = '🖨️ Generando informe...';
+
+    const A4_W = 794, A4_H = 1123;       // portada y tablas: A4 vertical
+    const CERT_W = 1122, CERT_H = 794;   // certificados: horizontal (su diseño original)
+    const MARGIN = 40;
+    const CONTENT_W = A4_W - MARGIN * 2;
+    const HEADER_H = 40;
+
+    // Portada y tablas se dibujan como texto vectorial (no capturas de pantalla) —
+    // así cada página pesa unos pocos KB en vez de ~100-300KB, y el logo/encabezado
+    // se repite en cada hoja sin costo de tamaño.
+    const logoImg = await new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = RBD_LOGO_URL;
+    });
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'px', format: [A4_W, A4_H], orientation: 'portrait' });
+    let y = 0;
+
+    function dibujarEncabezado() {
+      if (logoImg) {
+        const logoH = 20;
+        const logoW = logoImg.naturalWidth && logoImg.naturalHeight
+          ? (logoImg.naturalWidth / logoImg.naturalHeight) * logoH : 50;
+        doc.addImage(logoImg, 'PNG', MARGIN, 8, logoW, logoH);
+      }
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(120);
+      doc.text('SSO-DO-001  ·  Versión 01', A4_W - MARGIN, 16, { align: 'right' });
+      doc.setDrawColor(210);
+      doc.setLineWidth(0.75);
+      doc.line(MARGIN, HEADER_H, A4_W - MARGIN, HEADER_H);
+      doc.setTextColor(0);
+      y = HEADER_H + 18;
+    }
+
+    function nuevaPagina() {
+      doc.addPage([A4_W, A4_H], 'portrait');
+      dibujarEncabezado();
+    }
+
+    function asegurarEspacio(alto) {
+      if (y + alto > A4_H - 30) nuevaPagina();
+    }
+
+    function escribirParrafo(texto, { size = 9.5, bold = false, gap = 6, align = 'left', x } = {}) {
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.setFontSize(size);
+      const lineas = doc.splitTextToSize(texto, CONTENT_W);
+      const lineH = size * 1.35;
+      const posX = x !== undefined ? x : (align === 'center' ? A4_W / 2 : align === 'right' ? A4_W - MARGIN : MARGIN);
+      for (const linea of lineas) {
+        asegurarEspacio(lineH);
+        doc.text(linea, posX, y, { align });
+        y += lineH;
+      }
+      y += gap;
+    }
+
+    dibujarEncabezado();
+
+    // ── Portada ──
+    escribirParrafo('INFORME EXTERNO CAPACITACIONES SSOMA', { size: 15, bold: true, align: 'center', gap: 10 });
+    escribirParrafo(`Informe Mensual de Capacitación N° ${String(numeroInforme).padStart(2, '0')} - ${RN_MESES[mes - 1].toUpperCase()}`, { size: 11, bold: true, gap: 16 });
+    escribirParrafo('1. Datos Generales', { size: 10, bold: true, gap: 8 });
+    const datosGenerales = [
+      ['Consultora', RBD_NOMBRE],
+      ['Empresa capacitada', empresa?.nombre || '—'],
+      ['RUC', empresa?.ruc || '—'],
+      ['Proyecto/Cliente final', sedeCfg.cliente_final],
+      ['Periodo capacitado y evaluado', `${RN_MESES[mes - 1]} ${anio}`],
+      ['Modalidad', RBD_MODALIDAD],
+      ['Responsable de capacitación', RBD_RESPONSABLE],
+    ];
+    for (const [label, valor] of datosGenerales) {
+      escribirParrafo(`${label}: ${valor}`, { size: 9.5, gap: 5 });
+    }
+
+    // ── Por curso: objetivo + fecha/duración + tabla de capacitados ──
+    const COLS = [
+      { label: 'DNI', w: 55 },
+      { label: 'Apellidos y nombres', w: 150 },
+      { label: 'Puesto', w: 105 },
+      { label: 'Estado', w: 50 },
+      { label: 'Nota', w: 32 },
+      { label: 'Fecha', w: 58 },
+      { label: 'Horas', w: 38 },
+      { label: 'Cert.', w: 32 },
+      { label: 'Código', w: 90 },
+    ];
+    const FILA_H = 13;
+
+    function dibujarCabeceraTabla() {
+      asegurarEspacio(FILA_H * 2);
+      doc.setFillColor(30, 58, 95);
+      doc.rect(MARGIN, y, CONTENT_W, FILA_H + 3, 'F');
+      doc.setTextColor(255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      let x = MARGIN + 3;
+      for (const col of COLS) {
+        doc.text(col.label, x, y + FILA_H - 2);
+        x += col.w;
+      }
+      y += FILA_H + 3;
+      doc.setTextColor(0);
+      doc.setFont('helvetica', 'normal');
+    }
+
+    let numCurso = 1;
+    for (const grupo of gruposCursos) {
+      const c = grupo.curso;
+      const filas = grupo.filas;
+      const fechaCurso = new Date(filas[0].fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+      const duracionTxt = c.duracion ? `${c.duracion} hora${c.duracion > 1 ? 's' : ''}` : '—';
+
+      asegurarEspacio(40);
+      escribirParrafo(`2.${numCurso}. Curso ${c.titulo}`, { size: 11, bold: true, gap: 8 });
+      escribirParrafo(`2.${numCurso}.1. Objetivos`, { size: 9.5, bold: true, gap: 4 });
+      escribirParrafo(c.objetivo || 'No se registró un objetivo para este curso.', { size: 9, gap: 10 });
+      escribirParrafo(`2.${numCurso}.2. Fecha y duración`, { size: 9.5, bold: true, gap: 4 });
+      escribirParrafo(`Realizado el ${fechaCurso} con una duración de ${duracionTxt}.`, { size: 9, gap: 10 });
+      escribirParrafo(`2.${numCurso}.3. Relación de trabajadores capacitados`, { size: 9.5, bold: true, gap: 8 });
+
+      dibujarCabeceraTabla();
+      doc.setFontSize(7);
+      for (const f of filas) {
+        if (y + FILA_H + 2 > A4_H - 30) { nuevaPagina(); dibujarCabeceraTabla(); doc.setFontSize(7); }
+        let x = MARGIN + 3;
+        const valores = [
+          f.dni || '',
+          `${f.apellidos || ''} ${f.nombres || ''}`.trim(),
+          f.cargo || '',
+          'Aprobado',
+          Number(f.nota).toFixed(0),
+          new Date(f.fecha).toLocaleDateString('es-PE'),
+          String(c.duracion || ''),
+          'Sí',
+          f.codigo || '',
+        ];
+        valores.forEach((val, i) => {
+          const texto = doc.splitTextToSize(String(val), COLS[i].w - 4)[0] || '';
+          doc.text(texto, x, y + FILA_H - 3);
+          x += COLS[i].w;
+        });
+        doc.setDrawColor(230);
+        doc.line(MARGIN, y + FILA_H, MARGIN + CONTENT_W, y + FILA_H);
+        y += FILA_H;
+      }
+      y += 14;
+      numCurso++;
+    }
+
+    // ── Hoja de cierre (firma) ──
+    const firmaImg = await new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = FIRMA_RBD_URL;
+    });
+    nuevaPagina();
+    y += 20;
+    escribirParrafo('Esto es todo cuanto puedo manifestar.', { size: 10, gap: 8 });
+    escribirParrafo('Atentamente:', { size: 10, gap: 50 });
+    if (firmaImg) {
+      const firmaH = 65;
+      const firmaW = firmaImg.naturalWidth && firmaImg.naturalHeight
+        ? (firmaImg.naturalWidth / firmaImg.naturalHeight) * firmaH : 130;
+      doc.addImage(firmaImg, A4_W - MARGIN - firmaW, y, firmaW, firmaH);
+      y += firmaH + 4;
+    } else {
+      y += 20;
+    }
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.75);
+    doc.line(A4_W - MARGIN - 200, y, A4_W - MARGIN, y);
+    y += 10;
+    escribirParrafo('SAMUEL DANIEL JUSTINIANI ARANDA', { size: 9, bold: true, align: 'right', gap: 2 });
+    escribirParrafo('Especialista SSOMA', { size: 8.5, align: 'right', gap: 1 });
+    escribirParrafo('Ingeniero Metalurgista CIP:181200', { size: 8.5, align: 'right', gap: 4 });
+
+    // ── Certificados individuales (logo y membrete RBD) ──
+    // Si entran pocos, van en el mismo PDF (como pediste: si es liviano, un solo
+    // archivo). Si son muchos, el informe se guarda aparte y los certificados van
+    // en un ZIP — combinar miles en un solo PDF cuelga el navegador.
+    if (certs.length <= UMBRAL_COMBINAR) {
+      status.textContent = `🖨️ Generando 0 / ${certs.length} certificados...`;
+      for (let i = 0; i < certs.length; i++) {
+        const f = certs[i];
+        const c = f.curso;
+        const duracionTxt = c.duracion ? `${c.duracion} hora${c.duracion > 1 ? 's' : ''}` : '';
+        const nombreCompleto = `${f.apellidos || ''} ${f.nombres || ''}`.trim().toUpperCase();
+        const notaTexto = Number.isFinite(Number(f.nota)) ? Number(f.nota).toFixed(1) : String(f.nota || '');
+        const fechaCert = new Date(f.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+
+        const htmlCert = buildHtmlCertificado({
+          nombreCompleto, dni: f.dni, documentoTipo: 'DNI', cargo: f.cargo,
+          cursotitulo: c.titulo, duracion: duracionTxt, notaTexto, fechaHoy: fechaCert,
+          codigo: f.codigo, logoUrl: RBD_LOGO_URL, empresaNombre: RBD_NOMBRE,
+        });
+        const canvas = await generarCertificadoCanvas(htmlCert, true); // liviano
+        doc.addPage([CERT_W, CERT_H], 'landscape');
+        doc.addImage(canvas.toDataURL('image/jpeg', 0.55), 'JPEG', 0, 0, CERT_W, CERT_H);
+        status.textContent = `🖨️ Generando ${i + 1} / ${certs.length} certificados...`;
+      }
+
+      status.textContent = '💾 Guardando PDF...';
+      doc.save(`Informe_RBD_${sedeAdminActiva}_${RN_MESES[mes - 1]}_${anio}.pdf`);
+    } else {
+      status.textContent = '💾 Guardando informe (portada y tablas)...';
+      doc.save(`Informe_RBD_${sedeAdminActiva}_${RN_MESES[mes - 1]}_${anio}_resumen.pdf`);
+
+      if (!window.JSZip) throw new Error('No se cargó JSZip (necesario para el ZIP de certificados).');
+      const zip = new window.JSZip();
+      const folder = zip.folder('Certificados');
+
+      status.textContent = `🖨️ Generando 0 / ${certs.length} certificados...`;
+      for (let i = 0; i < certs.length; i++) {
+        const f = certs[i];
+        const c = f.curso;
+        const duracionTxt = c.duracion ? `${c.duracion} hora${c.duracion > 1 ? 's' : ''}` : '';
+        const nombreCompleto = `${f.apellidos || ''} ${f.nombres || ''}`.trim().toUpperCase();
+        const notaTexto = Number.isFinite(Number(f.nota)) ? Number(f.nota).toFixed(1) : String(f.nota || '');
+        const fechaCert = new Date(f.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+
+        const htmlCert = buildHtmlCertificado({
+          nombreCompleto, dni: f.dni, documentoTipo: 'DNI', cargo: f.cargo,
+          cursotitulo: c.titulo, duracion: duracionTxt, notaTexto, fechaHoy: fechaCert,
+          codigo: f.codigo, logoUrl: RBD_LOGO_URL, empresaNombre: RBD_NOMBRE,
+        });
+        const pdfBlob = await generarCertificadoPDFBlob(htmlCert, true); // liviano
+        const nombreSeguro = nombreCompleto.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_');
+        folder.file(`${f.dni || 'sin_dni'}_${nombreSeguro}_${f.codigo}.pdf`, pdfBlob);
+        status.textContent = `🖨️ Generando ${i + 1} / ${certs.length} certificados...`;
+      }
+
+      status.textContent = '📦 Empaquetando ZIP...';
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const urlZip = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = urlZip;
+      a.download = `Certificados_RBD_${sedeAdminActiva}_${RN_MESES[mes - 1]}_${anio}.zip`;
+      a.click();
+      URL.revokeObjectURL(urlZip);
+    }
+
+    await supabase.from('informes_rbd_contador').upsert({ sede: sedeAdminActiva, ultimo_numero: numeroInforme });
+
+    status.textContent = `✅ Listo: informe N° ${String(numeroInforme).padStart(2, '0')} - ${RN_MESES[mes - 1]} ${anio} (${certs.length} certificados, ${gruposCursos.length} curso(s)).`;
+  } catch (err) {
+    console.error('Error generando informe RBD:', err);
+    status.textContent = `❌ ${err?.message || 'No se pudo generar el informe.'}`;
+  }
 };
 
 window.cerrarPanelEditarCurso = function () {
@@ -1857,6 +2411,7 @@ window.guardarEdicionCurso = async function () {
   const vigenciaRaw   = document.getElementById('editar-curso-vigencia').value;
   const vigencia_meses= vigenciaRaw ? parseInt(vigenciaRaw) : null;
   const url_material  = document.getElementById('editar-curso-url-material').value.trim();
+  const objetivo      = document.getElementById('editar-curso-objetivo').value.trim();
 
   if (!titulo || !codigo_prefijo || !duracion) {
     alert('❌ Completa los campos obligatorios: título, prefijo y duración.');
@@ -1870,6 +2425,7 @@ window.guardarEdicionCurso = async function () {
     duracion,
     vigencia_meses,
     url_material: url_material || null,
+    objetivo:     objetivo     || null,
   }).eq('id', id);
 
   if (error) { alert('❌ Error al guardar: ' + error.message); return; }

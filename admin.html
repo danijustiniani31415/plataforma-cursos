@@ -686,6 +686,10 @@
         <p class="campo-ayuda">Formato PREFIJO-AÑO-CORRELATIVO. Se genera solo al crear el curso; normalmente no hace falta tocarlo.</p>
         <input type="text"   id="editar-curso-codigo"         placeholder="Ej. TRAB-2026-0001" />
 
+        <label class="campo-label" for="editar-curso-objetivo">Objetivo del curso</label>
+        <p class="campo-ayuda">Usado en el informe mensual de capacitaciones (SSOMA). Ej. "Fortalecer las competencias de... a fin de prevenir...".</p>
+        <textarea id="editar-curso-objetivo" rows="3" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:7px;font-size:0.9rem;margin-bottom:12px;font-family:inherit;" placeholder="Objetivo del curso..."></textarea>
+
         <label class="campo-label" for="editar-curso-duracion">Duración *</label>
         <p class="campo-ayuda">Duración del curso en horas.</p>
         <input type="number" id="editar-curso-duracion"       placeholder="Ej. 2" />
@@ -695,11 +699,23 @@
         <input type="number" id="editar-curso-vigencia"       placeholder="Ej. 12" />
 
         <label class="campo-label" for="editar-curso-url-material">Material del curso (PDF)</label>
-        <p class="campo-ayuda">Enlace público al PDF que verá el trabajador. Súbelo con el botón de abajo o pega la URL manualmente.</p>
+        <p class="campo-ayuda">Enlace público al PDF que verá el trabajador. Súbelo con el botón de abajo, pega la URL manualmente, o reusa el de otro curso/sede abajo.</p>
         <input type="text"   id="editar-curso-url-material"   placeholder="https://.../materiales/archivo.pdf" />
         <div style="display:flex;gap:6px;align-items:center;margin:-8px 0 12px;">
           <input type="file" id="editar-curso-pdf-file" accept="application/pdf" style="flex:1;font-size:0.82rem;" />
           <button onclick="subirPdfCurso()" class="btn-secondary" style="white-space:nowrap;">📤 Subir PDF</button>
+        </div>
+
+        <div style="background:#f7f9fc;border:1px solid #e3e8f0;border-radius:8px;padding:10px 12px;margin:0 0 12px;">
+          <p class="campo-ayuda" style="margin:0 0 6px;font-weight:600;color:#1e3a5f;">🔁 Reusar de otro curso (cualquier sede)</p>
+          <select id="reusar-curso-select" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;margin-bottom:6px;">
+            <option value="">-- Selecciona un curso de referencia --</option>
+          </select>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button type="button" onclick="usarPdfDeReferencia()" class="btn-secondary" style="white-space:nowrap;">📄 Usar su PDF</button>
+            <button type="button" onclick="usarObjetivoDeReferencia()" class="btn-secondary" style="white-space:nowrap;">📝 Usar su objetivo</button>
+            <button type="button" onclick="copiarVideosDeReferencia()" class="btn-secondary" style="white-space:nowrap;">🎬 Copiar sus videos</button>
+          </div>
         </div>
 
         <div class="modal-actions">
@@ -959,6 +975,31 @@
     </div>
   </div>
 
+  <!-- ═══ TAB: INFORME RBD (mensual) ═══ -->
+  <div id="tab-informe-rbd" class="tab-panel">
+    <div class="panel-card">
+      <h2>📑 Informe externo de capacitaciones (RBD)</h2>
+      <p style="color:#555; font-size:0.85rem; margin-bottom:14px;">
+        Genera un único PDF con portada, objetivos y relación de capacitados por curso, y todos los certificados
+        (con logo y membrete de RBD Consultoría Empresarial) del mes y sede seleccionados — listo para entregar.
+      </p>
+      <div class="form-grid">
+        <select id="rbd-mes" style="padding:9px 12px;border:1px solid #ddd;border-radius:7px;">
+          <option value="">-- Mes --</option>
+          <option value="1">Enero</option><option value="2">Febrero</option>
+          <option value="3">Marzo</option><option value="4">Abril</option>
+          <option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option>
+          <option value="9">Septiembre</option><option value="10">Octubre</option>
+          <option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <select id="rbd-anio" style="padding:9px 12px;border:1px solid #ddd;border-radius:7px;"></select>
+      </div>
+      <button onclick="generarInformeRBD()" class="btn-primary" style="margin-top:16px;">📑 Generar informe RBD</button>
+      <p id="rbd-status" style="color:#555; font-size:0.85rem; margin-top:12px;"></p>
+    </div>
+  </div>
+
   <!-- ═══ TAB: PROGRAMA SST (subir) ═══ -->
   <div id="tab-programa-sst" class="tab-panel">
     <div class="panel-card">
@@ -1080,6 +1121,7 @@
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
@@ -1100,7 +1142,10 @@
       { tab: 'cursos-obligatorios', label: 'Obligatorios por cargo' },
     ],
     'certificados':   [{ tab: 'certificados',   label: 'Certificados' }],
-    'reporte':        [{ tab: 'reporte',        label: 'Registro de Notas' }],
+    'reporte':        [
+      { tab: 'reporte',        label: 'Registro de Notas' },
+      { tab: 'informe-rbd',    label: 'Informe RBD (mensual)' },
+    ],
     'programa-sst': [
       { tab: 'programa-sst',              label: 'Subir programa' },
       { tab: 'programa-sst-ver',          label: 'Ver programa guardado' },

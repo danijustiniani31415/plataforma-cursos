@@ -1215,11 +1215,11 @@ window.consultarEstado = async function () {
   // También revisar tabla certificados (cursos completados antes de ocultar el botón)
   const { data: certificados } = await supabase
     .from('certificados')
-    .select('curso_id, created_at')
+    .select('curso_id, fecha')
     .eq('usuario_id', perfil.id);
 
   const certMap = {};
-  certificados?.forEach(c => { certMap[c.curso_id] = c.created_at; });
+  certificados?.forEach(c => { certMap[c.curso_id] = c.fecha; });
 
   const nombreCompleto = `${perfil.apellidos || ''} ${perfil.nombres || ''}`.trim();
   const empresa = perfil.empresas?.nombre || '—';

@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       .eq('id', id_curso)
 
     // Guardar certificado
-    await supabaseAdmin.from('certificados').insert([{
+    const { error: insertError } = await supabaseAdmin.from('certificados').insert([{
       usuario_id,
       usuario_email,
       curso_id:  id_curso,
@@ -76,6 +76,28 @@ Deno.serve(async (req) => {
       empresa,
       sede: cursoData?.sede || 'ANTAMINA',
     }])
+
+    if (insertError) {
+      // 23505 = unique_violation. Puede pasar si dos peticiones llegaron casi
+      // simultáneas (doble clic, dos pestañas) y ambas pasaron el chequeo de
+      // "¿ya existe?" de arriba antes de que la primera terminara de insertar.
+      // En ese caso, la otra petición ya generó el certificado real: lo devolvemos.
+      if (insertError.code === '23505') {
+        const { data: certRace } = await supabaseAdmin
+          .from('certificados')
+          .select('codigo')
+          .eq('usuario_id', usuario_id)
+          .eq('curso_id', id_curso)
+          .maybeSingle()
+        if (certRace) {
+          return new Response(JSON.stringify({ success: true, codigo: certRace.codigo, yaExistia: true }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+      }
+      throw insertError
+    }
 
     // DESHABILITADO: solo admins pueden ver certificados, no se notifica al trabajador
     /* Enviar email de notificación con Resend

@@ -4,11 +4,15 @@ const alert = alertToToast;
 
 const FONDO_URL = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/sign/certificados/Fondo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MjRkNDBhNC1jZTI0LTQwYzItYTc3NC1lMmUwNzBjNGMzMzUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjZXJ0aWZpY2Fkb3MvRm9uZG8ucG5nIiwiaWF0IjoxNzc0MTkxNDc5LCJleHAiOjE5MzE4NzE0Nzl9.LIMJ5ZojaBjlxG1-Tg5_G7zr_bRLTNGKlIUahmOUJLk';
 const FIRMA_URL = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/sign/certificados/Firma.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MjRkNDBhNC1jZTI0LTQwYzItYTc3NC1lMmUwNzBjNGMzMzUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjZXJ0aWZpY2Fkb3MvRmlybWEucG5nIiwiaWF0IjoxNzc0MTkxNDYyLCJleHAiOjE5MzE4NzE0NjJ9.SdrIBlz2EWYzDVY35YYfCJMJO3LypxQ5JIE8oHvegTM';
+export const FIRMA_RBD_URL = FIRMA_URL;
 const LOGO_URL  = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/sign/certificados/Logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MjRkNDBhNC1jZTI0LTQwYzItYTc3NC1lMmUwNzBjNGMzMzUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjZXJ0aWZpY2Fkb3MvTG9nby5wbmciLCJpYXQiOjE3NzQxOTE4MjksImV4cCI6MTkzMTg3MTgyOX0.rzYxlgmM8bq-3Bmk8rTNgVfvsUu7ex3LVQyrI1oCIHk';
+export const RBD_LOGO_URL = 'https://wrahjlstautwinxyqcfx.supabase.co/storage/v1/object/sign/certificados/Logo_RBD.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MjRkNDBhNC1jZTI0LTQwYzItYTc3NC1lMmUwNzBjNGMzMzUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjZXJ0aWZpY2Fkb3MvTG9nb19SQkQucG5nIiwic2NvcGUiOiJkb3dubG9hZCIsImlhdCI6MTc4NjM1NDQ1MiwiZXhwIjoyNjUwMzU0NDUyfQ.FOANoXcrV6lphpYIjV3hoBJTsUm82xy_FPxjoPDWrg0';
 
 const PLATAFORMA_URL = 'https://plataforma-cursos.sdjustiniani-a.workers.dev';
 
-export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo, cursotitulo, duracion, notaTexto, fechaHoy, codigo }) {
+export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo, cursotitulo, duracion, notaTexto, fechaHoy, codigo, logoUrl, empresaNombre }) {
+  const logo    = logoUrl || LOGO_URL;
+  const empresa = empresaNombre || 'CV GLOBAL S.A.C.';
   const verificarUrl = `${PLATAFORMA_URL}/verificar.html?codigo=${encodeURIComponent(codigo)}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=72x72&data=${encodeURIComponent(verificarUrl)}&color=002855&bgcolor=ffffff&margin=2`;
   return `<!DOCTYPE html>
@@ -64,19 +68,19 @@ export function buildHtmlCertificado({ nombreCompleto, dni, documentoTipo, cargo
     <div class="esquina tr"></div>
     <div class="esquina bl"></div>
     <div class="esquina br"></div>
-    <img class="logo" src="${LOGO_URL}" crossorigin="anonymous" alt="" />
+    <img class="logo" src="${logo}" crossorigin="anonymous" alt="" />
     <img class="firma-img" src="${FIRMA_URL}" crossorigin="anonymous" />
     <div class="contenido">
       <div class="titulo">Certificado de Capacitación</div>
       <div class="subtitulo">Seguridad · Salud · Medio Ambiente</div>
       <div class="linea-decorativa"><span class="linea-decorativa-icono">✦</span></div>
-      <div class="certifica-texto">La empresa CV GLOBAL S.A.C. certifica que:</div>
+      <div class="certifica-texto">La empresa ${empresa} certifica que:</div>
       <div class="nombre">${nombreCompleto}</div>
       <div class="dni-cargo">Con ${documentoTipo || 'DNI'} N°: <strong>${dni}</strong></div>
       <div class="separador"></div>
       <div class="participacion-texto">Ha PARTICIPADO y APROBADO satisfactoriamente el curso:</div>
       <div class="curso-nombre">${cursotitulo}</div>
-      <div class="empresa-texto">Dictado por CV GLOBAL S.A.C. &nbsp;·&nbsp; Duración: <strong>${duracion}</strong></div>
+      <div class="empresa-texto">Dictado por ${empresa} &nbsp;·&nbsp; Duración: <strong>${duracion}</strong></div>
       <div class="duracion-fecha">Lima, ${fechaHoy}</div>
     </div>
     <div class="qr-bloque">
@@ -177,14 +181,64 @@ export async function descargarCertificadoPDF(htmlContent, nombreArchivo) {
   }
 }
 
+// Variante liviana — para generación masiva (ej. informe RBD con cientos de
+// certificados) donde el tamaño de archivo importa más que la resolución máxima.
+// No se usa en la descarga individual del trabajador (esa mantiene la calidad original).
+const PDF_OPTS_LIGERO = {
+  ...PDF_OPTS,
+  image: { type: 'jpeg', quality: 0.55 },
+  html2canvas: { ...PDF_OPTS.html2canvas, scale: 0.75 },
+};
+
 // ─── Genera blob ──────────────────────────────────────────────────────────────
-export async function generarCertificadoPDFBlob(htmlContent) {
+export async function generarCertificadoPDFBlob(htmlContent, liviano = false) {
   const contenedor = await crearContenedor(htmlContent, false);
   const el = contenedor.querySelector('.certificado') || contenedor;
   try {
-    return await window.html2pdf().set(PDF_OPTS).from(el).outputPdf('blob');
+    return await window.html2pdf().set(liviano ? PDF_OPTS_LIGERO : PDF_OPTS).from(el).outputPdf('blob');
   } finally {
     limpiarContenedor(contenedor);
+  }
+}
+
+// ─── Canvas (para combinar varias páginas en un solo PDF, ej. informe RBD) ────
+export async function generarCertificadoCanvas(htmlContent, liviano = false) {
+  const contenedor = await crearContenedor(htmlContent, false);
+  const el = contenedor.querySelector('.certificado') || contenedor;
+  try {
+    return await window.html2canvas(el, liviano ? PDF_OPTS_LIGERO.html2canvas : PDF_OPTS.html2canvas);
+  } finally {
+    limpiarContenedor(contenedor);
+  }
+}
+
+// Renderiza un bloque de HTML arbitrario (sin la clase .certificado) a un canvas
+// del tamaño de página indicado — usado para portada/tablas del informe.
+export async function renderPaginaCanvas(htmlBody, width = 1122, height = 794) {
+  const contenedor = document.createElement('div');
+  contenedor.style.cssText = `position:fixed;top:0;left:0;width:${width}px;height:${height}px;overflow:hidden;background:white;z-index:99999;opacity:0.01;pointer-events:none;`;
+  // html2canvas debe capturar un hijo SIN el opacity:0.01 (ese estilo va en el
+  // contenedor padre nomás, para que la página no aparezca visible en pantalla) —
+  // si se captura el propio contenedor con opacity:0.01, sale casi en blanco.
+  const inner = document.createElement('div');
+  inner.style.cssText = `width:${width}px;height:${height}px;background:white;font-family:"Segoe UI",Arial,sans-serif;`;
+  inner.innerHTML = htmlBody;
+  contenedor.appendChild(inner);
+  document.body.appendChild(contenedor);
+  await Promise.all(
+    Array.from(inner.querySelectorAll('img')).map(img =>
+      new Promise(r => { if (img.complete) return r(); img.onload = img.onerror = r; })
+    )
+  );
+  await new Promise(r => setTimeout(r, 200));
+  try {
+    return await window.html2canvas(inner, {
+      ...PDF_OPTS.html2canvas,
+      width, height, windowWidth: width, windowHeight: height,
+      backgroundColor: '#ffffff',
+    });
+  } finally {
+    document.body.removeChild(contenedor);
   }
 }
 

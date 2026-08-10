@@ -221,7 +221,7 @@ async function cargarAdmins() {
   const { data } = await supabase
     .from('profiles')
     .select('*, empresas(nombre)')
-    .in('rol', ['admin', 'gestor'])
+    .in('rol', ['admin', 'gestor', 'superadmin'])
     .order('apellidos');
 
   _adminsCache = data || [];
@@ -229,9 +229,15 @@ async function cargarAdmins() {
   cont.innerHTML = '';
 
   if (!_adminsCache.length) {
-    cont.innerHTML = '<p style="color:#888;padding:12px;">No hay administradores ni gestores registrados.</p>';
+    cont.innerHTML = '<p style="color:#888;padding:12px;">No hay administradores, gestores ni superadmins registrados.</p>';
     return;
   }
+
+  const badgeRol = u => u.rol === 'superadmin'
+    ? `<span class="badge-superadmin">Superadmin</span>`
+    : u.rol === 'gestor'
+    ? `<span class="badge-gestor">Gestor</span>`
+    : `<span class="badge-admin2">Admin</span>`;
 
   cont.innerHTML = _adminsCache.map((u, idx) => `
     <div class="admin-row">
@@ -239,7 +245,7 @@ async function cargarAdmins() {
         <div class="admin-avatar">${(u.apellidos || '?').trim().charAt(0)}${(u.nombres || '').trim().charAt(0)}</div>
         <div>
           <div class="admin-nombre">${u.apellidos || ''} ${u.nombres || ''}
-            <span class="${u.rol === 'gestor' ? 'badge-gestor' : 'badge-admin2'}">${u.rol === 'gestor' ? 'Gestor' : 'Admin'}</span>
+            ${badgeRol(u)}
           </div>
           <div class="admin-meta">${u.empresas?.nombre || '—'} · ${u.documento_tipo}: ${u.documento_numero || '—'} · ${u.email || 'sin correo'}</div>
         </div>
@@ -249,7 +255,7 @@ async function cargarAdmins() {
         <button class="btn-fila" onclick="abrirGestionSedes(${idx})" title="Elegir qué sedes puede ver">🌐 Sedes</button>
         <button class="btn-fila" style="background:#0d6efd;color:#fff;" onclick="cambiarEmailAdmin(${idx})" title="Cambiar correo de acceso">✉️ Cambiar correo</button>
         <button class="btn-fila" style="background:#e65100;color:#fff;" onclick="enviarResetPasswordAdmin(${idx})" title="Envía un correo para que fije su propia contraseña">📧 Cambiar contraseña</button>
-        <button class="btn-fila" style="background:#6f42c1;color:#fff;" onclick="hacerSuperadmin(${idx})" title="Dar acceso total de superadmin">⭐ Hacer superadmin</button>
+        ${u.rol === 'superadmin' ? '' : `<button class="btn-fila" style="background:#6f42c1;color:#fff;" onclick="hacerSuperadmin(${idx})" title="Dar acceso total de superadmin">⭐ Hacer superadmin</button>`}
         <button class="btn-fila" style="background:${u.activo ? '#dc3545' : '#28a745'};color:#fff;" onclick="toggleUsuario('${u.id}', ${u.activo})">
           ${u.activo ? 'Desactivar' : 'Activar'}
         </button>
@@ -466,11 +472,18 @@ let todosUsuarios = [];
 async function cargarTodosUsuarios() {
   const { data } = await supabase
     .from('profiles')
-    .select('*, empresas(nombre), cargos(nombre)')
+    .select('*, empresas(nombre), cargos(nombre), perfil_sede(sede)')
     .order('apellidos');
 
   todosUsuarios = data || [];
   renderizarUsuarios(todosUsuarios);
+
+  const selSede = document.getElementById('filtro-sede');
+  const sedesUnicas = [...new Set(
+    todosUsuarios.flatMap(u => (u.perfil_sede || []).map(ps => ps.sede))
+  )].sort();
+  selSede.innerHTML = '<option value="">Todas las sedes</option>' +
+    sedesUnicas.map(s => `<option value="${s}">${s}</option>`).join('');
 }
 
 function renderizarUsuarios(usuarios) {
@@ -515,6 +528,7 @@ window.filtrarUsuarios = function () {
   _filtrarDebounce = setTimeout(() => {
     const texto = document.getElementById('buscar-usuario').value.toLowerCase();
     const empresaId = document.getElementById('filtro-empresa').value;
+    const sede = document.getElementById('filtro-sede').value;
 
     const filtrados = todosUsuarios.filter(u => {
       const coincideTexto =
@@ -523,7 +537,8 @@ window.filtrarUsuarios = function () {
         (u.email || '').toLowerCase().includes(texto) ||
         (u.documento_numero || '').includes(texto);
       const coincideEmpresa = !empresaId || u.empresa_id === empresaId;
-      return coincideTexto && coincideEmpresa;
+      const coincideSede = !sede || (u.perfil_sede || []).some(ps => ps.sede === sede);
+      return coincideTexto && coincideEmpresa && coincideSede;
     });
 
     renderizarUsuarios(filtrados);

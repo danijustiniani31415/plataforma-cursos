@@ -8,6 +8,13 @@ function normalizarDNI(raw) {
   return String(raw).trim().replace(/[\n\r]/g, '').padStart(8, '0');
 }
 
+// Extrae el ID (11 caracteres) de un link de YouTube sin importar el formato:
+// watch?v=, youtu.be/, embed/, shorts/, m.youtube.com, con o sin &si=/&t=/&list= al final.
+function extraerIdYoutube(url) {
+  const match = String(url).match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : null;
+}
+
 // Ejecuta un query Supabase con .in(col, values) en chunks, en paralelo,
 // para evitar exceder el límite de URL (~8-16KB) cuando values es grande.
 // queryFn recibe un sub-array y debe retornar { data, error }.
@@ -37,6 +44,7 @@ let empresaAdminNombre = null;
 let empresaAdminRuc = null;
 let sedeAdminActiva = null;
 let sedesAdminDisponibles = [];
+let currentUserId = null;
 
 function pintarCheckboxesSedes() {
   const cont = document.getElementById('nuevo-sedes-checks');
@@ -85,9 +93,15 @@ async function resolverSedeAdmin(userId) {
     if (cont && !document.getElementById('selector-sede-admin')) {
       const sel = document.createElement('select');
       sel.id = 'selector-sede-admin';
-      sel.style.marginLeft = '10px';
-      sel.style.padding = '4px 8px';
+      sel.style.display = 'block';
+      sel.style.width = '100%';
+      sel.style.marginTop = '6px';
+      sel.style.padding = '6px 8px';
       sel.style.borderRadius = '6px';
+      sel.style.border = '1px solid rgba(255,255,255,0.25)';
+      sel.style.background = 'rgba(255,255,255,0.08)';
+      sel.style.color = '#fff';
+      sel.style.fontSize = '0.76rem';
       sedes.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.sede;
@@ -122,6 +136,8 @@ async function resolverSedeAdmin(userId) {
     return;
   }
 
+  currentUserId = user.id;
+
   const { data: perfil } = await supabase
     .from("profiles")
     .select("rol")
@@ -137,21 +153,13 @@ async function resolverSedeAdmin(userId) {
 
   await cargarDatosAdmin();
 
-  // Gestor de Personal: solo ve las tabs de importar y actualizar trabajadores
+  // Gestor de Personal: solo ve la sección Trabajadores, sin "Crear gestor"
   if (perfil?.rol === "gestor") {
-    const tabsPermitidas = ["trabajadores", "importar", "actualizar"];
-    document.getElementById('panel-crear-gestor')?.remove();
-    document.querySelectorAll('.nav-tab').forEach(btn => {
-      const onclick = btn.getAttribute('onclick') || '';
-      const match = onclick.match(/mostrarTab\('([^']+)'/);
-      const tabNombre = match ? match[1] : null;
-      if (!tabNombre || !tabsPermitidas.includes(tabNombre)) {
-        btn.style.display = 'none';
-      }
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn => {
+      if (btn.id !== 'seccion-btn-trabajadores') btn.style.display = 'none';
     });
-    // Activar la tab de importar por defecto
-    const btnImportar = document.querySelector(".nav-tab[onclick*=\"mostrarTab('importar'\"]");
-    if (btnImportar) btnImportar.click();
+    document.getElementById('subtab-btn-crear-gestor')?.remove();
+    mostrarTab('importar');
   }
 })();
 
@@ -204,16 +212,9 @@ async function cargarDatosAdmin() {
   configurarRENIEC('nuevo-dni', 'nuevo-doc-tipo', 'nuevo-nombres', 'nuevo-apellidos');
   configurarRENIEC('gestor-dni', 'gestor-doc-tipo', 'gestor-nombres', 'gestor-apellidos');
 
-  // Cargar cursos en los selects que los necesitan (Forms import + bulk cert)
+  // Cargar cursos en los selects que los necesitan (bulk cert)
   const { data: cursosForSelect } = await supabase
     .from('cursos').select('id, titulo').eq('sede', sedeAdminActiva).order('titulo');
-  const selFormsCurso = document.getElementById('forms-curso');
-  if (selFormsCurso) {
-    (cursosForSelect || []).forEach(c => {
-      selFormsCurso.innerHTML += `<option value="${c.id}">${c.titulo}</option>`;
-    });
-    initSelectBuscable('forms-curso');
-  }
   const selBulkCurso = document.getElementById('cert-bulk-curso');
   if (selBulkCurso) {
     (cursosForSelect || []).forEach(c => {
@@ -441,8 +442,6 @@ window.subirCurso = async function () {
   const prefijo       = document.getElementById("codigo-prefijo").value.trim().toUpperCase();
   const duracion      = parseInt(document.getElementById("duracion-curso").value);
   const vigencia_meses= parseInt(document.getElementById("vigencia-curso").value) || 12;
-  const url_video     = document.getElementById("url-video").value.trim();
-  const url_material  = document.getElementById("url-material").value.trim();
 
   if (!titulo || !prefijo || !duracion) {
     alert("❌ Completa los campos obligatorios: título, prefijo y duración.");
@@ -465,8 +464,6 @@ window.subirCurso = async function () {
     codigo,
     duracion,
     vigencia_meses,
-    url_video:    url_video    || null,
-    url_material: url_material || null,
     activo:       true,
     sede:         sedeAdminActiva
   }]);
@@ -474,56 +471,18 @@ window.subirCurso = async function () {
   if (error) {
     alert("❌ Error al subir curso: " + error.message);
   } else {
-    alert(`✅ Curso subido correctamente.\nCódigo: ${codigo}`);
-    ["titulo-curso", "codigo-prefijo", "duracion-curso", "vigencia-curso",
-     "url-video", "url-material"].forEach(id => {
+    alert(`✅ Curso subido correctamente.\nCódigo: ${codigo}\n\nAhora ábrelo con "✏️ Editar" en la lista de cursos para subir el material y los videos.`);
+    ["titulo-curso", "codigo-prefijo", "duracion-curso", "vigencia-curso"].forEach(id => {
       document.getElementById(id).value = '';
     });
+    cargarListaCursos();
   }
 };
-// ═══════════════════════════════
-// 📋 Mostrar registros de notas
-// ═══════════════════════════════
-window.cargarRegistros = async function () {
-  const { data, error } = await supabase
-    .from('envios_formulario')
-    .select('usuario_email, puntaje, aprobado, created_at, formularios(tipo), cursos(titulo)')
-    .eq('estado', 'completado')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    alert("❌ Error al cargar registros: " + error.message);
-    return;
-  }
-
-  const tbody = document.querySelector("#tabla-registros tbody");
-  tbody.innerHTML = "";
-
-  const tipoLabel = { encuesta: 'Encuesta', examen: 'Examen', eficacia: 'Evaluación de la eficacia' };
-
-  data.forEach(reg => {
-    const tipo = reg.formularios?.tipo || '';
-    const esEncuesta = tipo === 'encuesta';
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${reg.usuario_email}</td>
-      <td>${reg.cursos?.titulo || "Curso eliminado"}</td>
-      <td>${tipoLabel[tipo] || tipo}</td>
-      <td>${esEncuesta ? '—' : (reg.puntaje ?? '—')}</td>
-      <td>${new Date(reg.created_at).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}</td>
-      <td style="color: ${reg.aprobado ? 'green' : esEncuesta ? '#888' : 'red'}">
-        ${esEncuesta ? '✅ Completada' : reg.aprobado ? '✅ Aprobado' : '❌ No aprobado'}
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-};
-
 // ═══════════════════════════════
 // 🔐 Resetear contraseña
 // ═══════════════════════════════
-window.resetearContrasena = async function () {
-  const emailIngresado = document.getElementById("email-reset").value.trim();
+window.resetearContrasena = async function (emailDirecto) {
+  const emailIngresado = (emailDirecto || document.getElementById("email-reset")?.value || "").trim();
 
   if (!emailIngresado) {
     alert("Ingresa el correo.");
@@ -913,252 +872,6 @@ window.aplicarCambiosDeCargo = async function () {
   if (selVerMes)  selVerMes.value  = mesActual;
 })();
 
-// ═══════════════════════════════
-// 📅 ASIGNACIÓN MENSUAL
-// ═══════════════════════════════
-
-window.descargarPlantillaAsignacion = async function (e) {
-  e.preventDefault();
-  const XLSX = window.XLSX;
-
-  const { data: cargos } = await supabase.from('cargos').select('nombre').eq('activo', true).order('nombre');
-  const listaCargos = cargos?.map(c => c.nombre) || [];
-
-  const ws = XLSX.utils.aoa_to_sheet([
-    ['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Telefono', 'Fecha Ingreso'],
-  ]);
-  for (let row = 2; row <= 501; row++) {
-    ws[`A${row}`] = { t: 's', v: '' };
-  }
-  ws['!ref'] = 'A1:G501';
-  ws['!cols'] = [12, 22, 22, 28, 22, 14, 14].map(w => ({ wch: w }));
-
-  if (listaCargos.length > 0) {
-    ws['!dataValidations'] = [{
-      type: 'list', sqref: 'E2:E500',
-      formula1: listaCargos.join(',').length <= 255
-        ? '"' + listaCargos.join(',') + '"'
-        : 'Cargos!$A$1:$A$' + listaCargos.length
-    }];
-  }
-
-  const wsCargos = XLSX.utils.aoa_to_sheet(listaCargos.map(c => [c]));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Asignacion');
-  XLSX.utils.book_append_sheet(wb, wsCargos, 'Cargos');
-  XLSX.writeFile(wb, 'plantilla_asignacion_mensual.xlsx');
-};
-
-let filasAsignacion = [];
-
-window.previsualizarAsignacion = async function () {
-  const archivo = document.getElementById('archivo-asignacion').files[0];
-  if (!archivo) return;
-
-  const reader = new FileReader();
-  reader.onload = async function (e) {
-    const XLSX = window.XLSX;
-    const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-    const hoja = wb.Sheets[wb.SheetNames[0]];
-    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
-
-    filasAsignacion = filas.slice(1).filter(f => f[0]);
-
-    const dnis = filasAsignacion.map(f => normalizarDNI(f[0]));
-
-    const { data: perfiles } = await supabase
-      .from('profiles')
-      .select('documento_numero, nombres, apellidos, email')
-      .in('documento_numero', dnis)
-      .eq('empresa_id', empresaAdminId);
-
-    const perfilMap = {};
-    perfiles?.forEach(p => { perfilMap[p.documento_numero] = p; });
-
-    const tbody = document.getElementById('tbody-asignacion');
-    tbody.innerHTML = '';
-    let existentes = 0, nuevos = 0;
-
-    filasAsignacion.forEach(f => {
-      const dni      = normalizarDNI(f[0]);
-      const apellidos = String(f[1]).trim();
-      const nombres   = String(f[2]).trim();
-      const cargo     = String(f[4]).trim();
-      const p = perfilMap[dni];
-      const tr = document.createElement('tr');
-      if (p) {
-        existentes++;
-        tr.innerHTML = `<td>${dni}</td><td>${p.apellidos} ${p.nombres}</td>
-          <td>${p.cargo || ''}</td>
-          <td style="color:#007bff;">🔵 Ya existe — solo se asigna</td>`;
-      } else if (apellidos && nombres) {
-        nuevos++;
-        tr.innerHTML = `<td>${dni}</td><td>${apellidos} ${nombres}</td>
-          <td>${cargo}</td>
-          <td style="color:green;">🟢 Nuevo — se creará y asignará</td>`;
-      } else {
-        tr.innerHTML = `<td>${dni}</td><td style="color:#888;">Sin nombres</td>
-          <td></td>
-          <td style="color:red;">❌ Falta Apellidos/Nombres</td>`;
-      }
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById('preview-resumen-asig').textContent =
-      `${filasAsignacion.length} filas — 🔵 ${existentes} existentes, 🟢 ${nuevos} nuevos a crear.`;
-    document.getElementById('preview-asignacion').style.display = 'block';
-  };
-  reader.readAsArrayBuffer(archivo);
-};
-
-window.importarAsignacion = async function () {
-  if (!filasAsignacion.length) return;
-
-  const mes  = parseInt(document.getElementById('asig-mes').value);
-  const anio = parseInt(document.getElementById('asig-anio').value);
-  const btn  = document.getElementById('btn-confirmar-asignacion');
-  btn.disabled = true;
-  btn.textContent = '⏳ Procesando...';
-
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
-
-  const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true);
-  const { data: perfilesExistentes } = await supabase
-    .from('profiles')
-    .select('id, documento_numero, email')
-    .in('documento_numero', filasAsignacion.map(f => normalizarDNI(f[0])))
-    .eq('empresa_id', empresaAdminId);
-
-  const perfilMap = {};
-  perfilesExistentes?.forEach(p => { perfilMap[p.documento_numero] = p; });
-
-  const filas = document.querySelectorAll('#tbody-asignacion tr');
-  const progreso = document.getElementById('progreso-asignacion');
-  let ok = 0, errores = 0;
-  const registros = [];
-
-  for (let i = 0; i < filasAsignacion.length; i++) {
-    const f          = filasAsignacion[i];
-    const dni        = String(f[0]).trim();
-    const apellidos  = String(f[1]).trim();
-    const nombres    = String(f[2]).trim();
-    const emailRaw   = String(f[3]).trim();
-    const cargoNombre = String(f[4]).trim();
-    const telefono   = String(f[5]).trim();
-    const fechaRaw   = f[6];
-    let fechaIngreso = '';
-    if (fechaRaw instanceof Date) {
-      fechaIngreso = `${fechaRaw.getFullYear()}-${String(fechaRaw.getMonth()+1).padStart(2,'0')}-${String(fechaRaw.getDate()).padStart(2,'0')}`;
-    } else if (fechaRaw) {
-      fechaIngreso = String(fechaRaw).trim();
-    }
-
-    const tdEstado = filas[i]?.querySelectorAll('td')[3];
-
-    if (perfilMap[dni]) {
-      // Trabajador existente — solo asignar
-      registros.push({
-        empresa_id: empresaAdminId,
-        usuario_id: perfilMap[dni].id,
-        usuario_email: perfilMap[dni].email,
-        documento_numero: dni, mes, anio,
-        sede: sedeAdminActiva
-      });
-      if (tdEstado) { tdEstado.textContent = '✅ Asignado'; tdEstado.style.color = 'green'; }
-      ok++;
-    } else if (apellidos && nombres) {
-      // Trabajador nuevo — crear cuenta y asignar
-      const email  = emailRaw.includes('@') ? emailRaw : null;
-      const cargo  = cargos?.find(c => c.nombre.toLowerCase() === cargoNombre.toLowerCase());
-      if (tdEstado) { tdEstado.textContent = '⏳ Creando...'; tdEstado.style.color = '#888'; }
-
-      const res  = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/crear-usuario', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s'
-        },
-        body: JSON.stringify({
-          email, password: dni, nombres, apellidos,
-          documento_tipo: 'DNI', documento_numero: dni,
-          telefono: telefono || null, empresa_id: empresaAdminId,
-          cargo_id: cargo?.id || null, fecha_ingreso: fechaIngreso || null, rol: 'trabajador',
-          sedes: [sedeAdminActiva]
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || data?.error) {
-        if (tdEstado) { tdEstado.textContent = '❌ ' + (data?.error || 'Error'); tdEstado.style.color = 'red'; }
-        errores++;
-      } else {
-        // Buscar el perfil recién creado para obtener su ID
-        const { data: nuevoPerfil } = await supabase
-          .from('profiles').select('id, email').eq('documento_numero', dni).single();
-        if (nuevoPerfil) {
-          registros.push({
-            empresa_id: empresaAdminId,
-            usuario_id: nuevoPerfil.id,
-            usuario_email: nuevoPerfil.email,
-            documento_numero: dni, mes, anio,
-            sede: sedeAdminActiva
-          });
-        }
-        if (tdEstado) { tdEstado.textContent = '✅ Creado y asignado'; tdEstado.style.color = 'green'; }
-        ok++;
-      }
-    } else {
-      if (tdEstado) { tdEstado.textContent = '⚠️ Saltado'; tdEstado.style.color = 'orange'; }
-    }
-
-    progreso.textContent = `Progreso: ${i+1}/${filasAsignacion.length} — ✅ ${ok}, ❌ ${errores}`;
-  }
-
-  // Insertar todas las asignaciones de una vez
-  if (registros.length) {
-    await supabase.from('asignaciones_mes')
-      .upsert(registros, { onConflict: 'empresa_id,sede,documento_numero,mes,anio' });
-  }
-
-  progreso.textContent += ` — ¡Completado! ${registros.length} asignados al ${mes}/${anio}.`;
-  btn.disabled = false;
-  btn.textContent = '✅ Confirmar asignación';
-};
-
-window.verAsignadosMes = async function () {
-  const mes  = parseInt(document.getElementById('ver-asig-mes').value);
-  const anio = parseInt(document.getElementById('ver-asig-anio').value);
-
-  const { data, error } = await supabase
-    .from('asignaciones_mes')
-    .select('documento_numero, usuario_email, profiles(nombres, apellidos, cargo)')
-    .eq('empresa_id', empresaAdminId)
-    .eq('sede', sedeAdminActiva)
-    .eq('mes', mes)
-    .eq('anio', anio)
-    .order('documento_numero');
-
-  const cont = document.getElementById('lista-asignados-mes');
-  if (error || !data?.length) {
-    cont.innerHTML = '<p style="color:#888;">No hay asignaciones para ese mes.</p>';
-    return;
-  }
-
-  cont.innerHTML = `
-    <p style="font-size:0.88rem; color:#555; margin-bottom:10px;">${data.length} trabajadores asignados</p>
-    <div style="overflow-x:auto;">
-      <table class="tabla-trabajadores">
-        <thead><tr><th>DNI</th><th>Apellidos y Nombres</th><th>Cargo</th><th>Email</th></tr></thead>
-        <tbody>${data.map(r => `<tr>
-          <td>${r.documento_numero}</td>
-          <td>${r.profiles?.apellidos || ''} ${r.profiles?.nombres || ''}</td>
-          <td>${r.profiles?.cargo || ''}</td>
-          <td>${r.usuario_email || ''}</td>
-        </tr>`).join('')}</tbody>
-      </table>
-    </div>`;
-};
 
 // ═══════════════════════════════════════════════════
 // 📊 REGISTRO DE NOTAS — v2 (fuente: certificados)
@@ -1465,9 +1178,16 @@ let cargosDisponibles = [];
 const PAGE_SIZE = 50;
 let _trabTotal = 0;
 
+function iniciales(apellidos, nombres) {
+  const a = (apellidos || '').trim()[0] || '';
+  const n = (nombres || '').trim()[0] || '';
+  return (a + n).toUpperCase() || '?';
+}
+
 window.cargarTrabajadores = async function (page = 0) {
   const desde = page * PAGE_SIZE;
   const busqueda = document.getElementById('buscar-apellido')?.value.trim() || '';
+  const filtroEstado = document.getElementById('filtro-estado-trab')?.value || '';
 
   let query = supabase
     .from('profiles')
@@ -1480,6 +1200,8 @@ window.cargarTrabajadores = async function (page = 0) {
   if (busqueda) {
     query = query.or(`apellidos.ilike.%${busqueda}%,documento_numero.ilike.%${busqueda}%`);
   }
+  if (filtroEstado === 'activo')   query = query.eq('activo', true);
+  if (filtroEstado === 'inactivo') query = query.eq('activo', false);
 
   const [{ data, error, count }, { data: cargos }] = await Promise.all([
     query,
@@ -1490,45 +1212,47 @@ window.cargarTrabajadores = async function (page = 0) {
 
   _trabTotal = count || 0;
   cargosDisponibles = cargos || [];
+  _trabEncontrados = data || [];
 
-  const tbody = document.getElementById('tbody-trabajadores');
-  tbody.innerHTML = '';
+  const cont = document.getElementById('galeria-trabajadores');
 
   if (!data || data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#888;">
-      Sin trabajadores registrados en tu empresa.</td></tr>`;
-    document.getElementById('tabla-trabajadores').style.display = 'table';
+    cont.innerHTML = `<p style="color:#888;padding:12px;">Sin trabajadores para este filtro.</p>`;
     document.getElementById('paginacion-trabajadores')?.remove();
     return;
   }
 
-  data.forEach(u => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${u.apellidos || ''} ${u.nombres || ''}</td>
-      <td>${u.documento_numero || ''}</td>
-      <td>${u.email || ''}</td>
-      <td>${u.cargo || ''}</td>
-      <td>${u.telefono || ''}</td>
-      <td><span class="${u.activo ? 'badge-activo' : 'badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
-      <td style="display:flex; gap:6px;">
-        <button class="btn-editar" onclick="abrirEditar('${u.id}')">✏️ Editar</button>
+  cont.innerHTML = data.map((u, idx) => `
+    <div class="trab-card">
+      <div class="trab-card-top">
+        <div class="trab-avatar">${iniciales(u.apellidos, u.nombres)}</div>
+        <div class="trab-info">
+          <div class="trab-nombre">${u.apellidos || ''} ${u.nombres || ''}</div>
+          <div class="trab-meta">DNI ${u.documento_numero || '—'}${u.cargo ? ' · ' + u.cargo : ''}</div>
+        </div>
+        <span class="${u.activo ? 'badge-activo' : 'badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span>
+      </div>
+      <div class="trab-email">${u.email || '<em style="color:#aaa;">Sin correo</em>'}</div>
+      <div class="trab-actions">
+        <button class="btn-editar" onclick="abrirFormEdicion(${idx})">✏️ Modificar</button>
         <button class="${u.activo ? 'btn-toggle-on' : 'btn-toggle-off'}" onclick="toggleActivo('${u.id}', ${u.activo})">
           ${u.activo ? 'Desactivar' : 'Activar'}
         </button>
-      </td>`;
-    tbody.appendChild(tr);
-  });
-
-  document.getElementById('tabla-trabajadores').style.display = 'table';
+        <button onclick="resetearPasswordADni(${idx})"
+                style="padding:5px 12px;background:#e65100;color:white;border:none;border-radius:5px;cursor:pointer;font-size:0.8rem;">
+          🔑 DNI
+        </button>
+      </div>
+    </div>
+  `).join('');
 
   // Paginación
   let pag = document.getElementById('paginacion-trabajadores');
   if (!pag) {
     pag = document.createElement('div');
     pag.id = 'paginacion-trabajadores';
-    pag.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:12px;font-size:0.85rem;color:#555;';
-    document.getElementById('tabla-trabajadores').after(pag);
+    pag.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:14px;font-size:0.85rem;color:#555;';
+    cont.after(pag);
   }
   const totalPages = Math.ceil(_trabTotal / PAGE_SIZE);
   pag.innerHTML = totalPages <= 1 ? `<span>${_trabTotal} trabajadores</span>` : `
@@ -1538,80 +1262,6 @@ window.cargarTrabajadores = async function (page = 0) {
     <button onclick="cargarTrabajadores(${page + 1})" ${page >= totalPages - 1 ? 'disabled' : ''}
       style="padding:5px 12px;border:1px solid #dde3ec;border-radius:6px;cursor:pointer;background:white;">›</button>
   `;
-};
-
-window.abrirEditar = async function (id) {
-  const { data: u } = await supabase
-    .from('profiles')
-    .select('id, nombres, apellidos, email, documento_numero, telefono, cargo_id, fecha_ingreso')
-    .eq('id', id)
-    .single();
-
-  document.getElementById('editar-id').value = u.id;
-  document.getElementById('editar-nombres').value = u.nombres || '';
-  document.getElementById('editar-apellidos').value = u.apellidos || '';
-  document.getElementById('editar-email').value = u.email || '';
-  document.getElementById('editar-telefono').value = u.telefono || '';
-  document.getElementById('editar-documento').value = u.documento_numero || '';
-  document.getElementById('editar-fecha-ingreso').value = u.fecha_ingreso || '';
-
-  const selCargo = document.getElementById('editar-cargo');
-  selCargo.innerHTML = '<option value="">-- Sin cargo --</option>';
-  cargosDisponibles.forEach(c => {
-    selCargo.innerHTML += `<option value="${c.id}" ${u.cargo_id === c.id ? 'selected' : ''}>${c.nombre}</option>`;
-  });
-
-  const modal = document.getElementById('modal-editar');
-  modal.style.display = 'flex';
-};
-
-window.cerrarModal = function () {
-  document.getElementById('modal-editar').style.display = 'none';
-};
-
-window.guardarEdicion = async function () {
-  const id          = document.getElementById('editar-id').value;
-  const nombres     = document.getElementById('editar-nombres').value.trim();
-  const apellidos   = document.getElementById('editar-apellidos').value.trim();
-  const email       = document.getElementById('editar-email').value.trim();
-  const telefono    = document.getElementById('editar-telefono').value.trim();
-  const documento   = document.getElementById('editar-documento').value.trim();
-  const cargo_id    = document.getElementById('editar-cargo').value || null;
-  const fecha_ingreso = document.getElementById('editar-fecha-ingreso').value || null;
-
-  if (!nombres || !apellidos) { alert('❌ Nombres y apellidos son obligatorios.'); return; }
-
-  const emailFinal = email || null;
-
-  // Obtener nombre del cargo y datos de empresa
-  let cargoNombre = null;
-  if (cargo_id) {
-    const { data: carg } = await supabase.from('cargos').select('nombre').eq('id', cargo_id).single();
-    cargoNombre = carg?.nombre || null;
-  }
-
-  const { data: emp } = await supabase.from('empresas').select('nombre, ruc').eq('id', empresaAdminId).single();
-
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      nombres, apellidos,
-      email:            emailFinal,
-      telefono:         telefono || null,
-      documento_numero: documento,
-      cargo_id,
-      cargo:            cargoNombre,
-      empresa:          emp?.nombre || null,
-      empresa_ruc:      emp?.ruc || null,
-      fecha_ingreso
-    })
-    .eq('id', id);
-
-  if (error) { alert('❌ Error: ' + error.message); return; }
-
-  alert('✅ Datos actualizados correctamente.');
-  cerrarModal();
-  cargarTrabajadores();
 };
 
 // ═══════════════════════════════
@@ -1845,59 +1495,155 @@ window.ejecutarActualizacion = async function () {
 // ═══════════════════════════════
 let _trabEncontrados = [];
 
-window.buscarTrabajador = async function () {
-  const q = document.getElementById('buscar-trab-input').value.trim();
-  if (!q) { alert('Ingresa un DNI o apellidos para buscar.'); return; }
+// Reseteo de un clic: deja la contraseña del trabajador igual a su DNI completo.
+// Pensado para resolver en el momento el caso típico de "no puedo ingresar".
+window.resetearPasswordADni = async function (idx) {
+  const t = _trabEncontrados[idx];
+  if (!t) return;
+  if (!await showConfirm(
+    `¿Resetear la contraseña de ${t.apellidos}, ${t.nombres} a su DNI (${t.documento_numero})?`,
+    { confirmText: 'Sí, resetear' }
+  )) return;
 
-  const resultadoDiv = document.getElementById('resultado-busqueda-trab');
-  const resumenEl    = document.getElementById('resumen-busqueda-trab');
-  const listaEl      = document.getElementById('lista-busqueda-trab');
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
+  const { data: sessionData } = await supabase.auth.getSession();
 
-  resumenEl.textContent = '⏳ Buscando...';
-  resultadoDiv.style.display = 'block';
-  listaEl.innerHTML = '';
-  document.getElementById('form-editar-trab').style.display = 'none';
+  const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${sessionData.session?.access_token}`,
+      'apikey': ANON_KEY,
+    },
+    body: JSON.stringify({
+      usuario_id: t.id,
+      updates: {},
+      password: t.documento_numero,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
 
-  let qb = supabase
+  if (!res.ok || data?.error) {
+    alert('❌ ' + (data?.error || 'Error al resetear la contraseña.'));
+    return;
+  }
+  alert(`✅ Contraseña reseteada. Ya puede ingresar con DNI: ${t.documento_numero}`);
+};
+
+// ═══════════════════════════════
+// 🛡️ ADMINISTRADORES Y GESTORES
+// ═══════════════════════════════
+let _staffEncontrados = [];
+
+window.cargarStaff = async function () {
+  const busqueda = document.getElementById('buscar-staff')?.value.trim() || '';
+  const filtroRol = document.getElementById('filtro-rol-staff')?.value || '';
+
+  let query = supabase
     .from('profiles')
-    .select('id, documento_numero, nombres, apellidos, email, telefono, cargo_id, cargo, fecha_ingreso')
+    .select('id, nombres, apellidos, email, documento_numero, rol, activo')
     .eq('empresa_id', empresaAdminId)
-    .order('apellidos')
-    .limit(10);
+    .in('rol', filtroRol ? [filtroRol] : ['admin', 'gestor'])
+    .order('apellidos');
 
-  if (/^\d/.test(q)) {
-    qb = qb.ilike('documento_numero', `%${q}%`);
-  } else {
-    qb = qb.ilike('apellidos', `%${q}%`);
+  if (busqueda) {
+    query = query.or(`apellidos.ilike.%${busqueda}%,documento_numero.ilike.%${busqueda}%`);
   }
 
-  const { data, error } = await qb;
+  const { data, error } = await query;
+  if (error) { alert('❌ ' + error.message); return; }
 
-  if (error || !data?.length) {
-    resumenEl.textContent = 'No se encontraron trabajadores.';
+  _staffEncontrados = data || [];
+  const cont = document.getElementById('galeria-staff');
+
+  if (!_staffEncontrados.length) {
+    cont.innerHTML = '<p style="color:#888;padding:12px;">Sin cuentas para este filtro.</p>';
     return;
   }
 
-  _trabEncontrados = data;
-  resumenEl.textContent = `${data.length} trabajador(es) encontrado(s):`;
-
-  data.forEach((t, idx) => {
-    const div = document.createElement('div');
-    div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:white;border:1px solid #ddd;border-radius:7px;margin-bottom:8px;gap:12px;';
-    div.innerHTML = `
-      <div style="flex:1;min-width:0;">
-        <strong>${t.apellidos}, ${t.nombres}</strong>
-        <span style="color:#888;font-size:0.85rem;"> · DNI: ${t.documento_numero}</span>
-        ${t.cargo ? `<span style="color:#888;font-size:0.85rem;"> · ${t.cargo}</span>` : ''}
-        ${t.email ? `<br><span style="color:#aaa;font-size:0.82rem;">${t.email}</span>` : ''}
+  cont.innerHTML = _staffEncontrados.map((u, idx) => `
+    <div class="trab-card">
+      <div class="trab-card-top">
+        <div class="trab-avatar">${iniciales(u.apellidos, u.nombres)}</div>
+        <div class="trab-info">
+          <div class="trab-nombre">${u.apellidos || ''} ${u.nombres || ''}</div>
+          <div class="trab-meta">DNI ${u.documento_numero || '—'} · ${u.rol === 'gestor' ? 'Gestor' : 'Administrador'}</div>
+        </div>
+        <span class="${u.activo ? 'badge-activo' : 'badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span>
       </div>
-      <button onclick="abrirFormEdicion(${idx})"
-              style="white-space:nowrap;padding:7px 14px;background:#002855;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;">
-        ✏️ Editar
-      </button>
-    `;
-    listaEl.appendChild(div);
+      <div class="trab-email">${u.email || '<em style="color:#aaa;">Sin correo</em>'}</div>
+      <div class="trab-actions">
+        <button onclick="cambiarEmailStaff(${idx})"
+                style="padding:5px 12px;background:#0d6efd;color:white;border:none;border-radius:5px;cursor:pointer;font-size:0.8rem;">
+          ✉️ Cambiar correo
+        </button>
+        <button class="${u.activo ? 'btn-toggle-on' : 'btn-toggle-off'}"
+                onclick="toggleActivoStaff('${u.id}', ${u.activo})" ${u.id === currentUserId ? 'disabled title="No puedes desactivar tu propia cuenta"' : ''}>
+          ${u.activo ? 'Desactivar' : 'Activar'}
+        </button>
+        <button onclick="resetearPasswordStaffADni(${idx})"
+                style="padding:5px 12px;background:#e65100;color:white;border:none;border-radius:5px;cursor:pointer;font-size:0.8rem;">
+          🔑 Resetear a DNI
+        </button>
+      </div>
+    </div>
+  `).join('');
+};
+
+window.toggleActivoStaff = async function (id, activo) {
+  if (id === currentUserId) { alert('❌ No puedes desactivar tu propia cuenta.'); return; }
+  const { error } = await supabase.from('profiles').update({ activo: !activo }).eq('id', id);
+  if (error) { alert('❌ ' + error.message); return; }
+  cargarStaff();
+};
+
+window.cambiarEmailStaff = async function (idx) {
+  const u = _staffEncontrados[idx];
+  if (!u) return;
+  const nuevoEmail = prompt(`Nuevo correo de contacto para ${u.apellidos}, ${u.nombres}:`, u.email || '');
+  if (nuevoEmail === null) return;
+  if (nuevoEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nuevoEmail)) {
+    alert('❌ Correo inválido.');
+    return;
+  }
+  const { error } = await supabase.from('profiles').update({ email: nuevoEmail || null }).eq('id', u.id);
+  if (error) { alert('❌ ' + error.message); return; }
+  alert('✅ Correo actualizado. Recuerda: esto no cambia cómo ingresa a la plataforma (sigue siendo su DNI).');
+  cargarStaff();
+};
+
+// Reseteo de un clic: deja la contraseña de la cuenta admin/gestor igual a su DNI completo.
+window.resetearPasswordStaffADni = async function (idx) {
+  const u = _staffEncontrados[idx];
+  if (!u) return;
+  if (!await showConfirm(
+    `¿Resetear la contraseña de ${u.apellidos}, ${u.nombres} a su DNI (${u.documento_numero})?`,
+    { confirmText: 'Sí, resetear' }
+  )) return;
+
+  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
+  const { data: sessionData } = await supabase.auth.getSession();
+
+  const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${sessionData.session?.access_token}`,
+      'apikey': ANON_KEY,
+    },
+    body: JSON.stringify({
+      usuario_id: u.id,
+      updates: {},
+      password: u.documento_numero,
+    }),
   });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || data?.error) {
+    alert('❌ ' + (data?.error || 'Error al resetear la contraseña.'));
+    return;
+  }
+  alert(`✅ Contraseña reseteada. Ya puede ingresar con DNI: ${u.documento_numero}`);
 };
 
 window.abrirFormEdicion = async function (idx) {
@@ -2062,383 +1808,6 @@ window.corregirPasswordsDNI = async function () {
 window.toggleActivo = async function (id, activo) {
   await supabase.from('profiles').update({ activo: !activo }).eq('id', id);
   cargarTrabajadores();
-};
-
-// ═══════════════════════════════
-// 📊 DASHBOARD
-// ═══════════════════════════════
-
-let graficaSatisfaccionChart = null;
-
-window.cargarGraficaSatisfaccion = async function () {
-  const anio = parseInt(document.getElementById('sat-anio').value);
-
-  // Emails de trabajadores de la empresa
-  const { data: trabajadores } = await supabase
-    .from('profiles')
-    .select('email')
-    .eq('empresa_id', empresaAdminId)
-    .eq('rol', 'trabajador')
-    .eq('activo', true);
-  if (!trabajadores?.length) return;
-  const emails = trabajadores.map(t => t.email).filter(Boolean);
-  if (!emails.length) return;
-
-  // IDs de formularios tipo encuesta
-  const { data: formsEncuesta } = await supabase
-    .from('formularios').select('id').eq('tipo', 'encuesta');
-  const encuestaIds = formsEncuesta?.map(f => f.id) || [];
-  if (!encuestaIds.length) { alert('No hay encuestas configuradas.'); return; }
-
-  // Envíos de encuesta del año seleccionado
-  const desde = new Date(Date.UTC(anio,  0, 1, 5, 0, 0)).toISOString();
-  const hasta = new Date(Date.UTC(anio + 1, 0, 1, 5, 0, 0)).toISOString();
-
-  const { data: envios } = await chunkedInQuery(emails, 150, chunk =>
-    supabase
-      .from('envios_formulario')
-      .select('porcentaje, created_at')
-      .in('usuario_email', chunk)
-      .in('id_formulario', encuestaIds)
-      .eq('estado', 'completado')
-      .gte('created_at', desde)
-      .lt('created_at', hasta)
-  );
-
-  // Agrupar por mes y calcular promedio
-  const mesesNombre = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const sumaMes  = Array(12).fill(0);
-  const countMes = Array(12).fill(0);
-
-  envios?.forEach(e => {
-    if (e.porcentaje == null || e.porcentaje === 100) return; // ignorar registros sin puntaje real
-    const mes = new Date(e.created_at).getMonth(); // 0-11
-    sumaMes[mes]  += e.porcentaje;
-    countMes[mes] += 1;
-  });
-
-  const promedios = sumaMes.map((s, i) => countMes[i] > 0 ? parseFloat((s / countMes[i]).toFixed(1)) : null);
-  const promedioGlobal = promedios.filter(v => v !== null);
-  const promedioAnual  = promedioGlobal.length
-    ? (promedioGlobal.reduce((a, b) => a + b, 0) / promedioGlobal.length).toFixed(1)
-    : null;
-
-  document.getElementById('sat-promedio').textContent = promedioAnual
-    ? `Promedio anual: ${promedioAnual}%`
-    : 'Sin datos para este año';
-
-  const ctx = document.getElementById('grafica-satisfaccion').getContext('2d');
-  if (graficaSatisfaccionChart) graficaSatisfaccionChart.destroy();
-
-  graficaSatisfaccionChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: mesesNombre,
-      datasets: [{
-        label: `Satisfacción % — ${anio}`,
-        data: promedios,
-        borderColor: '#002855',
-        backgroundColor: 'rgba(0,40,85,0.08)',
-        borderWidth: 2,
-        pointRadius: 5,
-        pointBackgroundColor: '#002855',
-        tension: 0.3,
-        spanGaps: true
-      }, {
-        label: 'Meta (80%)',
-        data: Array(12).fill(80),
-        borderColor: '#28a745',
-        borderDash: [6, 4],
-        borderWidth: 1.5,
-        pointRadius: 0,
-        tension: 0
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: { min: 0, max: 100, ticks: { callback: v => v + '%' } }
-      },
-      plugins: {
-        tooltip: { callbacks: { label: ctx => ctx.parsed.y !== null ? ctx.parsed.y + '%' : 'Sin datos' } }
-      }
-    }
-  });
-};
-
-// ── 1. Estado mensual ──
-window.cargarDashboardMes = async function () {
-  const mes  = parseInt(document.getElementById('dash-mes')?.value  || (new Date().getMonth() + 1));
-  const anio = parseInt(document.getElementById('dash-anio')?.value || new Date().getFullYear());
-  // Rango en hora Perú (UTC-5): medianoche Lima = 05:00 UTC
-  const desde = new Date(Date.UTC(anio, mes - 1, 1, 5, 0, 0)).toISOString();
-  const hasta = new Date(Date.UTC(anio, mes,     1, 5, 0, 0)).toISOString();
-
-  // Usar asignaciones del mes si existen, sino todos los activos
-  const { data: asignaciones } = await supabase
-    .from('asignaciones_mes')
-    .select('usuario_email, documento_numero')
-    .eq('empresa_id', empresaAdminId)
-    .eq('sede', sedeAdminActiva)
-    .eq('mes', mes)
-    .eq('anio', anio);
-
-  let trabajadores, emails, fuenteLabel;
-
-  if (asignaciones?.length) {
-    // Usar lista de asignados
-    emails = asignaciones.map(a => a.usuario_email).filter(Boolean);
-    const { data: perfs } = await chunkedInQuery(emails, 150, chunk =>
-      supabase
-        .from('profiles')
-        .select('id, nombres, apellidos, documento_numero, cargo, email')
-        .in('email', chunk)
-    );
-    trabajadores = perfs || [];
-    fuenteLabel  = `📋 Lista asignada (${asignaciones.length} trabajadores)`;
-  } else {
-    // Fallback: todos los activos de la empresa
-    const { data: todos } = await supabase
-      .from('profiles')
-      .select('id, nombres, apellidos, documento_numero, cargo, email')
-      .eq('empresa_id', empresaAdminId)
-      .eq('rol', 'trabajador')
-      .eq('activo', true);
-    trabajadores = todos || [];
-    emails = trabajadores.map(t => t.email).filter(Boolean);
-    fuenteLabel = `👥 Todos los activos (sin lista asignada)`;
-  }
-
-  if (!trabajadores.length) {
-    document.getElementById('cards-mes').innerHTML = '<p style="color:#888;">No hay trabajadores para este mes.</p>';
-    return;
-  }
-
-  const { data: enviosMes } = await chunkedInQuery(emails, 150, chunk =>
-    supabase
-      .from('envios_formulario')
-      .select('usuario_email, aprobado')
-      .in('usuario_email', chunk)
-      .eq('estado', 'completado')
-      .gte('created_at', desde)
-      .lt('created_at', hasta)
-  );
-
-  const correosConActividad = new Set(enviosMes?.map(n => n.usuario_email) || []);
-  const aprobados = new Set(enviosMes?.filter(n => n.aprobado).map(n => n.usuario_email) || []);
-  const conActividad = correosConActividad.size;
-  const sinActividad = trabajadores.length - conActividad;
-  const pct = Math.round((conActividad / trabajadores.length) * 100);
-
-  const cards = document.getElementById('cards-mes');
-  cards.innerHTML = `
-    <div style="grid-column:1/-1; font-size:0.8rem; color:#888; margin-bottom:4px;">${fuenteLabel}</div>
-    <div class="stat-card">
-      <div class="stat-num">${trabajadores.length}</div>
-      <div class="stat-label">Asignados al mes</div>
-    </div>
-    <div class="stat-card verde">
-      <div class="stat-num">${conActividad}</div>
-      <div class="stat-label">Han rendido este mes</div>
-    </div>
-    <div class="stat-card naranja">
-      <div class="stat-num">${sinActividad}</div>
-      <div class="stat-label">Sin actividad este mes</div>
-    </div>
-    <div class="stat-card verde">
-      <div class="stat-num">${aprobados.size}</div>
-      <div class="stat-label">Aprobaron examen (≥16)</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-num">${pct}%</div>
-      <div class="stat-label">Participación mensual</div>
-    </div>
-  `;
-
-  // Tabla de sin actividad
-  const sinAct = trabajadores.filter(t => !correosConActividad.has(t.email));
-  const tbody = document.getElementById('tbody-sin-actividad');
-  tbody.innerHTML = '';
-  sinAct.forEach(t => {
-    tbody.innerHTML += `<tr>
-      <td>${t.apellidos || ''} ${t.nombres || ''}</td>
-      <td>${t.documento_numero || ''}</td>
-      <td>${t.cargo || ''}</td>
-    </tr>`;
-  });
-  document.getElementById('detalle-pendientes').style.display = sinAct.length ? 'block' : 'none';
-};
-
-// ── 2. Buscador por trabajador ──
-let todosTrabajadoresDash = [];
-let todosCursosDash = [];
-
-async function cargarDatosDashboard() {
-  if (todosTrabajadoresDash.length) return;
-  const [{ data: trabajadores }, { data: cursos }] = await Promise.all([
-    supabase.from('profiles').select('id, nombres, apellidos, email, documento_numero, cargo')
-      .eq('empresa_id', empresaAdminId).eq('rol', 'trabajador').eq('activo', true).order('apellidos'),
-    supabase.from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva)
-  ]);
-  todosTrabajadoresDash = trabajadores || [];
-  todosCursosDash = cursos || [];
-
-  const sel = document.getElementById('select-curso-dashboard');
-  todosCursosDash.forEach(c => {
-    sel.innerHTML += `<option value="${c.id}">${c.titulo}</option>`;
-  });
-  initSelectBuscable('select-curso-dashboard');
-}
-
-window.buscarTrabajadorDashboard = function () {
-  const texto = document.getElementById('buscar-trabajador').value.toLowerCase().trim();
-  const lista = document.getElementById('lista-sugerencias');
-  document.getElementById('resultado-trabajador').style.display = 'none';
-
-  if (!texto || texto.length < 2) { lista.innerHTML = ''; return; }
-
-  cargarDatosDashboard().then(() => {
-    const coinciden = todosTrabajadoresDash.filter(t =>
-      (t.nombres || '').toLowerCase().includes(texto) ||
-      (t.apellidos || '').toLowerCase().includes(texto) ||
-      (t.documento_numero || '').includes(texto)
-    ).slice(0, 8);
-
-    if (!coinciden.length) {
-      lista.innerHTML = '<div style="color:#888; font-size:0.85rem; padding:8px;">No se encontraron trabajadores.</div>';
-      return;
-    }
-
-    lista.innerHTML = `<div style="border:1px solid #e0e0e0; border-radius:8px; overflow:hidden; max-width:500px;">
-      ${coinciden.map(t => `
-        <div class="sugerencia-item" onclick="verCursosTrabajador('${t.email}')">
-          <strong>${t.apellidos} ${t.nombres}</strong>
-          <span style="color:#888; margin-left:8px; font-size:0.8rem;">${t.documento_numero || ''} · ${t.cargo || ''}</span>
-        </div>`).join('')}
-    </div>`;
-  });
-};
-
-window.verCursosTrabajador = async function (email) {
-  document.getElementById('lista-sugerencias').innerHTML = '';
-  document.getElementById('buscar-trabajador').value = '';
-
-  await cargarDatosDashboard();
-  const trabajador = todosTrabajadoresDash.find(t => t.email === email);
-  if (!trabajador) return;
-
-  const { data: todosFormularios } = await supabase
-    .from('formularios').select('id, tipo');
-  const tipoFormMap = {};
-  todosFormularios?.forEach(f => { tipoFormMap[f.id] = f.tipo; });
-
-  const { data: envios } = await supabase
-    .from('envios_formulario')
-    .select('id_curso, id_formulario, puntaje, created_at')
-    .eq('usuario_email', email)
-    .eq('estado', 'completado')
-    .order('created_at', { ascending: false });
-
-  // Guardar el resultado más reciente del examen por curso
-  const notasMap = {};
-  envios?.filter(n => tipoFormMap[n.id_formulario] === 'examen')
-         .forEach(n => {
-           if (!notasMap[n.id_curso]) // solo el más reciente
-             notasMap[n.id_curso] = { puntaje: n.puntaje, fecha: n.created_at };
-         });
-
-  const UN_ANIO_MS = 365 * 24 * 60 * 60 * 1000;
-  const ahora = Date.now();
-
-  const vigentes   = todosCursosDash.filter(c => notasMap[c.id] && (ahora - new Date(notasMap[c.id].fecha).getTime()) < UN_ANIO_MS);
-  const vencidos   = todosCursosDash.filter(c => notasMap[c.id] && (ahora - new Date(notasMap[c.id].fecha).getTime()) >= UN_ANIO_MS);
-  const pendientes = todosCursosDash.filter(c => !notasMap[c.id]);
-
-  document.getElementById('trabajador-inicial').textContent =
-    (trabajador.apellidos || '?')[0].toUpperCase();
-  document.getElementById('trabajador-nombre').textContent =
-    `${trabajador.apellidos} ${trabajador.nombres}`;
-  document.getElementById('trabajador-info').textContent =
-    `${trabajador.documento_numero || ''} · ${trabajador.cargo || ''}`;
-
-  const renderCurso = c => {
-    const info = notasMap[c.id];
-    const cls  = info.puntaje >= 16 ? 'aprobado' : 'desaprobado';
-    const fecha = new Date(info.fecha).toLocaleDateString('es-PE');
-    return `<div class="curso-item ${cls}">
-      <span>${c.titulo}</span>
-      <div style="font-size:0.75rem; color:#666;">${fecha}</div>
-      <strong>${info.puntaje}/20</strong>
-    </div>`;
-  };
-
-  document.getElementById('cursos-vigentes').innerHTML  = vigentes.length  ? vigentes.map(renderCurso).join('')  : '<div style="color:#888; font-size:0.83rem;">Ninguno</div>';
-  document.getElementById('cursos-vencidos').innerHTML  = vencidos.length  ? vencidos.map(renderCurso).join('')  : '<div style="color:#888; font-size:0.83rem;">Ninguno</div>';
-  document.getElementById('cursos-pendientes').innerHTML = pendientes.length ? pendientes.map(c => `<div class="curso-item pendiente">${c.titulo}</div>`).join('') : '<div style="color:#28a745; font-size:0.83rem;">¡Todos completados!</div>';
-
-  document.getElementById('resultado-trabajador').style.display = 'block';
-};
-
-// ── 3. Estado por curso ──
-window.cargarEstadoCurso = async function () {
-  const cursoId = parseInt(document.getElementById('select-curso-dashboard').value);
-  if (!cursoId) { alert('Selecciona un curso.'); return; }
-
-  await cargarDatosDashboard();
-
-  const { data: todosFormularios } = await supabase
-    .from('formularios').select('id, tipo');
-  const tipoFormMap = {};
-  todosFormularios?.forEach(f => { tipoFormMap[f.id] = f.tipo; });
-
-  const emails = todosTrabajadoresDash.map(t => t.email).filter(Boolean);
-  if (!emails.length) return;
-  const { data: envios } = await chunkedInQuery(emails, 150, chunk =>
-    supabase
-      .from('envios_formulario')
-      .select('usuario_email, id_formulario, puntaje')
-      .eq('id_curso', cursoId)
-      .in('usuario_email', chunk)
-      .eq('estado', 'completado')
-  );
-
-  const notasMap = {};
-  envios?.filter(n => tipoFormMap[n.id_formulario] === 'examen')
-         .forEach(n => { notasMap[n.usuario_email] = n.puntaje; });
-
-  const aprobados     = todosTrabajadoresDash.filter(t => notasMap[t.email] !== undefined && notasMap[t.email] >= 16);
-  const desaprobados  = todosTrabajadoresDash.filter(t => notasMap[t.email] !== undefined && notasMap[t.email] < 16);
-  const pendientes    = todosTrabajadoresDash.filter(t => notasMap[t.email] === undefined);
-  const total         = todosTrabajadoresDash.length;
-
-  document.getElementById('cards-curso').innerHTML = `
-    <div class="stat-card verde">
-      <div class="stat-num">${aprobados.length}</div>
-      <div class="stat-label">Aprobados (${Math.round(aprobados.length/total*100)}%)</div>
-    </div>
-    <div class="stat-card rojo">
-      <div class="stat-num">${desaprobados.length}</div>
-      <div class="stat-label">Desaprobados</div>
-    </div>
-    <div class="stat-card naranja">
-      <div class="stat-num">${pendientes.length}</div>
-      <div class="stat-label">No han rendido</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-num">${total}</div>
-      <div class="stat-label">Total trabajadores</div>
-    </div>
-  `;
-
-  const fmt = lista => lista.length
-    ? lista.map(t => `<div class="trabajador-item">${t.apellidos} ${t.nombres}${notasMap[t.email] !== undefined ? ` <strong>(${notasMap[t.email]}/20)</strong>` : ''}</div>`).join('')
-    : '<div style="color:#888; font-size:0.83rem;">Ninguno</div>';
-
-  document.getElementById('lista-aprobados-curso').innerHTML    = fmt(aprobados);
-  document.getElementById('lista-desaprobados-curso').innerHTML = fmt(desaprobados);
-  document.getElementById('lista-pendientes-curso').innerHTML   = fmt(pendientes);
-  document.getElementById('stats-curso').style.display = 'block';
 };
 
 // ═══════════════════════════════════════════════
@@ -2671,9 +2040,6 @@ window.cargarListaCursos = async function () {
     return;
   }
 
-  const activos   = cursos.filter(c => c.activo);
-  const inactivos = cursos.filter(c => !c.activo);
-
   window.cursosCache = {};
   cursos.forEach(c => { window.cursosCache[c.id] = c; });
 
@@ -2681,19 +2047,11 @@ window.cargarListaCursos = async function () {
     <tr>
       <td style="padding:10px 12px; font-weight:500;">${c.titulo}</td>
       <td style="padding:10px 12px; color:#888; font-size:0.82rem;">${c.duracion ? c.duracion + 'h' : '—'}</td>
-      <td style="padding:10px 12px;">
-        <span class="${c.activo ? 'badge-activo' : 'badge-inactivo'}">${c.activo ? '✅ Activo' : '⏸ Inactivo'}</span>
-      </td>
       <td style="padding:10px 12px; white-space:nowrap;">
         <button onclick="abrirEdicionCurso('${c.id}')"
                 style="padding:6px 14px; border:none; border-radius:6px; cursor:pointer; font-size:0.82rem;
-                       background:#0d6efd; color:white; margin-right:6px;">
-          Editar
-        </button>
-        <button onclick="toggleActivoCurso('${c.id}', ${c.activo})"
-                style="padding:6px 14px; border:none; border-radius:6px; cursor:pointer; font-size:0.82rem;
-                       background:${c.activo ? '#dc3545' : '#198754'}; color:white;">
-          ${c.activo ? 'Desactivar' : 'Activar'}
+                       background:#0d6efd; color:white;">
+          ✏️ Editar
         </button>
       </td>
     </tr>`;
@@ -2704,26 +2062,13 @@ window.cargarListaCursos = async function () {
         <tr style="background:#f8f9fa; font-size:0.82rem; color:#555; text-transform:uppercase; letter-spacing:0.5px;">
           <th style="padding:8px 12px; text-align:left;">Curso</th>
           <th style="padding:8px 12px; text-align:left;">Duración</th>
-          <th style="padding:8px 12px; text-align:left;">Estado</th>
           <th style="padding:8px 12px; text-align:left;">Acción</th>
         </tr>
       </thead>
       <tbody>
-        ${activos.map(renderFila).join('')}
-        ${inactivos.length ? `
-          <tr><td colspan="5" style="padding:8px 12px; font-size:0.78rem; color:#888; background:#f8f9fa; border-top:2px solid #eee;">
-            ── Inactivos ──
-          </td></tr>
-          ${inactivos.map(renderFila).join('')}
-        ` : ''}
+        ${cursos.map(renderFila).join('')}
       </tbody>
     </table>`;
-};
-
-window.toggleActivoCurso = async function (id, activo) {
-  const { error } = await supabase.from('cursos').update({ activo: !activo }).eq('id', id);
-  if (error) { alert('❌ ' + error.message); return; }
-  cargarListaCursos();
 };
 
 window.abrirEdicionCurso = function (id) {
@@ -2832,11 +2177,18 @@ window.cargarVideosCurso = async function (cursoId) {
 };
 
 window.agregarVideoCurso = async function () {
-  const cursoId = document.getElementById('editar-curso-id').value;
-  const url     = document.getElementById('nuevo-video-url').value.trim();
+  const cursoId  = document.getElementById('editar-curso-id').value;
+  const urlCruda = document.getElementById('nuevo-video-url').value.trim();
 
-  if (!cursoId) { alert('❌ Primero guarda o abre un curso.'); return; }
-  if (!url)     { alert('❌ Ingresa el link de YouTube.'); return; }
+  if (!cursoId)  { alert('❌ Primero guarda o abre un curso.'); return; }
+  if (!urlCruda) { alert('❌ Pega el link de YouTube.'); return; }
+
+  const videoId = extraerIdYoutube(urlCruda);
+  if (!videoId) {
+    alert('❌ No reconozco ese link de YouTube. Pega el link que te da el botón "Compartir" del video.');
+    return;
+  }
+  const url = `https://www.youtube.com/embed/${videoId}`;
 
   const { data: existentes } = await supabase
     .from('videos_curso').select('orden')
@@ -2900,10 +2252,17 @@ window.cargarFormulariosCurso = async function () {
         <p style="color:#888;font-size:0.85rem;margin-top:8px;">No existe aún para este curso.</p>`;
     } else {
       bloque.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
           <h3 style="margin:0;color:${color};">${label}</h3>
-          <button onclick="mostrarFormPregunta(${form.id},'${tipo}')" class="btn-primary" style="font-size:0.85rem;">+ Nueva pregunta</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <a href="#" onclick="descargarPlantillaPreguntas(event)" style="font-size:0.8rem;color:#666;text-decoration:underline;">⬇️ Plantilla Excel</a>
+            <input type="file" id="import-preg-${form.id}" accept=".xlsx,.xls" style="display:none;"
+              onchange="importarPreguntasExcel(${form.id},'${tipo}', this)" />
+            <button onclick="document.getElementById('import-preg-${form.id}').click()" class="btn-secondary" style="font-size:0.85rem;">📥 Importar Excel</button>
+            <button onclick="mostrarFormPregunta(${form.id},'${tipo}')" class="btn-primary" style="font-size:0.85rem;">+ Nueva pregunta</button>
+          </div>
         </div>
+        <div id="progreso-import-preg-${form.id}" style="font-size:0.82rem;color:#666;margin-bottom:8px;"></div>
         <div id="lista-preguntas-${form.id}"><em style="color:#888;font-size:0.85rem;">Cargando...</em></div>
         <div id="form-nueva-pregunta-${form.id}" style="display:none;background:#f8f9fa;border-radius:8px;padding:14px;margin-top:12px;">
           <p style="font-weight:600;margin:0 0 10px;">Nueva pregunta</p>
@@ -2934,6 +2293,79 @@ window.crearFormulario = async function (cursoId, tipo) {
 window.mostrarFormPregunta = function (formularioId, tipo) {
   const div = document.getElementById(`form-nueva-pregunta-${formularioId}`);
   if (div) { div.style.display = 'block'; document.getElementById(`txt-pregunta-${formularioId}`).focus(); }
+};
+
+window.descargarPlantillaPreguntas = function (e) {
+  e?.preventDefault();
+  const XLSX = window.XLSX;
+  const datos = [
+    ['Pregunta', 'Puntaje', 'Opción 1', 'Opción 2', 'Opción 3', 'Opción 4', 'Correcta (1-4)'],
+    ['¿Cuál es el equipo de protección obligatorio para trabajos en altura?', 1, 'Arnés', 'Guantes', 'Botas', 'Casco', 1],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(datos);
+  ws['!cols'] = [{ wch: 45 }, { wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 14 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Preguntas');
+  XLSX.writeFile(wb, 'plantilla_preguntas.xlsx');
+};
+
+// Importa preguntas de opción múltiple en bloque desde Excel.
+// Columnas: Pregunta, Puntaje, Opción 1-4 (deja vacías las que no uses), Correcta (1-4).
+window.importarPreguntasExcel = async function (formularioId, tipo, inputEl) {
+  const file = inputEl.files[0];
+  if (!file) return;
+
+  const progreso = document.getElementById(`progreso-import-preg-${formularioId}`);
+  if (progreso) progreso.textContent = '⏳ Leyendo Excel...';
+
+  const XLSX = window.XLSX;
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const filas = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true }).slice(1).filter(f => f?.[0]);
+
+  if (!filas.length) {
+    if (progreso) progreso.textContent = '❌ El Excel está vacío o no tiene el formato esperado.';
+    inputEl.value = '';
+    return;
+  }
+
+  const { data: ult } = await supabase.from('preguntas').select('orden')
+    .eq('id_formulario', formularioId).order('orden', { ascending: false }).limit(1);
+  let orden = ult?.[0]?.orden || 0;
+
+  let ok = 0, errores = 0;
+  for (let i = 0; i < filas.length; i++) {
+    if (progreso) progreso.textContent = `⏳ Importando ${i + 1} de ${filas.length}...`;
+    const [pregunta, puntaje, op1, op2, op3, op4, correcta] = filas[i];
+    if (!pregunta) continue;
+    orden++;
+
+    const { data: nuevaPregunta, error } = await supabase.from('preguntas')
+      .insert([{ id_formulario: formularioId, pregunta: String(pregunta).trim(), orden, puntaje: parseFloat(puntaje) || 1 }])
+      .select().single();
+
+    if (error || !nuevaPregunta) { errores++; continue; }
+
+    const opciones = [op1, op2, op3, op4]
+      .map((texto, idx) => texto ? {
+        id_pregunta: nuevaPregunta.id,
+        opcion: String(texto).trim(),
+        orden: idx + 1,
+        es_correcta: parseInt(correcta) === idx + 1,
+      } : null)
+      .filter(Boolean);
+
+    if (opciones.length) {
+      const { error: errOp } = await supabase.from('opciones_pregunta').insert(opciones);
+      if (errOp) { errores++; continue; }
+    }
+    ok++;
+  }
+
+  if (progreso) progreso.textContent = `✅ ${ok} pregunta(s) importada(s).${errores ? ` ❌ ${errores} con error.` : ''}`;
+  inputEl.value = '';
+  cargarPreguntas(formularioId, tipo);
 };
 
 window.guardarNuevaPregunta = async function (formularioId, tipo) {
@@ -3137,6 +2569,9 @@ window.eliminarPreguntaEncuesta = async function (preguntaId, formularioId) {
 let filasProgramaSST = [];
 
 window.initSelectorAnioSST = function initSelectorAnioSST() {
+  const spanSede = document.getElementById('sst-sede-actual');
+  if (spanSede) spanSede.textContent = sedeAdminActiva || '—';
+
   const anioActual = new Date().getFullYear();
   const mesCurrent = new Date().getMonth() + 1;
   ['sst-anio', 'ver-sst-anio', 'seg-anio', 'stats-anio'].forEach(id => {
@@ -3163,8 +2598,8 @@ window.previsualizarProgramaSST = function () {
   reader.onload = e => {
     const XLSX = window.XLSX;
     const wb = XLSX.read(e.target.result, { type: 'array' });
-    // Buscar hoja ANTAMINA o la primera hoja
-    const nombreHoja = wb.SheetNames.find(n => n.toUpperCase().includes('ANTAMINA')) || wb.SheetNames[0];
+    // Buscar hoja con el nombre de la sede activa, o la primera hoja
+    const nombreHoja = wb.SheetNames.find(n => n.toUpperCase().includes((sedeAdminActiva || '').toUpperCase())) || wb.SheetNames[0];
     const ws = wb.Sheets[nombreHoja];
     const filas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
@@ -3256,17 +2691,17 @@ window.importarProgramaSST = async function () {
   const progreso = document.getElementById('progreso-sst');
   progreso.textContent = 'Guardando...';
 
-  // Eliminar programa anterior del mismo año para esta empresa
+  // Eliminar programa anterior del mismo año para esta empresa y sede
   await supabase.from('programa_capacitaciones')
     .delete()
     .eq('empresa_id', empresaAdminId)
     .eq('anio', anio)
-    .eq('sede', 'ANTAMINA');
+    .eq('sede', sedeAdminActiva);
 
   const registros = filasProgramaSST.map(f => ({
     ...f,
     empresa_id: empresaAdminId,
-    sede: 'ANTAMINA',
+    sede: sedeAdminActiva,
     anio,
   }));
 
@@ -3282,6 +2717,8 @@ window.importarProgramaSST = async function () {
   filasProgramaSST = [];
 };
 
+const TIPO_COLOR_SST = { 'Seguridad': '#002855', 'Salud': '#198754', 'Medio ambiente': '#8a6d3b' };
+
 window.verProgramaSST = async function () {
   const anio = parseInt(document.getElementById('ver-sst-anio').value);
   const tipo  = document.getElementById('ver-sst-tipo').value;
@@ -3292,59 +2729,53 @@ window.verProgramaSST = async function () {
     .select('*')
     .eq('empresa_id', empresaAdminId)
     .eq('anio', anio)
-    .eq('sede', 'ANTAMINA')
+    .eq('sede', sedeAdminActiva)
     .order('numero');
 
   if (tipo) query = query.eq('tipo_curso', tipo);
 
   const { data, error } = await query;
   if (error || !data?.length) {
-    cont.innerHTML = '<p style="color:#888;">No hay programa guardado para este año.</p>';
+    cont.innerHTML = `<p style="color:#888;">No hay programa guardado para ${anio} en ${sedeAdminActiva}.</p>`;
     return;
   }
 
-  const mesesNom = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const mesesNom = ['E','F','M','A','My','Jn','Jl','Ag','S','O','N','D'];
   const mesesKey = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const colorTipo = c => TIPO_COLOR_SST[c] || '#666';
 
-  const filas = data.map(f => {
-    const mesesCeldas = mesesKey.map(m => `<td style="text-align:center;">${f[m] ? '✔' : ''}</td>`).join('');
-    return `<tr style="border-bottom:1px solid #eee;">
-      <td style="padding:7px 10px;">${f.requisito || ''}</td>
-      <td style="padding:7px 10px;">${f.numero ?? ''}</td>
-      <td style="padding:7px 10px;font-weight:500;">${f.curso}</td>
-      <td style="padding:7px 10px;">${f.tipo_curso || ''}</td>
-      <td style="padding:7px 10px;">${f.encargado || ''}</td>
-      <td style="padding:7px 10px;text-align:center;">${f.duracion_hr ?? ''}</td>
-      ${mesesCeldas}
-    </tr>`;
-  }).join('');
+  const tarjetas = data.map(f => `
+    <div class="trab-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+        <div>
+          <div class="trab-nombre">${f.curso}</div>
+          <div class="trab-meta">${f.requisito || ''}${f.encargado ? ' · ' + f.encargado : ''}${f.duracion_hr ? ' · ' + f.duracion_hr + 'h' : ''}</div>
+        </div>
+        ${f.tipo_curso ? `<span style="background:${colorTipo(f.tipo_curso)};color:white;padding:3px 9px;border-radius:12px;font-size:0.72rem;white-space:nowrap;">${f.tipo_curso}</span>` : ''}
+      </div>
+      <div style="display:flex; gap:4px; margin-top:6px;">
+        ${mesesKey.map((m, i) => `
+          <span title="${MESES_NOM[i]}" style="flex:1; text-align:center; padding:4px 0; border-radius:5px; font-size:0.72rem; font-weight:600;
+            background:${f[m] ? '#d4edda' : '#f0f0f0'}; color:${f[m] ? '#155724' : '#bbb'};">
+            ${mesesNom[i]}
+          </span>`).join('')}
+      </div>
+    </div>
+  `).join('');
 
   cont.innerHTML = `
-    <p style="font-size:0.85rem;color:#555;margin-bottom:10px;">${data.length} cursos — Año ${anio} · ANTAMINA</p>
-    <div style="overflow-x:auto;">
-      <table style="border-collapse:collapse;width:100%;font-size:0.8rem;min-width:900px;">
-        <thead><tr style="background:#002855;color:white;">
-          <th style="padding:8px 10px;text-align:left;">Requisito</th>
-          <th style="padding:8px 10px;">N°</th>
-          <th style="padding:8px 10px;text-align:left;">Curso</th>
-          <th style="padding:8px 10px;text-align:left;">Tipo</th>
-          <th style="padding:8px 10px;text-align:left;">Encargado</th>
-          <th style="padding:8px 10px;">Hr</th>
-          ${mesesNom.map(m => `<th style="padding:8px 6px;">${m}</th>`).join('')}
-        </tr></thead>
-        <tbody>${filas}</tbody>
-      </table>
-    </div>`;
+    <p style="font-size:0.85rem;color:#555;margin-bottom:12px;">${data.length} cursos — Año ${anio} · ${sedeAdminActiva}</p>
+    <div class="galeria-trabajadores">${tarjetas}</div>`;
 };
 
 window.eliminarProgramaSST = async function () {
   const anio = parseInt(document.getElementById('ver-sst-anio').value);
-  if (!await showConfirm(`¿Eliminar todo el programa SST del año ${anio} para ANTAMINA?\nEsta acción no se puede deshacer.`, { confirmText: 'Eliminar' })) return;
+  if (!await showConfirm(`¿Eliminar todo el programa SST del año ${anio} para ${sedeAdminActiva}?\nEsta acción no se puede deshacer.`, { confirmText: 'Eliminar' })) return;
   const { error } = await supabase.from('programa_capacitaciones')
     .delete()
     .eq('empresa_id', empresaAdminId)
     .eq('anio', anio)
-    .eq('sede', 'ANTAMINA');
+    .eq('sede', sedeAdminActiva);
   if (error) { alert('❌ ' + error.message); return; }
   document.getElementById('lista-programa-sst').innerHTML = '<p style="color:#888;">Programa eliminado.</p>';
 };
@@ -3359,7 +2790,7 @@ window.descargarPlantillaSST = function (e) {
     'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
   ];
   const ejemplo = [
-    'ANEXO 6 DS 023-2017 EM', 1, 'Trabajos en altura', 'ANTAMINA', 'RRHH/SEMAS',
+    'ANEXO 6 DS 023-2017 EM', 1, 'Trabajos en altura', sedeAdminActiva || 'ANTAMINA', 'RRHH/SEMAS',
     'PROYECTOS - Residente, Supervisores, Técnicos', 'Seguridad', 'Externo', 'Anual', 4,
     '', '', 'P', '', '', '', 'P', '', '', '', '', ''
   ];
@@ -3382,7 +2813,7 @@ window.descargarPlantillaSST = function (e) {
   // Hoja instrucciones
   const wsInstr = XLSX.utils.aoa_to_sheet(instrucciones);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'ANTAMINA');
+  XLSX.utils.book_append_sheet(wb, ws, (sedeAdminActiva || 'ANTAMINA').substring(0, 31));
   XLSX.utils.book_append_sheet(wb, wsInstr, 'Instrucciones');
   XLSX.writeFile(wb, 'plantilla_programa_sst.xlsx');
 };
@@ -3406,7 +2837,7 @@ window.cargarSeguimientoMes = async function () {
     .select('id, curso, tipo_curso, encargado, duracion_hr')
     .eq('empresa_id', empresaAdminId)
     .eq('anio', anio)
-    .eq('sede', 'ANTAMINA')
+    .eq('sede', sedeAdminActiva)
     .eq(mesKey, true)
     .order('tipo_curso');
 
@@ -3422,7 +2853,8 @@ window.cargarSeguimientoMes = async function () {
     .select('*')
     .eq('empresa_id', empresaAdminId)
     .eq('anio', anio)
-    .eq('mes', mes);
+    .eq('mes', mes)
+    .eq('sede', sedeAdminActiva);
 
   const segMap = {};
   (seguimientos || []).forEach(s => { segMap[s.programa_id] = s; });
@@ -3507,7 +2939,7 @@ window.guardarSeguimiento = async function () {
   const registros = datosSeguimiento.map(d => ({
     empresa_id: empresaAdminId,
     programa_id: d.programa_id,
-    anio, mes, sede: 'ANTAMINA',
+    anio, mes, sede: sedeAdminActiva,
     estado: d.estado,
     n_programados: d.n_programados !== '' ? parseInt(d.n_programados) : null,
     n_asistentes:  d.n_asistentes  !== '' ? parseInt(d.n_asistentes)  : null,
@@ -3643,1308 +3075,158 @@ window.cargarEstadisticasSST = async function () {
 };
 
 // ═══════════════════════════════════════════════
-// ✅ CUMPLIMIENTO DE CERTIFICADOS
+// ✅ CURSOS OBLIGATORIOS POR CARGO
 // ═══════════════════════════════════════════════
 
-let datosCumplimiento = [];
+window.initCursosObligatorios = async function () {
+  document.getElementById('obl-sede-actual').textContent = sedeAdminActiva || '—';
 
-window.initCumplimiento = async function () {
-  // Poblar selector de cursos
-  const { data: cursos } = await supabase.from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva).order('titulo');
-  const sel = document.getElementById('select-curso-cumpl');
-  if (sel) {
-    sel.innerHTML = '<option value="">-- Selecciona un curso --</option>';
-    (cursos || []).forEach(c => {
-      sel.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.titulo}</option>`);
-    });
-    initSelectBuscable('select-curso-cumpl');
-  }
-  await cargarResumenCumplimiento();
-};
-
-async function cargarResumenCumplimiento() {
-  if (!empresaAdminId) return;
-
-  const [{ data: workers }, { data: cursos }] = await Promise.all([
-    supabase.from('profiles').select('id, nombres, apellidos, email, documento_numero, cargo').eq('empresa_id', empresaAdminId).eq('activo', true).order('apellidos'),
-    supabase.from('cursos').select('id, titulo, vigencia_meses').eq('activo', true).eq('sede', sedeAdminActiva),
-  ]);
-
-  if (!workers?.length || !cursos?.length) {
-    document.getElementById('cumpl-kpis').innerHTML = '<p style="color:#888;">No hay datos suficientes.</p>';
-    document.getElementById('tabla-por-vencer').innerHTML = '';
-    return;
-  }
-
-  const emails = workers.map(w => w.email).filter(Boolean);
-  if (!emails.length) {
-    document.getElementById('cumpl-kpis').innerHTML = '<p style="color:#888;">No hay trabajadores con email registrado.</p>';
-    document.getElementById('tabla-por-vencer').innerHTML = '';
-    return;
-  }
-  const { data: envios } = await chunkedInQuery(emails, 150, chunk =>
-    supabase
-      .from('envios_formulario')
-      .select('usuario_email, id_curso, created_at, formularios(tipo)')
-      .in('usuario_email', chunk)
-      .eq('aprobado', true)
-  );
-
-  // Solo tipo examen, más reciente por worker+curso
-  const lastSub = {};
-  (envios || []).filter(e => e.formularios?.tipo === 'examen').forEach(e => {
-    const key = `${e.usuario_email}__${e.id_curso}`;
-    if (!lastSub[key] || new Date(e.created_at) > new Date(lastSub[key].created_at)) {
-      lastSub[key] = e;
-    }
-  });
-
-  const now   = new Date();
-  const in30  = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-  datosCumplimiento = [];
-  workers.forEach(w => {
-    cursos.forEach(c => {
-      const sub = lastSub[`${w.email}__${c.id}`];
-      if (!sub) {
-        datosCumplimiento.push({ worker: w, curso: c, estado: 'Pendiente', fecha_emision: null, fecha_vencimiento: null });
-      } else {
-        const emision     = new Date(sub.created_at);
-        const vencimiento = new Date(emision);
-        vencimiento.setMonth(vencimiento.getMonth() + (c.vigencia_meses || 12));
-        const estado = vencimiento < now ? 'Vencido' : vencimiento < in30 ? 'Por vencer' : 'Vigente';
-        datosCumplimiento.push({ worker: w, curso: c, estado, fecha_emision: emision, fecha_vencimiento: vencimiento });
-      }
-    });
-  });
-
-  // KPIs
-  const vigentes   = datosCumplimiento.filter(d => d.estado === 'Vigente').length;
-  const porVencer  = datosCumplimiento.filter(d => d.estado === 'Por vencer').length;
-  const vencidos   = datosCumplimiento.filter(d => d.estado === 'Vencido').length;
-  const pendientes = datosCumplimiento.filter(d => d.estado === 'Pendiente').length;
-  const total      = datosCumplimiento.length;
-  const pct        = total > 0 ? Math.round((vigentes + porVencer) / total * 100) : 0;
-
-  document.getElementById('cumpl-kpis').innerHTML = [
-    ['Cumplimiento', `${pct}%`,  pct >= 80 ? '#198754' : pct >= 50 ? '#fd7e14' : '#dc3545'],
-    ['Vigentes',     vigentes,   '#198754'],
-    ['Por vencer',   porVencer,  '#fd7e14'],
-    ['Vencidos',     vencidos,   '#dc3545'],
-    ['Pendientes',   pendientes, '#6c757d'],
-  ].map(([label, val, color]) => `
-    <div style="background:#f8f9fa;border-radius:10px;padding:14px 20px;min-width:120px;text-align:center;border-top:4px solid ${color};">
-      <div style="font-size:1.5rem;font-weight:700;color:${color};">${val}</div>
-      <div style="font-size:0.78rem;color:#555;margin-top:4px;">${label}</div>
-    </div>`).join('');
-
-  // Tabla por vencer / vencidos
-  const alertas = datosCumplimiento.filter(d => d.estado === 'Por vencer' || d.estado === 'Vencido')
-    .sort((a, b) => (a.fecha_vencimiento || 0) - (b.fecha_vencimiento || 0));
-
-  if (!alertas.length) {
-    document.getElementById('tabla-por-vencer').innerHTML =
-      '<p style="color:#198754;font-weight:600;">✅ No hay certificados por vencer en los próximos 30 días.</p>';
-    return;
-  }
-
-  const colAlert = { 'Vencido': '#dc3545', 'Por vencer': '#fd7e14' };
-  document.getElementById('tabla-por-vencer').innerHTML = `
-    <div style="overflow-x:auto;">
-      <table style="border-collapse:collapse;width:100%;font-size:0.85rem;">
-        <thead><tr style="background:#002855;color:white;">
-          <th style="padding:8px 10px;text-align:left;">Trabajador</th>
-          <th style="padding:8px 10px;">Documento</th>
-          <th style="padding:8px 10px;">Cargo</th>
-          <th style="padding:8px 10px;text-align:left;">Curso</th>
-          <th style="padding:8px 10px;">Emisión</th>
-          <th style="padding:8px 10px;">Vencimiento</th>
-          <th style="padding:8px 10px;">Estado</th>
-        </tr></thead>
-        <tbody>
-          ${alertas.map(d => `
-            <tr style="border-bottom:1px solid #eee;">
-              <td style="padding:7px 10px;font-weight:500;">${d.worker.apellidos}, ${d.worker.nombres}</td>
-              <td style="padding:7px 10px;">${d.worker.documento_numero}</td>
-              <td style="padding:7px 10px;">${d.worker.cargo || ''}</td>
-              <td style="padding:7px 10px;">${d.curso.titulo}</td>
-              <td style="padding:7px 10px;">${d.fecha_emision?.toLocaleDateString('es-PE') || '—'}</td>
-              <td style="padding:7px 10px;color:${colAlert[d.estado]};font-weight:600;">${d.fecha_vencimiento?.toLocaleDateString('es-PE') || '—'}</td>
-              <td style="padding:7px 10px;"><span style="background:${colAlert[d.estado]};color:white;padding:3px 8px;border-radius:10px;font-size:0.78rem;">${d.estado}</span></td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
-}
-
-window.cargarCumplimientoCurso = async function () {
-  const cursoId = document.getElementById('select-curso-cumpl').value;
-  if (!cursoId) { alert('Selecciona un curso.'); return; }
-  if (!datosCumplimiento.length) { alert('Espera a que carguen los datos.'); return; }
-
-  const datos = datosCumplimiento.filter(d => d.curso.id === cursoId);
-  if (!datos.length) {
-    document.getElementById('tabla-cumplimiento-curso').innerHTML = '<p style="color:#888;">Sin datos.</p>';
-    return;
-  }
-
-  const colores = { 'Vigente': '#198754', 'Por vencer': '#fd7e14', 'Vencido': '#dc3545', 'Pendiente': '#6c757d' };
-  const vigentes = datos.filter(d => d.estado === 'Vigente').length;
-  const pct = Math.round(vigentes / datos.length * 100);
-
-  document.getElementById('tabla-cumplimiento-curso').innerHTML = `
-    <p style="font-size:0.85rem;color:#555;margin-bottom:10px;">
-      <strong>${datos[0].curso.titulo}</strong> — Vigencia: ${datos[0].curso.vigencia_meses || 12} meses —
-      <span style="color:#198754;font-weight:600;">${pct}% vigente</span> (${vigentes}/${datos.length} trabajadores)
-    </p>
-    <div style="overflow-x:auto;">
-      <table style="border-collapse:collapse;width:100%;font-size:0.85rem;">
-        <thead><tr style="background:#002855;color:white;">
-          <th style="padding:8px 10px;text-align:left;">Trabajador</th>
-          <th style="padding:8px 10px;">Documento</th>
-          <th style="padding:8px 10px;">Cargo</th>
-          <th style="padding:8px 10px;">Fecha emisión</th>
-          <th style="padding:8px 10px;">Fecha vencimiento</th>
-          <th style="padding:8px 10px;">Estado</th>
-        </tr></thead>
-        <tbody>
-          ${datos.map(d => `
-            <tr style="border-bottom:1px solid #eee;">
-              <td style="padding:7px 10px;font-weight:500;">${d.worker.apellidos}, ${d.worker.nombres}</td>
-              <td style="padding:7px 10px;">${d.worker.documento_numero}</td>
-              <td style="padding:7px 10px;">${d.worker.cargo || ''}</td>
-              <td style="padding:7px 10px;">${d.fecha_emision?.toLocaleDateString('es-PE') || '—'}</td>
-              <td style="padding:7px 10px;">${d.fecha_vencimiento?.toLocaleDateString('es-PE') || '—'}</td>
-              <td style="padding:7px 10px;"><span style="background:${colores[d.estado]};color:white;padding:3px 8px;border-radius:10px;font-size:0.78rem;">${d.estado}</span></td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
-};
-
-window.enviarNotificaciones = async function () {
-  if (!datosCumplimiento.length) { alert('Primero abre la pestaña Cumplimiento para cargar los datos.'); return; }
-
-  const tipo = document.getElementById('tipo-notif').value;
-  const cont = document.getElementById('preview-notificaciones');
-
-  // Agrupar por trabajador según tipo
-  const pendientes = datosCumplimiento.filter(d => d.estado === 'Pendiente');
-  const alertas    = datosCumplimiento.filter(d => d.estado === 'Por vencer' || d.estado === 'Vencido');
-  const seleccion  = tipo === 'pendientes' ? pendientes : tipo === 'vencimientos' ? alertas : [...pendientes, ...alertas];
-
-  const porWorker = {};
-  seleccion.forEach(d => {
-    const key = d.worker.email;
-    if (!porWorker[key]) porWorker[key] = { worker: d.worker, items: [] };
-    porWorker[key].items.push({ curso: d.curso.titulo, estado: d.estado });
-  });
-
-  const lista = Object.values(porWorker);
-  if (!lista.length) {
-    cont.innerHTML = '<p style="color:#198754;">✅ No hay trabajadores que requieran notificación.</p>';
-    return;
-  }
-
-  cont.innerHTML = `
-    <p style="font-size:0.88rem;color:#555;margin-bottom:10px;">
-      Se enviarán notificaciones a <strong>${lista.length}</strong> trabajadores:
-    </p>
-    <ul style="font-size:0.84rem;color:#444;padding-left:18px;margin-bottom:14px;">
-      ${lista.slice(0, 8).map(t => `<li>${t.worker.nombres} ${t.worker.apellidos} — ${t.items.length} curso(s)</li>`).join('')}
-      ${lista.length > 8 ? `<li style="color:#888;">...y ${lista.length - 8} más</li>` : ''}
-    </ul>
-    <span id="progreso-notif" style="font-size:0.88rem;color:#555;">Enviando...</span>`;
-
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const resp = await fetch(
-      'https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/enviar-notificaciones',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ empresa_id: empresaAdminId, tipo, empresa_nombre: empresaAdminNombre }),
-      }
-    );
-    const result = await resp.json();
-    document.getElementById('progreso-notif').textContent =
-      result.ok ? `✅ ${result.enviados} correos enviados correctamente.` : `❌ Error: ${result.error}`;
-  } catch {
-    document.getElementById('progreso-notif').textContent =
-      '❌ Función de notificaciones no desplegada aún. Sigue las instrucciones para activarla.';
-  }
-};
-
-window.exportarCumplimientoExcel = function () {
-  if (!datosCumplimiento.length) { alert('Primero abre la pestaña Cumplimiento para cargar los datos.'); return; }
-  const XLSX = window.XLSX;
-
-  const workers = [...new Map(datosCumplimiento.map(d => [d.worker.email, d.worker])).values()];
-  const cursos  = [...new Map(datosCumplimiento.map(d => [d.curso.id,    d.curso])).values()];
-
-  const header = ['Apellidos', 'Nombres', 'Documento', 'Cargo', ...cursos.map(c => c.titulo)];
-  const rows = workers.map(w => {
-    const celdas = cursos.map(c => {
-      const d = datosCumplimiento.find(x => x.worker.email === w.email && x.curso.id === c.id);
-      return d ? d.estado : 'Pendiente';
-    });
-    return [w.apellidos, w.nombres, w.documento_numero, w.cargo || '', ...celdas];
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  ws['!cols'] = [20, 20, 15, 20, ...cursos.map(() => ({ wch: 14 }))].map(w => typeof w === 'number' ? { wch: w } : w);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Cumplimiento');
-  XLSX.writeFile(wb, `Matriz_Cumplimiento_${new Date().getFullYear()}.xlsx`);
-};
-
-// ═══════════════════════════════════════════════
-// 🗺️ RUTAS DE APRENDIZAJE
-// ═══════════════════════════════════════════════
-
-let rutaActualId = null;
-
-window.initRutas = async function () {
   const [{ data: cargos }, { data: cursos }, { data: rutas }] = await Promise.all([
     supabase.from('cargos').select('id, nombre').eq('activo', true).order('nombre'),
-    supabase.from('cursos').select('id, titulo').eq('activo', true).order('titulo'),
-    supabase.from('rutas_aprendizaje').select('id, nombre, cargos(nombre)').eq('empresa_id', empresaAdminId).order('nombre'),
+    supabase.from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva).order('titulo'),
+    supabase.from('rutas_aprendizaje').select('id, cargo_id, ruta_cursos(curso_id)')
+      .eq('empresa_id', empresaAdminId).eq('sede', sedeAdminActiva),
   ]);
 
-  // Selector cargo
-  const selCargo = document.getElementById('ruta-cargo');
-  selCargo.innerHTML = '<option value="">-- Selecciona un cargo --</option>';
-  (cargos || []).forEach(c => selCargo.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.nombre}</option>`));
-
-  // Selector cursos para agregar
-  const selCurso = document.getElementById('ruta-add-curso');
-  selCurso.innerHTML = '<option value="">-- Agregar curso --</option>';
-  (cursos || []).forEach(c => selCurso.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.titulo}</option>`));
-  initSelectBuscable('ruta-add-curso');
-
-  // Selector rutas (ver y progreso)
-  const rutaOpts = (rutas || []).map(r => `<option value="${r.id}">${r.nombre} (${r.cargos?.nombre || 'sin cargo'})</option>`).join('');
-  ['sel-ruta-ver', 'sel-ruta-progreso'].forEach(id => {
-    const sel = document.getElementById(id);
-    sel.innerHTML = '<option value="">-- Selecciona una ruta --</option>' + rutaOpts;
-  });
-};
-
-window.crearRuta = async function () {
-  const cargoId = document.getElementById('ruta-cargo').value;
-  const nombre  = document.getElementById('ruta-nombre').value.trim();
-  if (!nombre) { alert('Escribe un nombre para la ruta.'); return; }
-
-  const { error } = await supabase.from('rutas_aprendizaje').insert({
-    empresa_id: empresaAdminId,
-    cargo_id: cargoId || null,
-    nombre,
+  window._cargosObl = cargos || [];
+  window._cursosObl = cursos || [];
+  window._rutaPorCargo = {};
+  window._cursosPorCargo = {};
+  (rutas || []).forEach(r => {
+    window._rutaPorCargo[r.cargo_id] = r.id;
+    window._cursosPorCargo[r.cargo_id] = new Set((r.ruta_cursos || []).map(rc => rc.curso_id));
   });
 
-  if (error) { alert('❌ ' + error.message); return; }
-  alert('✅ Ruta creada.');
-  document.getElementById('ruta-nombre').value = '';
-  initRutas();
+  renderMatrizObligatorios();
 };
 
-window.cargarRuta = async function () {
-  const rutaId = document.getElementById('sel-ruta-ver').value;
-  if (!rutaId) return;
-  rutaActualId = rutaId;
+function renderMatrizObligatorios() {
+  const cargos = window._cargosObl, cursos = window._cursosObl;
+  const cont = document.getElementById('matriz-obligatorios');
 
-  const { data: cursos } = await supabase
-    .from('ruta_cursos')
-    .select('id, orden, obligatorio, cursos(id, titulo)')
-    .eq('ruta_id', rutaId)
-    .order('orden');
-
-  document.getElementById('panel-ruta').style.display = 'block';
-
-  if (!cursos?.length) {
-    document.getElementById('lista-cursos-ruta').innerHTML =
-      '<p style="color:#888;font-size:0.88rem;">No hay cursos en esta ruta. Agrega el primero.</p>';
+  if (!cargos.length || !cursos.length) {
+    cont.innerHTML = '<p style="color:#888;">Necesitas al menos un cargo y un curso activo en esta sede para configurar esto.</p>';
     return;
   }
 
-  document.getElementById('lista-cursos-ruta').innerHTML = `
-    <table style="border-collapse:collapse;width:100%;font-size:0.88rem;">
-      <thead><tr style="background:#002855;color:white;">
-        <th style="padding:8px 10px;">Orden</th>
-        <th style="padding:8px 10px;text-align:left;">Curso</th>
-        <th style="padding:8px 10px;">Obligatorio</th>
-        <th style="padding:8px 10px;">Acción</th>
-      </tr></thead>
-      <tbody>
-        ${cursos.map(c => `
-          <tr style="border-bottom:1px solid #eee;">
-            <td style="padding:7px 10px;text-align:center;font-weight:700;color:#002855;">${c.orden}</td>
-            <td style="padding:7px 10px;">${c.cursos?.titulo || ''}</td>
-            <td style="padding:7px 10px;text-align:center;">${c.obligatorio ? '✅' : '—'}</td>
-            <td style="padding:7px 10px;text-align:center;">
-              <button onclick="eliminarCursoRuta('${c.id}')" style="background:#dc3545;color:white;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.8rem;">Quitar</button>
-            </td>
-          </tr>`).join('')}
-      </tbody>
-    </table>`;
-};
-
-window.agregarCursoRuta = async function () {
-  if (!rutaActualId) { alert('Selecciona una ruta primero.'); return; }
-  const cursoId    = document.getElementById('ruta-add-curso').value;
-  const orden      = parseInt(document.getElementById('ruta-add-orden').value);
-  const obligatorio= document.getElementById('ruta-obligatorio').checked;
-  if (!cursoId) { alert('Selecciona un curso.'); return; }
-
-  const { error } = await supabase.from('ruta_cursos').insert({
-    ruta_id: rutaActualId, curso_id: cursoId, orden, obligatorio,
-  });
-  if (error) { alert('❌ ' + error.message); return; }
-  cargarRuta();
-};
-
-window.eliminarCursoRuta = async function (id) {
-  if (!await showConfirm('¿Quitar este curso de la ruta?', { confirmText: 'Quitar' })) return;
-  await supabase.from('ruta_cursos').delete().eq('id', id);
-  cargarRuta();
-};
-
-window.cargarProgresoRuta = async function () {
-  const rutaId = document.getElementById('sel-ruta-progreso').value;
-  if (!rutaId) return;
-  const cont = document.getElementById('tabla-progreso-ruta');
-  cont.innerHTML = '<p style="color:#888;">Cargando...</p>';
-
-  const [{ data: rutaCursos }, { data: workers }] = await Promise.all([
-    supabase.from('ruta_cursos').select('orden, obligatorio, cursos(id, titulo, vigencia_meses)').eq('ruta_id', rutaId).order('orden'),
-    supabase.from('profiles').select('id, nombres, apellidos, email, documento_numero, cargo').eq('empresa_id', empresaAdminId).eq('activo', true).order('apellidos'),
-  ]);
-
-  if (!rutaCursos?.length || !workers?.length) {
-    cont.innerHTML = '<p style="color:#888;">Sin datos suficientes.</p>';
-    return;
-  }
-
-  const emails = workers.map(w => w.email).filter(Boolean);
-  if (!emails.length) {
-    cont.innerHTML = '<p style="color:#888;">No hay trabajadores con email registrado.</p>';
-    return;
-  }
-  const { data: envios } = await chunkedInQuery(emails, 150, chunk =>
-    supabase
-      .from('envios_formulario')
-      .select('usuario_email, id_curso, created_at, formularios(tipo)')
-      .in('usuario_email', chunk)
-      .eq('aprobado', true)
-  );
-
-  const lastSub = {};
-  (envios || []).filter(e => e.formularios?.tipo === 'examen').forEach(e => {
-    const key = `${e.usuario_email}__${e.id_curso}`;
-    if (!lastSub[key] || new Date(e.created_at) > new Date(lastSub[key].created_at)) lastSub[key] = e;
-  });
-
-  const now = new Date();
-  const cursos = rutaCursos.map(rc => rc.cursos);
-
-  const headerCursos = cursos.map(c => `<th style="padding:8px 6px;font-size:0.78rem;max-width:100px;">${c?.titulo || ''}</th>`).join('');
-
-  const filas = workers.map(w => {
-    let completados = 0;
-    const celdas = cursos.map(c => {
-      const sub = lastSub[`${w.email}__${c?.id}`];
-      if (!sub) return `<td style="padding:6px;text-align:center;color:#aaa;">—</td>`;
-      const venc = new Date(sub.created_at);
-      venc.setMonth(venc.getMonth() + (c?.vigencia_meses || 12));
-      const vigente = venc > now;
-      if (vigente) completados++;
-      return `<td style="padding:6px;text-align:center;">
-        <span style="background:${vigente ? '#198754' : '#dc3545'};color:white;padding:2px 7px;border-radius:8px;font-size:0.75rem;">
-          ${vigente ? '✓' : 'Venc.'}
-        </span>
-      </td>`;
-    });
-    const pct = Math.round(completados / cursos.length * 100);
-    const barColor = pct === 100 ? '#198754' : pct >= 50 ? '#fd7e14' : '#dc3545';
+  const header = cursos.map(c => `<th style="padding:8px 6px;font-size:0.76rem;max-width:110px;">${c.titulo}</th>`).join('');
+  const filas = cargos.map(cg => {
+    const marcados = window._cursosPorCargo[cg.id] || new Set();
+    const celdas = cursos.map(c => `
+      <td style="text-align:center;padding:6px;">
+        <input type="checkbox" ${marcados.has(c.id) ? 'checked' : ''}
+          onchange="toggleCargoCurso('${cg.id}','${c.id}', this.checked)" />
+      </td>`).join('');
     return `<tr style="border-bottom:1px solid #eee;">
-      <td style="padding:7px 10px;font-weight:500;white-space:nowrap;">${w.apellidos}, ${w.nombres}</td>
-      <td style="padding:7px 10px;">
-        <div style="display:flex;align-items:center;gap:6px;">
-          <div style="flex:1;background:#eee;border-radius:4px;height:8px;">
-            <div style="width:${pct}%;background:${barColor};height:8px;border-radius:4px;"></div>
-          </div>
-          <span style="font-size:0.78rem;color:${barColor};font-weight:600;">${pct}%</span>
-        </div>
-      </td>
-      ${celdas.join('')}
+      <td style="padding:7px 10px;font-weight:500;white-space:nowrap;">${cg.nombre}</td>
+      ${celdas}
     </tr>`;
   }).join('');
 
   cont.innerHTML = `
     <div style="overflow-x:auto;">
-      <table style="border-collapse:collapse;width:100%;font-size:0.84rem;min-width:600px;">
+      <table style="border-collapse:collapse;width:100%;font-size:0.85rem;">
         <thead><tr style="background:#002855;color:white;">
-          <th style="padding:8px 10px;text-align:left;">Trabajador</th>
-          <th style="padding:8px 10px;min-width:120px;">Progreso</th>
-          ${headerCursos}
+          <th style="padding:8px 10px;text-align:left;">Cargo</th>
+          ${header}
         </tr></thead>
         <tbody>${filas}</tbody>
       </table>
     </div>`;
-
-  // Guardar para exportar
-  window._progresoRuta = { workers, cursos, lastSub, now };
-};
-
-window.exportarProgresoRuta = function () {
-  const d = window._progresoRuta;
-  if (!d) { alert('Primero carga el progreso.'); return; }
-  const XLSX = window.XLSX;
-  const header = ['Apellidos', 'Nombres', 'Documento', ...d.cursos.map(c => c?.titulo || '')];
-  const rows = d.workers.map(w => {
-    const celdas = d.cursos.map(c => {
-      const sub = d.lastSub[`${w.email}__${c?.id}`];
-      if (!sub) return 'Pendiente';
-      const venc = new Date(sub.created_at);
-      venc.setMonth(venc.getMonth() + (c?.vigencia_meses || 12));
-      return venc > d.now ? 'Vigente' : 'Vencido';
-    });
-    return [w.apellidos, w.nombres, w.documento_numero, ...celdas];
-  });
-  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  ws['!cols'] = [20, 20, 15, ...d.cursos.map(() => ({ wch: 14 }))].map(v => typeof v === 'number' ? { wch: v } : v);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Progreso Ruta');
-  XLSX.writeFile(wb, `Progreso_Ruta_${new Date().getFullYear()}.xlsx`);
-};
-
-// ═══════════════════════════════════════════════
-// 🏛️ REPORTE SUNAFIL
-// ═══════════════════════════════════════════════
-
-window.initSelectorSUNAFIL = function () {
-  const anioActual = new Date().getFullYear();
-  const sel = document.getElementById('sunafil-anio');
-  if (!sel || sel.options.length > 1) return;
-  for (let a = anioActual; a >= anioActual - 3; a--) {
-    const opt = document.createElement('option');
-    opt.value = a; opt.textContent = a;
-    if (a === anioActual) opt.selected = true;
-    sel.appendChild(opt);
-  }
-};
-
-window.generarReporteSUNAFIL = async function () {
-  const anio = parseInt(document.getElementById('sunafil-anio').value);
-  const tipo  = document.getElementById('sunafil-tipo').value;
-
-  const inicioAnio = new Date(`${anio}-01-01T00:00:00-05:00`).toISOString();
-  const finAnio    = new Date(`${anio}-12-31T23:59:59-05:00`).toISOString();
-
-  // 1. Datos de empresa
-  const { data: emp } = await supabase.from('empresas').select('nombre, ruc').eq('id', empresaAdminId).single();
-
-  // 2. Envíos del año con perfil + curso + formulario
-  let query = supabase
-    .from('envios_formulario')
-    .select('usuario_email, id_curso, puntaje, porcentaje, aprobado, created_at, formularios(tipo, titulo), cursos(titulo, duracion)')
-    .eq('estado', 'completado')
-    .eq('sede', sedeAdminActiva)
-    .gte('created_at', inicioAnio)
-    .lte('created_at', finAnio);
-
-  if (tipo) query = query.eq('formularios.tipo', tipo);
-
-  const { data: envios } = await query;
-  if (!envios?.length) { alert('No hay registros para ese año.'); return; }
-
-  // 3. Perfiles
-  const emails = [...new Set(envios.map(e => e.usuario_email))].filter(Boolean);
-  const { data: perfiles } = await chunkedInQuery(emails, 150, chunk =>
-    supabase
-      .from('profiles')
-      .select('email, nombres, apellidos, documento_numero, documento_tipo, cargo, empresa')
-      .in('email', chunk)
-  );
-
-  const perfilMap = {};
-  (perfiles || []).forEach(p => { perfilMap[p.email] = p; });
-
-  // 4. Contar participantes por curso+fecha (día)
-  const participantesPorCursoFecha = {};
-  envios.forEach(e => {
-    const fecha = new Date(e.created_at).toLocaleDateString('es-PE');
-    const key   = `${e.id_curso}__${fecha}`;
-    participantesPorCursoFecha[key] = (participantesPorCursoFecha[key] || 0) + 1;
-  });
-
-  // 5. Construir filas SUNAFIL
-  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-  const filas = envios.map(e => {
-    const p       = perfilMap[e.usuario_email] || {};
-    const fecha   = new Date(e.created_at);
-    const fechaStr= fecha.toLocaleDateString('es-PE');
-    const key     = `${e.id_curso}__${fechaStr}`;
-    const tipoForm= e.formularios?.tipo || '';
-    const tipoSUN = tipoForm === 'examen' ? 'Específica' : tipoForm === 'encuesta' ? 'Inducción' : 'Periódica';
-    const nota    = tipoForm === 'examen' ? (e.puntaje ?? '') : '';
-    const estado  = tipoForm === 'examen' ? (e.aprobado ? 'Aprobado' : 'Desaprobado') : 'Completado';
-
-    return [
-      emp?.nombre || empresaAdminNombre || '',          // Razón Social
-      emp?.ruc    || empresaAdminRuc    || '',          // RUC
-      `${p.apellidos || ''} ${p.nombres || ''}`.trim(), // Apellidos y Nombres
-      p.documento_numero || '',                          // N° Documento
-      p.documento_tipo   || 'DNI',                      // Tipo Doc
-      p.cargo            || '',                          // Cargo
-      e.cursos?.titulo   || '',                          // Tema de Capacitación
-      tipoSUN,                                           // Tipo (Inducción/Específica/Periódica)
-      'Virtual',                                         // Modalidad
-      fechaStr,                                          // Fecha
-      MESES[fecha.getMonth()],                           // Mes
-      e.cursos?.duracion || '',                          // Duración (hrs)
-      participantesPorCursoFecha[key] || 1,              // N° Participantes
-      estado,                                            // Estado
-      nota,                                              // Nota (/20)
-      e.porcentaje != null ? `${e.porcentaje}%` : '',   // Porcentaje
-    ];
-  });
-
-  const XLSX = window.XLSX;
-  const encabezado = [
-    'Razón Social', 'RUC', 'Apellidos y Nombres', 'N° Documento', 'Tipo Doc',
-    'Cargo', 'Tema de Capacitación', 'Tipo', 'Modalidad', 'Fecha', 'Mes',
-    'Duración (hrs)', 'N° Participantes', 'Estado', 'Nota (/20)', 'Porcentaje'
-  ];
-
-  const ws = XLSX.utils.aoa_to_sheet([encabezado, ...filas]);
-  ws['!cols'] = [22,13,28,14,9,20,35,12,10,12,10,13,14,12,10,11].map(w => ({ wch: w }));
-
-  // Estilo encabezado (SheetJS básico)
-  const rango = XLSX.utils.decode_range(ws['!ref']);
-  for (let C = rango.s.c; C <= rango.e.c; C++) {
-    const cell = ws[XLSX.utils.encode_cell({ r: 0, c: C })];
-    if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: '002855' } }, font: { color: { rgb: 'FFFFFF' }, bold: true } };
-  }
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, `Capacitaciones ${anio}`);
-  XLSX.writeFile(wb, `Reporte_SUNAFIL_${emp?.ruc || 'empresa'}_${anio}.xlsx`);
-};
-
-// ═══════════════════════════════════════════════
-// 📷 QR ASISTENCIA PRESENCIAL
-// ═══════════════════════════════════════════════
-
-let sesionQRActual = null;
-let intervalAsistentes = null;
-
-window.initQRAsistencia = async function () {
-  const { data: cursos } = await supabase.from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva).order('titulo');
-  ['qr-curso', 'qr-filtro-curso'].forEach(id => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    sel.innerHTML = id === 'qr-filtro-curso'
-      ? '<option value="">Todos los cursos</option>'
-      : '<option value="">-- Selecciona el curso --</option>';
-    (cursos || []).forEach(c => sel.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.titulo}</option>`));
-    initSelectBuscable(id);
-  });
-
-  // Fecha default = ahora
-  const ahora = new Date();
-  ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
-  document.getElementById('qr-fecha').value = ahora.toISOString().slice(0, 16);
-
-  cargarSesionesAnteriores();
-};
-
-window.crearSesionQR = async function () {
-  const curso_id  = document.getElementById('qr-curso').value;
-  const lugar     = document.getElementById('qr-lugar').value.trim();
-  const fecha     = document.getElementById('qr-fecha').value;
-  const expositor = document.getElementById('qr-expositor').value.trim();
-  const duracion  = parseFloat(document.getElementById('qr-duracion').value) || null;
-
-  if (!curso_id || !lugar || !fecha) {
-    alert('Completa: curso, lugar y fecha.');
-    return;
-  }
-
-  const { data: sesion, error } = await supabase.from('sesiones_presenciales').insert({
-    empresa_id: empresaAdminId,
-    curso_id, lugar, fecha_hora: new Date(fecha).toISOString(),
-    expositor: expositor || null,
-    duracion_hr: duracion,
-    activa: true,
-  }).select().single();
-
-  if (error) { alert('❌ ' + error.message); return; }
-
-  sesionQRActual = sesion;
-  mostrarQR(sesion);
-  iniciarPollingAsistentes(sesion.id);
-};
-
-function mostrarQR(sesion) {
-  const url = `${window.location.origin}/qr-asistencia.html?sesion=${sesion.id}`;
-  const canvas = document.getElementById('qr-canvas');
-
-  window.QRCode.toCanvas(canvas, url, {
-    width: 280, margin: 2,
-    color: { dark: '#002855', light: '#ffffff' }
-  });
-
-  const fecha = new Date(sesion.fecha_hora).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
-  document.getElementById('qr-info-sesion').textContent =
-    `${sesion.lugar} · ${fecha}${sesion.expositor ? ' · ' + sesion.expositor : ''}`;
-
-  document.getElementById('panel-qr-generado').style.display = 'block';
-  document.getElementById('panel-asistentes-qr').style.display = 'block';
-  window.scrollTo({ top: document.getElementById('panel-qr-generado').offsetTop - 20, behavior: 'smooth' });
 }
 
-function iniciarPollingAsistentes(sesionId) {
-  if (intervalAsistentes) clearInterval(intervalAsistentes);
-  refrescarAsistentes();
-  intervalAsistentes = setInterval(refrescarAsistentes, 8000);
-}
+window.toggleCargoCurso = async function (cargoId, cursoId, marcado) {
+  let rutaId = window._rutaPorCargo[cargoId];
 
-window.refrescarAsistentes = async function () {
-  if (!sesionQRActual) return;
-  const { data } = await supabase
-    .from('asistencias_presenciales')
-    .select('id, created_at, profiles(nombres, apellidos, documento_numero, cargo)')
-    .eq('sesion_id', sesionQRActual.id)
-    .order('created_at');
-
-  const cont  = document.getElementById('lista-asistentes-qr');
-  const count = document.getElementById('qr-count');
-  count.textContent = `(${data?.length || 0})`;
-
-  if (!data?.length) {
-    cont.innerHTML = '<p style="color:#888; font-size:0.88rem;">Aún no hay asistentes. El QR está activo.</p>';
-    return;
+  if (!rutaId) {
+    if (!marcado) return;
+    const cargo = window._cargosObl.find(c => c.id === cargoId);
+    const { data, error } = await supabase.from('rutas_aprendizaje').insert({
+      empresa_id: empresaAdminId,
+      sede: sedeAdminActiva,
+      cargo_id: cargoId,
+      nombre: `Obligatorios · ${cargo?.nombre || ''}`,
+    }).select().single();
+    if (error) { alert('❌ ' + error.message); return; }
+    rutaId = data.id;
+    window._rutaPorCargo[cargoId] = rutaId;
+    window._cursosPorCargo[cargoId] = new Set();
   }
 
-  cont.innerHTML = `
-    <table style="border-collapse:collapse;width:100%;font-size:0.85rem;">
-      <thead><tr style="background:#002855;color:white;">
-        <th style="padding:8px 10px;">#</th>
-        <th style="padding:8px 10px;text-align:left;">Nombre</th>
-        <th style="padding:8px 10px;">Documento</th>
-        <th style="padding:8px 10px;">Cargo</th>
-        <th style="padding:8px 10px;">Hora</th>
-      </tr></thead>
-      <tbody>
-        ${data.map((a, i) => `
-          <tr style="border-bottom:1px solid #eee;">
-            <td style="padding:7px 10px;text-align:center;color:#888;">${i + 1}</td>
-            <td style="padding:7px 10px;font-weight:500;">${a.profiles?.apellidos || ''}, ${a.profiles?.nombres || ''}</td>
-            <td style="padding:7px 10px;text-align:center;">${a.profiles?.documento_numero || ''}</td>
-            <td style="padding:7px 10px;">${a.profiles?.cargo || ''}</td>
-            <td style="padding:7px 10px;text-align:center;font-size:0.8rem;color:#555;">
-              ${new Date(a.created_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
-            </td>
-          </tr>`).join('')}
-      </tbody>
-    </table>`;
-
-  window._asistentesQR = data;
+  if (marcado) {
+    const { error } = await supabase.from('ruta_cursos').insert({ ruta_id: rutaId, curso_id: cursoId, obligatorio: true });
+    if (error) { alert('❌ ' + error.message); return; }
+    window._cursosPorCargo[cargoId].add(cursoId);
+  } else {
+    await supabase.from('ruta_cursos').delete().eq('ruta_id', rutaId).eq('curso_id', cursoId);
+    window._cursosPorCargo[cargoId].delete(cursoId);
+  }
 };
 
-window.cerrarSesionQR = async function () {
-  if (!sesionQRActual) return;
-  if (!await showConfirm('¿Cerrar esta sesión?\nEl QR dejará de funcionar y no se podrán registrar más asistentes.', { confirmText: 'Cerrar sesión', danger: true })) return;
-  await supabase.from('sesiones_presenciales').update({ activa: false }).eq('id', sesionQRActual.id);
-  if (intervalAsistentes) { clearInterval(intervalAsistentes); intervalAsistentes = null; }
-  sesionQRActual = null;
-  document.getElementById('panel-qr-generado').style.display = 'none';
-  document.getElementById('panel-asistentes-qr').style.display = 'none';
-  cargarSesionesAnteriores();
-  alert('✅ Sesión cerrada.');
-};
+window.buscarTrabajadorExcepcion = async function () {
+  const q = document.getElementById('buscar-excepcion-input').value.trim();
+  if (!q) { alert('Ingresa un DNI o apellido.'); return; }
 
-window.imprimirQR = function () {
-  const canvas = document.getElementById('qr-canvas');
-  const info   = document.getElementById('qr-info-sesion').textContent;
-  const win    = window.open('', '_blank');
-  win.document.write(`
-    <html><body style="text-align:center;font-family:Arial;padding:40px;">
-      <h2 style="color:#002855;">Registro de Asistencia</h2>
-      <p style="font-size:1rem;color:#555;margin-bottom:20px;">${info}</p>
-      <img src="${canvas.toDataURL()}" style="width:280px;height:280px;" />
-      <p style="margin-top:20px;font-size:0.9rem;color:#888;">Escanea con tu celular para registrar tu asistencia</p>
-      <script>window.onload=()=>{window.print();}<\/script>
-    </body></html>`);
-  win.document.close();
-};
-
-window.descargarQR = function () {
-  const canvas = document.getElementById('qr-canvas');
-  const a = document.createElement('a');
-  a.download = `QR_Asistencia_${sesionQRActual?.lugar || 'sesion'}.png`;
-  a.href = canvas.toDataURL('image/png');
-  a.click();
-};
-
-window.exportarAsistentesQR = function () {
-  const data = window._asistentesQR;
-  if (!data?.length) { alert('No hay asistentes para exportar.'); return; }
-  const XLSX = window.XLSX;
-  const header = ['#', 'Apellidos', 'Nombres', 'Documento', 'Cargo', 'Hora de registro'];
-  const rows = data.map((a, i) => [
-    i + 1,
-    a.profiles?.apellidos || '',
-    a.profiles?.nombres   || '',
-    a.profiles?.documento_numero || '',
-    a.profiles?.cargo     || '',
-    new Date(a.created_at).toLocaleString('es-PE'),
-  ]);
-  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  ws['!cols'] = [5,20,20,14,20,18].map(w => ({ wch: w }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Asistentes');
-  XLSX.writeFile(wb, `Asistentes_${sesionQRActual?.lugar || 'sesion'}.xlsx`);
-};
-
-window.cargarSesionesAnteriores = async function () {
-  const cursoId = document.getElementById('qr-filtro-curso')?.value;
-  let query = supabase
-    .from('sesiones_presenciales')
-    .select('id, lugar, fecha_hora, activa, expositor, duracion_hr, cursos(titulo)')
-    .eq('empresa_id', empresaAdminId)
-    .order('fecha_hora', { ascending: false })
-    .limit(20);
-  if (cursoId) query = query.eq('curso_id', cursoId);
+  let query = supabase.from('profiles')
+    .select('id, nombres, apellidos, documento_numero, cargo_id')
+    .eq('empresa_id', empresaAdminId).eq('rol', 'trabajador').order('apellidos').limit(10);
+  query = /^\d/.test(q) ? query.ilike('documento_numero', `%${q}%`) : query.ilike('apellidos', `%${q}%`);
 
   const { data } = await query;
-  const cont = document.getElementById('lista-sesiones-anteriores');
-  if (!data?.length) { cont.innerHTML = '<p style="color:#888;">No hay sesiones registradas.</p>'; return; }
+  const cont = document.getElementById('resultado-excepcion');
+  document.getElementById('panel-excepciones').style.display = 'none';
 
+  if (!data?.length) { cont.innerHTML = '<p style="color:#888;">No se encontraron trabajadores.</p>'; return; }
+
+  window._trabExcepcion = data;
+  cont.innerHTML = data.map((t, idx) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:white;border:1px solid #ddd;border-radius:7px;margin-bottom:6px;">
+      <span>${t.apellidos}, ${t.nombres} · DNI ${t.documento_numero}</span>
+      <button onclick="abrirExcepcionesTrabajador(${idx})" style="padding:6px 12px;background:#002855;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.82rem;">Ver cursos</button>
+    </div>`).join('');
+};
+
+window.abrirExcepcionesTrabajador = async function (idx) {
+  const t = window._trabExcepcion[idx];
+  const { data: individuales } = await supabase
+    .from('curso_asignacion_individual').select('curso_id').eq('profile_id', t.id);
+
+  const marcadosCargo = window._cursosPorCargo?.[t.cargo_id] || new Set();
+  const marcadosIndividual = new Set((individuales || []).map(i => i.curso_id));
+
+  const cont = document.getElementById('panel-excepciones');
+  cont.style.display = 'block';
   cont.innerHTML = `
-    <table style="border-collapse:collapse;width:100%;font-size:0.85rem;">
-      <thead><tr style="background:#002855;color:white;">
-        <th style="padding:8px 10px;text-align:left;">Curso</th>
-        <th style="padding:8px 10px;text-align:left;">Lugar</th>
-        <th style="padding:8px 10px;">Fecha</th>
-        <th style="padding:8px 10px;">Estado</th>
-        <th style="padding:8px 10px;">Acción</th>
-      </tr></thead>
-      <tbody>
-        ${data.map(s => `
-          <tr style="border-bottom:1px solid #eee;">
-            <td style="padding:7px 10px;font-weight:500;">${s.cursos?.titulo || ''}</td>
-            <td style="padding:7px 10px;">${s.lugar}</td>
-            <td style="padding:7px 10px;text-align:center;font-size:0.82rem;">
-              ${new Date(s.fecha_hora).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}
-            </td>
-            <td style="padding:7px 10px;text-align:center;">
-              <span style="background:${s.activa ? '#d1fae5' : '#f1f5f9'};color:${s.activa ? '#065f46' : '#475569'};padding:2px 8px;border-radius:10px;font-size:0.78rem;font-weight:600;">
-                ${s.activa ? 'Activa' : 'Cerrada'}
-              </span>
-            </td>
-            <td style="padding:7px 10px;text-align:center;">
-              <button onclick="verAsistentesSesion('${s.id}')" style="background:#002855;color:white;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.8rem;">Ver</button>
-            </td>
-          </tr>`).join('')}
-      </tbody>
-    </table>`;
+    <h3 style="font-size:0.95rem;font-weight:600;color:#002855;margin-bottom:10px;">
+      Cursos extra para ${t.apellidos}, ${t.nombres}
+    </h3>
+    <p style="color:#888;font-size:0.8rem;margin-bottom:10px;">
+      Los ya marcados por su cargo no se pueden quitar aquí — eso se cambia en la matriz de arriba.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      ${(window._cursosObl || []).map(c => {
+        const porCargo = marcadosCargo.has(c.id);
+        const porIndividual = marcadosIndividual.has(c.id);
+        return `<label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;${porCargo ? 'color:#aaa;' : ''}">
+          <input type="checkbox" ${porCargo || porIndividual ? 'checked' : ''} ${porCargo ? 'disabled' : ''}
+            onchange="toggleExcepcionIndividual('${t.id}','${c.id}', this.checked)" />
+          ${c.titulo}${porCargo ? ' (ya la tiene por su cargo)' : ''}
+        </label>`;
+      }).join('')}
+    </div>`;
 };
 
-window.verAsistentesSesion = async function (sesionId) {
-  const { data } = await supabase
-    .from('asistencias_presenciales')
-    .select('created_at, profiles(nombres, apellidos, documento_numero, cargo)')
-    .eq('sesion_id', sesionId)
-    .order('created_at');
-
-  if (!data?.length) { alert('Sin asistentes registrados.'); return; }
-
-  const XLSX = window.XLSX;
-  const header = ['#', 'Apellidos', 'Nombres', 'Documento', 'Cargo', 'Hora'];
-  const rows = data.map((a, i) => [
-    i + 1,
-    a.profiles?.apellidos || '',
-    a.profiles?.nombres   || '',
-    a.profiles?.documento_numero || '',
-    a.profiles?.cargo     || '',
-    new Date(a.created_at).toLocaleString('es-PE'),
-  ]);
-  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  ws['!cols'] = [5,20,20,14,20,18].map(w => ({ wch: w }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Asistentes');
-  XLSX.writeFile(wb, `Asistentes_sesion.xlsx`);
-};
-
-// ═══════════════════════════════════════════════
-// 📊 IMPORTAR EVALUACIONES HISTÓRICAS
-// ═══════════════════════════════════════════════
-
-let filasEval = [];
-
-window.descargarPlantillaEvaluaciones = async function (e) {
-  e.preventDefault();
-  try {
-    const XLSX = window.XLSX;
-
-    const { data: cursos } = await supabase
-      .from('cursos').select('titulo').eq('activo', true).eq('sede', sedeAdminActiva).order('titulo');
-    const listaCursos = cursos?.map(c => c.titulo) || [];
-
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['DNI', 'Nombre del Curso', 'Fecha (DD/MM/AAAA)', 'Hora (HH:MM)', 'Nota (0-20)', 'Asistencia (SI/NO)'],
-      ['', '', '', '', '', ''],
-    ]);
-    ws['!cols'] = [12, 32, 20, 14, 16, 18].map(w => ({ wch: w }));
-
-    ws['!dataValidations'] = ws['!dataValidations'] || [];
-    if (listaCursos.length > 0) {
-      ws['!dataValidations'].push({
-        type: 'list', sqref: 'B2:B500',
-        formula1: listaCursos.join(',').length <= 255
-          ? '"' + listaCursos.join(',') + '"'
-          : 'Cursos!$A$1:$A$' + listaCursos.length
-      });
-    }
-    ws['!dataValidations'].push({
-      type: 'list', sqref: 'F2:F500',
-      formula1: '"SI,NO"'
-    });
-
-    const wsCursos = XLSX.utils.aoa_to_sheet(listaCursos.map(c => [c]));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Evaluaciones');
-    if (listaCursos.length > 0) XLSX.utils.book_append_sheet(wb, wsCursos, 'Cursos');
-    XLSX.writeFile(wb, 'plantilla_evaluaciones_historicas.xlsx');
-  } catch (err) {
-    alert('Error al generar plantilla: ' + err.message);
+window.toggleExcepcionIndividual = async function (profileId, cursoId, marcado) {
+  if (marcado) {
+    const { error } = await supabase.from('curso_asignacion_individual').insert({ profile_id: profileId, curso_id: cursoId });
+    if (error) { alert('❌ ' + error.message); return; }
+  } else {
+    await supabase.from('curso_asignacion_individual').delete().eq('profile_id', profileId).eq('curso_id', cursoId);
   }
 };
 
-window.previsualizarEvaluaciones = async function () {
-  const archivo = document.getElementById('archivo-eval').files[0];
-  if (!archivo) return;
-
-  const reader = new FileReader();
-  reader.onload = async function (e) {
-    const XLSX = window.XLSX;
-    const wb   = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-    const hoja = wb.Sheets[wb.SheetNames[0]];
-    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
-
-    filasEval = filas.slice(1).filter(f => f[0] && f[1]);
-
-    const dnis = [...new Set(filasEval.map(f => normalizarDNI(f[0])))];
-    const { data: perfiles } = await supabase
-      .from('profiles')
-      .select('id, documento_numero, nombres, apellidos, email')
-      .in('documento_numero', dnis)
-      .eq('empresa_id', empresaAdminId);
-
-    const perfilMap = {};
-    perfiles?.forEach(p => { perfilMap[p.documento_numero] = p; });
-
-    const tbody = document.getElementById('tbody-eval');
-    tbody.innerHTML = '';
-
-    filasEval.forEach(f => {
-      const dni    = normalizarDNI(f[0]);
-      const curso  = String(f[1]).trim();
-      const fecha  = String(f[2]).trim();
-      const hora   = String(f[3]).trim() || '08:00';
-      const nota   = parseFloat(String(f[4]).replace(',', '.')) || 0;
-      const asist  = String(f[5]).trim().toUpperCase();
-      const perfil = perfilMap[dni];
-      const tr = document.createElement('tr');
-      let estado = '';
-      if (!perfil) {
-        estado = '<span style="color:red;">❌ DNI no encontrado</span>';
-      } else if (!curso) {
-        estado = '<span style="color:red;">❌ Falta curso</span>';
-      } else {
-        const aprobado = nota >= 16;
-        estado = `<span style="color:${aprobado ? '#198754' : '#dc3545'};">${aprobado ? '✅ Aprobado' : '⚠️ Desaprobado'}</span>`;
-      }
-      tr.innerHTML = `
-        <td>${dni}</td>
-        <td>${perfil ? perfil.apellidos + ' ' + perfil.nombres : '<em style="color:#888;">No encontrado</em>'}</td>
-        <td>${curso}</td><td>${fecha}</td><td>${hora}</td>
-        <td><strong>${nota}</strong>/20</td>
-        <td>${asist === 'SI' ? '✅ SI' : asist === 'NO' ? '❌ NO' : asist}</td>
-        <td class="estado-fila-eval">${estado}</td>`;
-      tbody.appendChild(tr);
-    });
-
-    const validas = filasEval.filter(f => perfilMap[String(f[0]).trim()] && f[1]).length;
-    document.getElementById('preview-resumen-eval').textContent =
-      `${filasEval.length} filas — ${validas} válidas para importar, ${filasEval.length - validas} con errores.`;
-    document.getElementById('preview-eval').style.display = 'block';
-  };
-  reader.readAsArrayBuffer(archivo);
-};
-
-window.importarEvaluaciones = async function () {
-  if (!filasEval.length) return;
-
-  const btn = document.getElementById('btn-confirmar-eval');
-  btn.disabled = true;
-  btn.textContent = '⏳ Importando...';
-  const progreso = document.getElementById('progreso-eval');
-
-  // Cargar datos maestros de una vez
-  const dnis = [...new Set(filasEval.map(f => normalizarDNI(f[0])))];
-  const { data: perfiles } = await supabase
-    .from('profiles')
-    .select('id, documento_numero, email')
-    .in('documento_numero', dnis)
-    .eq('empresa_id', empresaAdminId);
-
-  const perfilMap = {};
-  perfiles?.forEach(p => { perfilMap[p.documento_numero] = p; });
-
-  const { data: cursos } = await supabase
-    .from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva);
-  const cursoMap = {};
-  cursos?.forEach(c => { cursoMap[c.titulo.toLowerCase()] = c; });
-
-  const { data: formularios } = await supabase
-    .from('formularios').select('id, id_curso, tipo').eq('tipo', 'examen');
-  const formMap = {};
-  formularios?.forEach(f => { formMap[f.id_curso] = f; });
-
-  const filas = document.querySelectorAll('#tbody-eval tr');
-  let ok = 0, errores = 0, omitidos = 0;
-
-  for (let i = 0; i < filasEval.length; i++) {
-    const f      = filasEval[i];
-    const dni    = normalizarDNI(f[0]);
-    const cursoNombre = String(f[1]).trim();
-    const fechaStr    = String(f[2]).trim();   // DD/MM/AAAA
-    const horaStr     = String(f[3]).trim() || '08:00';
-    const nota        = parseFloat(String(f[4]).replace(',', '.')) || 0;
-    const asistencia  = String(f[5]).trim().toUpperCase() === 'SI';
-    const tdEstado    = filas[i]?.querySelector('.estado-fila-eval');
-
-    const perfil = perfilMap[dni];
-    const curso  = cursoMap[cursoNombre.toLowerCase()];
-    const form   = curso ? formMap[curso.id] : null;
-
-    if (!perfil || !curso) {
-      if (tdEstado) { tdEstado.innerHTML = '<span style="color:orange;">⚠️ Omitido (dato faltante)</span>'; }
-      omitidos++;
-      progreso.textContent = `Progreso: ${i+1}/${filasEval.length} — ✅ ${ok}, ⚠️ ${omitidos}, ❌ ${errores}`;
-      continue;
-    }
-
-    // Construir timestamp con fecha y hora indicadas
-    let createdAt = new Date().toISOString();
-    try {
-      const [dia, mes, anio] = fechaStr.split('/');
-      const [hh, mm]         = horaStr.split(':');
-      const d = new Date(
-        parseInt(anio), parseInt(mes) - 1, parseInt(dia),
-        parseInt(hh) || 8, parseInt(mm) || 0, 0
-      );
-      if (!isNaN(d.getTime())) createdAt = d.toISOString();
-    } catch (_) { /* usar fecha actual */ }
-
-    const porcentaje = Math.round((nota / 20) * 100 * 10) / 10;
-    const aprobado   = nota >= 16;
-
-    // Insertar en envios_formulario
-    const { error: errEnvio } = await supabase.from('envios_formulario').insert({
-      id_formulario: form?.id || null,
-      usuario_id:    perfil.id,
-      usuario_email: perfil.email,
-      id_curso:      curso.id,
-      estado:        'completado',
-      puntaje:       nota,
-      porcentaje,
-      aprobado,
-      created_at:    createdAt,
-    });
-
-    if (errEnvio) {
-      if (tdEstado) { tdEstado.innerHTML = `<span style="color:red;">❌ ${errEnvio.message}</span>`; }
-      errores++;
-      progreso.textContent = `Progreso: ${i+1}/${filasEval.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
-      continue;
-    }
-
-    // Registrar asistencia si corresponde
-    if (asistencia) {
-      const { data: yaAsiste } = await supabase
-        .from('asistencias')
-        .select('usuario_id')
-        .eq('usuario_id', perfil.id)
-        .eq('curso_id', curso.id)
-        .maybeSingle();
-      if (!yaAsiste) {
-        await supabase.from('asistencias').insert({
-          usuario_id: perfil.id,
-          email:      perfil.email,
-          curso_id:   curso.id,
-        });
-      }
-    }
-
-    if (tdEstado) {
-      tdEstado.innerHTML = `<span style="color:${aprobado ? '#198754' : '#dc3545'};">✅ ${aprobado ? 'Aprobado' : 'Desaprobado'} importado</span>`;
-    }
-    ok++;
-    progreso.textContent = `Progreso: ${i+1}/${filasEval.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
-  }
-
-  progreso.textContent += ` — ¡Completado! ${ok} registros importados.`;
-  btn.disabled = false;
-  btn.textContent = '✅ Confirmar importación';
-};
-
-// ═══════════════════════════════════════════════
-// 📋 IMPORTAR DESDE MICROSOFT FORMS / GOOGLE FORMS
-// ═══════════════════════════════════════════════
-
-let filasForms = [];
-let filasFormsOrdenadas = [];
-let colsDniForms = -1, colFechaForms = -1, colNotaForms = -1, colNombreForms = -1;
-
-window.cargarCursosSelectForms = async function () {
-  const sel = document.getElementById('forms-curso');
-  if (!sel || sel.options.length > 1) return; // ya cargado
-  const { data: cursos } = await supabase
-    .from('cursos').select('id, titulo').eq('activo', true).eq('sede', sedeAdminActiva).order('titulo');
-  (cursos || []).forEach(c => {
-    sel.innerHTML += `<option value="${c.id}">${c.titulo}</option>`;
-  });
-};
-
-// Detecta qué columna del header coincide con un texto (exacto o parcial)
-function detectarColumna(headers, textos) {
-  for (const texto of textos) {
-    const idx = headers.findIndex(h =>
-      String(h).trim().toLowerCase() === texto.toLowerCase()
-    );
-    if (idx !== -1) return idx;
-  }
-  // búsqueda parcial como fallback
-  for (const texto of textos) {
-    const idx = headers.findIndex(h =>
-      String(h).trim().toLowerCase().includes(texto.toLowerCase())
-    );
-    if (idx !== -1) return idx;
-  }
-  return -1;
-}
-
-// Parsea fecha/hora: maneja Date objects de SheetJS, "M/D/YY H:MM:SS" e ISO
-function parsearFechaForms(raw) {
-  if (!raw) return { fechaStr: '', horaStr: '', iso: null };
-
-  // SheetJS con cellDates:true entrega Date objects — caso principal
-  if (raw instanceof Date && !isNaN(raw.getTime())) {
-    const dia = String(raw.getDate()).padStart(2, '0');
-    const mes = String(raw.getMonth() + 1).padStart(2, '0');
-    const hh  = String(raw.getHours()).padStart(2, '0');
-    const mm  = String(raw.getMinutes()).padStart(2, '0');
-    return { fechaStr: `${dia}/${mes}/${raw.getFullYear()}`, horaStr: `${hh}:${mm}`, iso: raw.toISOString() };
-  }
-
-  const s = String(raw).trim();
-  // Formato texto M/D/YY H:MM:SS (Forms exportado como CSV o texto)
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})/);
-  if (m) {
-    const anio = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]);
-    const mes  = m[1].padStart(2, '0');
-    const dia  = m[2].padStart(2, '0');
-    const hh   = m[4].padStart(2, '0');
-    const mm   = m[5].padStart(2, '0');
-    const d = new Date(anio, parseInt(mes) - 1, parseInt(dia), parseInt(hh), parseInt(mm));
-    return { fechaStr: `${dia}/${mes}/${anio}`, horaStr: `${hh}:${mm}`, iso: d.toISOString() };
-  }
-
-  // Fallback: cualquier string parseable
-  try {
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) {
-      const dia = String(d.getDate()).padStart(2, '0');
-      const mes = String(d.getMonth() + 1).padStart(2, '0');
-      const hh  = String(d.getHours()).padStart(2, '0');
-      const mm  = String(d.getMinutes()).padStart(2, '0');
-      return { fechaStr: `${dia}/${mes}/${d.getFullYear()}`, horaStr: `${hh}:${mm}`, iso: d.toISOString() };
-    }
-  } catch (_) {}
-  return { fechaStr: s, horaStr: '', iso: null };
-}
-
-window.previsualizarForms = async function () {
-  const archivo = document.getElementById('archivo-forms').files[0];
-  if (!archivo) return;
-  const cursoId = document.getElementById('forms-curso').value;
-  if (!cursoId) { alert('Selecciona primero el curso correspondiente.'); return; }
-
-  const reader = new FileReader();
-  reader.onload = async function (ev) {
-    const XLSX = window.XLSX;
-    const wb   = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
-    const hoja = wb.Sheets[wb.SheetNames[0]];
-    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
-    if (filas.length < 2) { alert('El archivo no tiene datos.'); return; }
-
-    const headers = filas[0].map(h => String(h).trim());
-
-    // Detectar columnas clave
-    colFechaForms  = detectarColumna(headers, ['Hora de finalización', 'End time', 'Hora de inicio', 'Start time']);
-    colNotaForms   = detectarColumna(headers, ['Total de puntos', 'Total points', 'Score', 'Puntuación']);
-    colNombreForms = detectarColumna(headers, ['Nombre', 'Name']);
-    // DNI: buscar columna cuyo header sea exactamente "DNI" (no "Puntos: DNI")
-    colsDniForms   = headers.findIndex(h => /^dni$/i.test(h.trim()));
-
-    if (colsDniForms === -1 || colNotaForms === -1) {
-      alert(`No se encontraron las columnas necesarias.\nDetectado: DNI en col ${colsDniForms}, Nota en col ${colNotaForms}.\nVerifica que el archivo sea una exportación de Microsoft Forms.`);
-      return;
-    }
-
-    const maxPuntaje = parseFloat(document.getElementById('forms-max-puntaje').value) || 20;
-
-    filasForms = filas.slice(1).filter(f => f[colsDniForms] && String(f[colsDniForms]).trim());
-
-    // Cargar perfiles para previsualizar estado
-    const dnis = [...new Set(filasForms.map(f => normalizarDNI(f[colsDniForms])))];
-    const { data: perfiles } = await supabase
-      .from('profiles')
-      .select('id, documento_numero, nombres, apellidos, email')
-      .in('documento_numero', dnis)
-      .eq('empresa_id', empresaAdminId);
-    const perfilMap = {};
-    (perfiles || []).forEach(p => { perfilMap[p.documento_numero] = p; });
-
-    const tbody = document.getElementById('tbody-forms');
-    tbody.innerHTML = '';
-    let validas = 0, invalidas = 0, desaprobados = 0;
-
-    // Preparar filas con orden calculado — guardar en variable global para el import
-    filasFormsOrdenadas = filasForms.map(f => {
-      const dniRaw     = normalizarDNI(f[colsDniForms]);
-      const notaRaw    = parseFloat(String(f[colNotaForms]).replace(',', '.')) || 0;
-      const nota20     = maxPuntaje === 20 ? notaRaw : Math.round((notaRaw / maxPuntaje) * 20 * 10) / 10;
-      const perfil     = perfilMap[dniRaw];
-      const aprobado   = nota20 >= 16;
-      // orden: 0 = aprobado, 1 = desaprobado, 2 = no encontrado
-      const orden = !perfil ? 2 : aprobado ? 0 : 1;
-      return { f, dniRaw, notaRaw, nota20, perfil, aprobado, orden };
-    }).sort((a, b) => a.orden - b.orden);
-
-    filasFormsOrdenadas.forEach(({ f, dniRaw, notaRaw, nota20, perfil, aprobado }) => {
-      const { fechaStr, horaStr } = parsearFechaForms(f[colFechaForms]);
-      const nombreForms = colNombreForms !== -1 ? String(f[colNombreForms]).trim() : '';
-      const tr = document.createElement('tr');
-      let estado;
-      if (!perfil) {
-        estado = `<span style="color:red;">❌ DNI ${dniRaw} no encontrado</span>`;
-        invalidas++;
-      } else if (aprobado) {
-        estado = `<span style="color:#198754;">✅ Aprobado</span>`;
-        validas++;
-      } else {
-        estado = `<span style="color:#dc3545;">⚠️ Desaprobado</span>`;
-        validas++;
-        desaprobados++;
-      }
-      tr.innerHTML = `
-        <td>${dniRaw}</td>
-        <td style="font-size:0.82rem;">${perfil ? perfil.apellidos+' '+perfil.nombres : (nombreForms || '<em style="color:#888;">—</em>')}</td>
-        <td>${fechaStr}</td><td>${horaStr}</td>
-        <td><strong>${nota20}</strong>/20${maxPuntaje !== 20 ? ` <span style="color:#888;font-size:0.78rem;">(${notaRaw}/${maxPuntaje})</span>` : ''}</td>
-        <td>${aprobado ? '✅' : '❌'}</td>
-        <td class="estado-fila-forms">${estado}</td>`;
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById('preview-resumen-forms').textContent =
-      `${filasForms.length} respuestas — ✅ ${validas - desaprobados} aprobados, ⚠️ ${desaprobados} desaprobados, ❌ ${invalidas} DNI no encontrados (se omitirán).`;
-    document.getElementById('preview-forms').style.display = 'block';
-  };
-  reader.readAsArrayBuffer(archivo);
-};
-
-window.importarDesdeforms = async function () {
-  if (!filasForms.length) return;
-  const cursoId    = document.getElementById('forms-curso').value;
-  const maxPuntaje = parseFloat(document.getElementById('forms-max-puntaje').value) || 20;
-  if (!cursoId) { alert('Selecciona el curso.'); return; }
-
-  const btn = document.getElementById('btn-confirmar-forms');
-  btn.disabled = true; btn.textContent = '⏳ Importando...';
-  const progreso = document.getElementById('progreso-forms');
-
-  // Datos maestros
-  const dnis = [...new Set(filasForms.map(f => String(f[colsDniForms]).trim().replace(/\n/g,'').replace(/\r/g,'')))];
-  const { data: perfiles } = await supabase
-    .from('profiles').select('id, documento_numero, email')
-    .in('documento_numero', dnis).eq('empresa_id', empresaAdminId);
-  const perfilMap = {};
-  (perfiles || []).forEach(p => { perfilMap[p.documento_numero] = p; });
-
-  const { data: formRows } = await supabase
-    .from('formularios').select('id, id_curso').eq('id_curso', cursoId).eq('tipo', 'examen');
-  const formId = formRows?.[0]?.id || null;
-
-  const filas = document.querySelectorAll('#tbody-forms tr');
-  let ok = 0, omitidos = 0, errores = 0;
-
-  for (let i = 0; i < filasFormsOrdenadas.length; i++) {
-    const { f, dniRaw, nota20, perfil } = filasFormsOrdenadas[i];
-    const notaRaw  = parseFloat(String(f[colNotaForms]).replace(',', '.')) || 0;
-    const { iso: createdAt } = parsearFechaForms(f[colFechaForms]);
-    const tdEstado = filas[i]?.querySelector('.estado-fila-forms');
-
-    if (!perfil) {
-      omitidos++;
-      progreso.textContent = `Progreso: ${i+1}/${filasFormsOrdenadas.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
-      continue;
-    }
 
 
-    const porcentaje = Math.round((nota20 / 20) * 100 * 10) / 10;
-    const aprobado   = nota20 >= 16;
-
-    const envioData = {
-      id_formulario: formId,
-      usuario_id:    perfil.id,
-      usuario_email: perfil.email,
-      id_curso:      cursoId,
-      estado:        'completado',
-      puntaje:       nota20,
-      porcentaje,
-      aprobado,
-    };
-    if (createdAt) envioData.created_at = createdAt;
-
-    const { error: errEnvio } = await supabase.from('envios_formulario').insert(envioData);
-    if (errEnvio) {
-      if (tdEstado) tdEstado.innerHTML = `<span style="color:red;">❌ ${errEnvio.message}</span>`;
-      errores++;
-    } else {
-      // Registrar asistencia
-      const { data: yaAsiste } = await supabase.from('asistencias')
-        .select('usuario_id').eq('usuario_id', perfil.id).eq('curso_id', cursoId).maybeSingle();
-      if (!yaAsiste) {
-        await supabase.from('asistencias').insert({ usuario_id: perfil.id, email: perfil.email, curso_id: cursoId });
-      }
-      if (tdEstado) tdEstado.innerHTML = `<span style="color:${aprobado?'#198754':'#dc3545'};">✅ ${aprobado?'Aprobado':'Desaprobado'} importado</span>`;
-      ok++;
-    }
-    progreso.textContent = `Progreso: ${i+1}/${filasForms.length} — ✅ ${ok}, ⏭️ ${omitidos}, ❌ ${errores}`;
-  }
-
-  progreso.textContent += ` — ¡Completado! ${ok} registros importados.`;
-  btn.disabled = false; btn.textContent = '✅ Confirmar importación';
-};
 
 // ═══════════════════════════════════════════════
 // ⏳ SPINNERS EN BOTONES — aplicar withLoading
@@ -4957,8 +3239,6 @@ document.addEventListener('DOMContentLoaded', () => {
   wrap('button[onclick="crearUsuario()"]',        'crearUsuario',        'Creando...');
   wrap('button[onclick="subirCurso()"]',           'subirCurso',          'Subiendo...');
   wrap('button[onclick="guardarSeguimiento()"]',   'guardarSeguimiento',  'Guardando...');
-  wrap('button[onclick="enviarNotificaciones()"]', 'enviarNotificaciones','Enviando...');
-  wrap('button[onclick="crearSesionQR()"]',        'crearSesionQR',       'Generando QR...');
   wrap('button[onclick="importarProgramaSST()"]',  'importarProgramaSST', 'Importando...');
 
   // Validación en tiempo real — formulario crear usuario

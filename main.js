@@ -3,6 +3,21 @@ import { generarCertificadoPDF } from './certificado.js';
 import { toast, alertToToast } from './toast.js';
 const alert = alertToToast;
 
+// Extrae el ID (11 caracteres) de un link de YouTube sin importar el formato:
+// watch?v=, youtu.be/, embed/, shorts/, m.youtube.com, con o sin &si=/&t=/&list= al final.
+function extraerIdYoutube(url) {
+  const match = String(url).match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : null;
+}
+
+// Si el DNI ingresado es puramente numérico, lo completa a 8 dígitos con ceros a la
+// izquierda (igual que en el panel admin) — evita el caso típico de login fallido
+// cuando el trabajador olvida el 0 inicial de su DNI.
+function normalizarDNILogin(raw) {
+  const limpio = String(raw).trim().replace(/\s+/g, '');
+  return /^\d+$/.test(limpio) ? limpio.padStart(8, '0') : limpio;
+}
+
 const loginSection            = document.getElementById('login-section');
 const cursosDisponiblesSection = document.getElementById('cursos-disponibles');
 const consultaSection         = document.getElementById('consulta-section');
@@ -136,7 +151,7 @@ async function login() {
     email    = document.getElementById('email-login').value.trim();
     errorMsg = '❌ Correo o contraseña incorrectos.';
   } else {
-    const dni = document.getElementById('dni-login').value.trim();
+    const dni = normalizarDNILogin(document.getElementById('dni-login').value);
     errorMsg  = '❌ DNI o contraseña incorrectos.';
     email = `${dni}@cvglobal.pe`;
   }
@@ -236,7 +251,7 @@ async function verificarAdmin(userId) {
 // 📚 CARGAR CURSOS
 // ═══════════════════════════════
 async function cargarCursos() {
-  const { data: cursos, error } = await supabase
+  let { data: cursos, error } = await supabase
     .from('cursos')
     .select('*')
     .eq('activo', true)
@@ -249,7 +264,7 @@ async function cargarCursos() {
   const [{ data: perfil }, { data: envios }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('nombres, apellidos, empresa_id, empresas(nombre)')
+      .select('nombres, apellidos, empresa_id, cargo_id, empresas(nombre)')
       .eq('id', usuarioActual.id)
       .single(),
     supabase
@@ -258,6 +273,32 @@ async function cargarCursos() {
       .eq('usuario_email', usuarioActual.email)
       .eq('estado', 'completado'),
   ]);
+
+  // Si el cargo del trabajador tiene cursos obligatorios configurados, filtrar
+  // la lista a solo esos (+ excepciones individuales). Si el cargo no tiene
+  // nada configurado todavía, se sigue mostrando todo (comportamiento anterior).
+  if (perfil?.cargo_id) {
+    const [{ data: rutas }, { data: individuales }] = await Promise.all([
+      supabase
+        .from('rutas_aprendizaje')
+        .select('ruta_cursos(curso_id)')
+        .eq('empresa_id', perfil.empresa_id)
+        .eq('sede', sedeActiva || 'ANTAMINA')
+        .eq('cargo_id', perfil.cargo_id),
+      supabase
+        .from('curso_asignacion_individual')
+        .select('curso_id')
+        .eq('profile_id', usuarioActual.id),
+    ]);
+
+    const tieneConfiguracion = (rutas || []).some(r => (r.ruta_cursos || []).length > 0);
+    if (tieneConfiguracion) {
+      const idsRequeridos = new Set();
+      (rutas || []).forEach(r => (r.ruta_cursos || []).forEach(rc => idsRequeridos.add(rc.curso_id)));
+      (individuales || []).forEach(i => idsRequeridos.add(i.curso_id));
+      cursos = cursos.filter(c => idsRequeridos.has(c.id));
+    }
+  }
 
   const empresa = perfil?.empresas;
 
@@ -458,7 +499,8 @@ async function mostrarPasoActual() {
       let videoEmbed = '';
 
       if (urlVideo.includes('youtube') || urlVideo.includes('youtu.be')) {
-        const videoUrl = urlVideo.replace("watch?v=", "embed/").replace("youtu.be/", "www.youtube.com/embed/");
+        const idYoutube = extraerIdYoutube(urlVideo);
+        const videoUrl  = idYoutube ? `https://www.youtube.com/embed/${idYoutube}` : urlVideo;
         videoEmbed = `
           <div class="video-wrap">
             <iframe width="100%" height="360" src="${videoUrl}" frameborder="0"

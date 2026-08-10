@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
         fecha_ingreso:         fecha_ingreso || null,
         rol:                   rol || 'trabajador',
         activo:                true,
-        debe_cambiar_password: false
+        debe_cambiar_password: ['admin', 'gestor'].includes(rol)
       })
 
     if (perfilError) {

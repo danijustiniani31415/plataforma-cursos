@@ -129,6 +129,13 @@ async function crearContenedor(htmlContent, visible) {
       new Promise(r => { if (img.complete) return r(); img.onload = img.onerror = r; })
     )
   );
+  // Esperar a que las fuentes (Cinzel/Crimson Text de Google Fonts) terminen de
+  // cargar antes de capturar. Si no, el layout puede no estar estable todavía y
+  // html2canvas revienta con "createPattern... width or height of 0" al dibujar
+  // el degradado CSS de la línea decorativa (canvas intermedio de tamaño 0).
+  if (document.fonts?.ready) {
+    await document.fonts.ready.catch(() => {});
+  }
   await new Promise(r => setTimeout(r, 1500));
 
   // Si alguna imagen no terminó de cargar bien (fondo/logo/firma/QR — a veces el

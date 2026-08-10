@@ -843,6 +843,18 @@
     </div>
   </div>
 
+  <!-- ═══ TAB: CURSOS (activar/desactivar) ═══ -->
+  <div id="tab-cursos-activar" class="tab-panel">
+    <div class="panel-card">
+      <h2>🔌 Activar / desactivar cursos</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
+        Los cursos desactivados quedan ocultos para los trabajadores. Por defecto todos los cursos están activos.
+      </p>
+      <p style="color:#888; font-size:0.78rem; margin-bottom:10px;">Sede actual: <strong id="activar-cursos-sede-actual"></strong></p>
+      <div id="lista-activar-cursos"><p style="color:#888;">Cargando...</p></div>
+    </div>
+  </div>
+
   <!-- ═══ TAB: CERTIFICADOS ═══ -->
   <div id="tab-certificados" class="tab-panel">
     <div class="panel-card">
@@ -1140,6 +1152,7 @@
       { tab: 'cursos-examen',       label: 'Examen y evaluación' },
       { tab: 'cursos-encuesta',     label: 'Encuesta de satisfacción' },
       { tab: 'cursos-obligatorios', label: 'Obligatorios por cargo' },
+      { tab: 'cursos-activar',      label: 'Activar cursos' },
     ],
     'certificados':   [{ tab: 'certificados',   label: 'Certificados' }],
     'reporte':        [
@@ -1211,6 +1224,9 @@
     }
     if (tab === 'cursos-obligatorios') {
       window.initCursosObligatorios?.();
+    }
+    if (tab === 'cursos-activar') {
+      window.cargarActivarCursos?.();
     }
     if (tab === 'programa-sst' || tab === 'programa-sst-ver' || tab === 'programa-sst-seguimiento') {
       window.initSelectorAnioSST?.();

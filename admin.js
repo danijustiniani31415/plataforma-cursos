@@ -1876,6 +1876,43 @@ window.cargarListaCursos = async function () {
   if (idSeleccionado && window.cursosCache[idSeleccionado]) sel.value = idSeleccionado;
 };
 
+window.cargarActivarCursos = async function () {
+  const cont = document.getElementById('lista-activar-cursos');
+  const sedeLabel = document.getElementById('activar-cursos-sede-actual');
+  if (sedeLabel) sedeLabel.textContent = sedeAdminActiva || '';
+
+  const { data: cursos, error } = await supabase
+    .from('cursos')
+    .select('id, titulo, activo')
+    .eq('sede', sedeAdminActiva)
+    .order('titulo');
+
+  if (error) { cont.innerHTML = `<p style="color:#c62828;">❌ ${error.message}</p>`; return; }
+  if (!cursos?.length) { cont.innerHTML = '<p style="color:#888;">No hay cursos registrados en esta sede.</p>'; return; }
+
+  cont.innerHTML = cursos.map(c => `
+    <div class="trab-card">
+      <div class="trab-card-top">
+        <div class="trab-info">
+          <div class="trab-nombre">${c.titulo}</div>
+        </div>
+        <span class="${c.activo ? 'badge-activo' : 'badge-inactivo'}">${c.activo ? 'Activo' : 'Inactivo'}</span>
+      </div>
+      <div class="trab-actions">
+        <button class="${c.activo ? 'btn-toggle-on' : 'btn-toggle-off'}" onclick="toggleActivoCurso('${c.id}', ${c.activo})">
+          ${c.activo ? 'Desactivar' : 'Activar'}
+        </button>
+      </div>
+    </div>
+  `).join('');
+};
+
+window.toggleActivoCurso = async function (id, activo) {
+  const { error } = await supabase.from('cursos').update({ activo: !activo }).eq('id', id);
+  if (error) { alert('❌ ' + error.message); return; }
+  cargarActivarCursos();
+};
+
 window.abrirEdicionCurso = function (id) {
   if (!id) { cerrarPanelEditarCurso(); return; }
   const c = window.cursosCache?.[id];

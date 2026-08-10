@@ -1046,12 +1046,13 @@ window.generarReporteNotas = async function () {
     // Paso 2: envíos aprobados en el rango → mapa 'userId|cursoId' y 'email|cursoId' → fecha_examen
     const enviosMapById    = {};  // usuario_id|id_curso → fecha
     const enviosMapByEmail = {};  // usuario_email|id_curso → fecha
+    const enviosRaw = [];
     if (examFormIds.length) {
       let pg = 0;
       while (true) {
         const { data: envios, error: ee } = await supabase
           .from('envios_formulario')
-          .select('usuario_id, usuario_email, id_curso, created_at')
+          .select('usuario_id, usuario_email, id_curso, puntaje, created_at')
           .in('id_formulario', examFormIds)
           .eq('aprobado', true)
           .eq('sede', sedeAdminActiva)
@@ -1060,6 +1061,7 @@ window.generarReporteNotas = async function () {
           .range(pg * 1000, (pg + 1) * 1000 - 1);
         if (ee) throw ee;
         if (!envios?.length) break;
+        enviosRaw.push(...envios);
         for (const e of envios) {
           if (e.usuario_id) {
             const k = `${e.usuario_id}|${e.id_curso}`;
@@ -1077,6 +1079,84 @@ window.generarReporteNotas = async function () {
       '| por email:', Object.keys(enviosMapByEmail).length,
       '| muestra id:', Object.entries(enviosMapById).slice(0, 3),
       '| muestra email:', Object.entries(enviosMapByEmail).slice(0, 3));
+
+    // Paso 2.5: regularizar certificados faltantes — el certificado no se crea
+    // automáticamente al aprobar el examen, solo cuando alguien lo genera/descarga,
+    // así que exámenes aprobados sin certificado aún quedaban afuera de este reporte.
+    if (enviosRaw.length) {
+      const usuarioIdsRN = [...new Set(enviosRaw.map(e => e.usuario_id).filter(Boolean))];
+      const cursoIdsRN   = [...new Set(enviosRaw.map(e => e.id_curso).filter(Boolean))];
+
+      const { data: certsYaExisten } = await chunkedInQuery(
+        usuarioIdsRN, 150,
+        (chunk) => fetchAllRows(() => supabase
+          .from('certificados').select('usuario_id, curso_id')
+          .in('usuario_id', chunk).in('curso_id', cursoIdsRN))
+      );
+      const setExistentes = new Set((certsYaExisten || []).map(c => `${c.usuario_id}|${c.curso_id}`));
+
+      const { data: perfilesRN } = await chunkedInQuery(
+        usuarioIdsRN, 150,
+        (chunk) => fetchAllRows(() => supabase
+          .from('profiles').select('id, email, nombres, apellidos, documento_numero, cargos(nombre)')
+          .in('id', chunk))
+      );
+      const mapaPerfilesRN = {};
+      (perfilesRN || []).forEach(p => mapaPerfilesRN[p.id] = p);
+
+      const { data: cursosRN } = await supabase
+        .from('cursos').select('id, titulo, codigo_prefijo, correlativo').in('id', cursoIdsRN);
+      const mapaCursosRN = {};
+      (cursosRN || []).forEach(c => mapaCursosRN[c.id] = c);
+
+      const correlativosRN = {};
+      (cursosRN || []).forEach(c => correlativosRN[c.id] = Number(c.correlativo || 0));
+      const nuevosRN = [];
+
+      for (const e of enviosRaw) {
+        const key = `${e.usuario_id}|${e.id_curso}`;
+        if (setExistentes.has(key)) continue;
+        setExistentes.add(key); // evitar duplicados si el mismo par se repite en enviosRaw
+        const perfil = mapaPerfilesRN[e.usuario_id];
+        const curso  = mapaCursosRN[e.id_curso];
+        if (!perfil || !curso) continue;
+
+        correlativosRN[curso.id] += 1;
+        const anioCert = new Date(e.created_at).getFullYear().toString().slice(-2);
+        const prefijo  = curso.codigo_prefijo || 'CERT';
+        const codigo   = `${prefijo}-${anioCert}-${String(correlativosRN[curso.id]).padStart(4, '0')}`;
+
+        nuevosRN.push({
+          usuario_id: e.usuario_id,
+          usuario_email: e.usuario_email || perfil.email || '',
+          curso_id: curso.id,
+          sede: sedeAdminActiva,
+          codigo,
+          nota: Number(e.puntaje || 0),
+          nombres: perfil.nombres || '',
+          apellidos: perfil.apellidos || '',
+          dni: perfil.documento_numero || '',
+          cargo: perfil.cargos?.nombre || '',
+          empresa: empresaAdminNombre || '',
+          fecha: e.created_at,
+        });
+      }
+
+      if (nuevosRN.length) {
+        const LOTE = 500;
+        for (let i = 0; i < nuevosRN.length; i += LOTE) {
+          const { error: errInsRN } = await supabase
+            .from('certificados')
+            .upsert(nuevosRN.slice(i, i + LOTE), { onConflict: 'usuario_id,curso_id', ignoreDuplicates: true });
+          if (errInsRN) throw errInsRN;
+        }
+        for (const [cid, correlativo] of Object.entries(correlativosRN)) {
+          if (correlativo !== Number(mapaCursosRN[cid]?.correlativo || 0)) {
+            await supabase.from('cursos').update({ correlativo }).eq('id', cid);
+          }
+        }
+      }
+    }
 
     // Paso 3: certificados de la empresa (sin filtro de fecha — se filtra por fecha_examen)
     const allCerts = [];

@@ -130,6 +130,15 @@ async function crearContenedor(htmlContent, visible) {
     )
   );
   await new Promise(r => setTimeout(r, 1500));
+
+  // Si alguna imagen no terminó de cargar bien (fondo/logo/firma/QR — a veces el
+  // servicio de QR externo falla o alguna imagen se corta en la red), sacarla del
+  // certificado en vez de dejarla rota: html2canvas revienta con "createPattern...
+  // width or height of 0" si intenta dibujar una imagen que no cargó.
+  contenedor.querySelectorAll('img').forEach(img => {
+    if (!img.naturalWidth || !img.naturalHeight) img.remove();
+  });
+
   return contenedor;
 }
 

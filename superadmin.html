@@ -3,37 +3,87 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#002855" />
+  <meta name="theme-color" content="#1e3a5f" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/Logo.png" />
   <title>Super Administrador · CV Global</title>
   <link rel="stylesheet" href="styles.css" />
   <style>
-    .tabs { display: flex; gap: 10px; margin-bottom: 30px; }
+    * { box-sizing: border-box; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 26px; border-bottom: 1px solid #e5e8ec; }
     .tab-btn {
-      padding: 10px 25px; border: none; border-radius: 6px;
-      cursor: pointer; font-weight: bold; background: #e0e0e0; color: #333;
+      padding: 11px 18px; border: none; border-bottom: 2px solid transparent; border-radius: 0;
+      cursor: pointer; font-weight: 500; font-size: 0.9rem; background: none; color: #667;
+      transition: color 0.15s, border-color 0.15s;
     }
-    .tab-btn.activo { background: #002855; color: white; }
+    .tab-btn:hover { color: #1e3a5f; }
+    .tab-btn.activo { color: #1e3a5f; border-bottom-color: #c9a84c; font-weight: 600; }
     .tab-content { display: none; }
     .tab-content.activo { display: block; }
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th { background: #002855; color: white; padding: 10px; text-align: left; }
+    th { background: #1e3a5f; color: white; padding: 10px; text-align: left; }
     td { padding: 10px; border-bottom: 1px solid #eee; }
     tr:hover { background: #f5f5f5; }
-    .badge-admin { background: #ffc107; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; }
-    .badge-superadmin { background: #dc3545; color: white; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; }
-    .badge-trabajador { background: #28a745; color: white; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; }
+    .badge-admin { background: #dbe4f0; color: #1e3a5f; padding: 3px 9px; border-radius: 12px; font-size: 0.76rem; font-weight: 600; }
+    .badge-superadmin { background: #f3e2e4; color: #a8323f; padding: 3px 9px; border-radius: 12px; font-size: 0.76rem; font-weight: 600; }
+    .badge-trabajador { background: #e3f6e9; color: #157347; padding: 3px 9px; border-radius: 12px; font-size: 0.76rem; font-weight: 600; }
+    .badge-activo { background: #e3f6e9; color: #157347; padding: 2px 9px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; }
+    .badge-inactivo { background: #fbe8ea; color: #b02a37; padding: 2px 9px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; }
+    .badge-gestor { background: #eee3f8; color: #6f42c1; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; margin-left: 6px; }
+    .badge-admin2 { background: #dbe4f0; color: #1e3a5f; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; margin-left: 6px; }
 
     .form-inline { display: grid; grid-template-columns: 1fr auto; gap: 10px; max-width: 600px; margin-bottom: 20px; }
     .form-inline input { width: 100%; box-sizing: border-box; padding: 12px 14px; font-size: 1rem; }
     .form-inline button { white-space: nowrap; }
+
+    /* Barra de filtros en una sola fila (neutraliza el width:100% de styles.css) */
+    .filtro-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+    .filtro-bar input, .filtro-bar select { width: auto; flex: 1 1 200px; }
+    .filtro-bar button { width: auto; flex: 0 0 auto; }
+    @media (max-width: 640px) {
+      .filtro-bar input, .filtro-bar select, .filtro-bar button { flex: 1 1 100%; }
+    }
+
+    /* Filas de administradores/gestores */
+    #lista-admins { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+    .admin-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+      background: #fff; border: 1px solid #e9ecf1; border-radius: 8px; padding: 10px 16px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .admin-row:hover { background: #f6f8fb; border-color: #d7dee8; }
+    .admin-row-info { display: flex; align-items: center; gap: 12px; flex: 1 1 320px; min-width: 260px; }
+    .admin-avatar {
+      width: 36px; height: 36px; border-radius: 50%; background: #1e3a5f; color: #fff;
+      display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; flex-shrink: 0;
+    }
+    .admin-nombre { font-weight: 600; font-size: 0.92rem; color: #1c2733; }
+    .admin-meta { font-size: 0.78rem; color: #8a93a3; margin-top: 2px; }
+    .admin-row-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+    .btn-fila {
+      padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer;
+      font-size: 0.78rem; font-weight: 500; background: #eef1f5; color: #333; white-space: nowrap;
+    }
+
+    /* Modal genérico */
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal-box {
+      background: white; padding: 26px; border-radius: 14px;
+      width: 90%; max-width: 420px; box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+      max-height: 80vh; overflow-y: auto;
+    }
+    .modal-box h3 { color: #1e3a5f; margin-bottom: 4px; font-size: 1.02rem; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+    .modal-actions .btn-primary, .modal-actions .btn-secondary { width: auto; flex: 0 0 auto; }
   </style>
 </head>
 <body>
 
   <header style="display:flex; align-items:center; justify-content:space-between;
-    background:#002855; padding:20px 40px; color:white;">
+    background:#1e3a5f; padding:20px 40px; color:white;">
     <div style="display:flex; align-items:center; gap:20px;">
       <img src="logo.png" alt="Logo" style="height:50px; filter:brightness(0) invert(1);" />
       <div>
@@ -161,20 +211,7 @@
         Crear Usuario
       </button>
       <h3 style="margin-top:30px;">Lista de Administradores y Gestores</h3>
-      <table id="tabla-admins">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Email</th>
-            <th>Empresa</th>
-            <th>Documento</th>
-            <th>Rol</th>
-            <th>Estado</th>
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div id="lista-admins"></div>
     </div>
 
     <!-- TAB CARGOS -->
@@ -199,9 +236,9 @@
     <!-- TAB TODOS LOS USUARIOS -->
     <div id="tab-usuarios" class="tab-content">
       <h2>👥 Todos los Usuarios</h2>
-      <div style="display:flex; gap:10px; margin-bottom:15px;">
-        <input type="text" id="buscar-usuario" placeholder="🔍 Buscar por nombre, email o documento..." 
-               oninput="filtrarUsuarios()" style="flex:1; padding:10px;" />
+      <div class="filtro-bar">
+        <input type="text" id="buscar-usuario" placeholder="🔍 Buscar por nombre, email o documento..."
+               oninput="filtrarUsuarios()" style="padding:10px;" />
         <select id="filtro-empresa" onchange="filtrarUsuarios()" style="padding:10px;">
           <option value="">Todas las empresas</option>
         </select>
@@ -222,6 +259,19 @@
       </table>
     </div>
 
+  </div>
+
+  <!-- Modal: gestión de sedes por admin -->
+  <div class="modal-overlay" id="modal-sedes">
+    <div class="modal-box">
+      <h3>🌐 Sedes visibles</h3>
+      <p style="color:#888; font-size:0.85rem; margin-bottom:14px;" id="modal-sedes-nombre"></p>
+      <div id="modal-sedes-lista"></div>
+      <div class="modal-actions">
+        <button onclick="guardarSedesAdmin()" class="btn-primary">💾 Guardar</button>
+        <button onclick="cerrarModalSedes()" class="btn-secondary">Cancelar</button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="superadmin.js"></script>

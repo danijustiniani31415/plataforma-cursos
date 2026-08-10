@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#002855" />
+  <meta name="theme-color" content="#1e3a5f" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Admin SST" />
@@ -15,17 +15,17 @@
   <style>
     .ts-wrapper.single .ts-control { border-radius: 7px; border-color: #ddd; font-size: 0.9rem; padding: 9px 12px; min-height: unset; }
     .ts-wrapper.single.input-active .ts-control,
-    .ts-wrapper.single .ts-control:focus { border-color: #002855; box-shadow: 0 0 0 2px rgba(0,40,85,0.15); }
+    .ts-wrapper.single .ts-control:focus { border-color: #1e3a5f; box-shadow: 0 0 0 2px rgba(0,40,85,0.15); }
     .ts-dropdown { border-color: #ddd; border-radius: 7px; font-size: 0.88rem; }
-    .ts-dropdown .option.selected { background: #002855; }
-    .ts-dropdown .option:hover, .ts-dropdown .option.active { background: #e8eef5; color: #002855; }
+    .ts-dropdown .option.selected { background: #1e3a5f; }
+    .ts-dropdown .option:hover, .ts-dropdown .option.active { background: #e8eef5; color: #1e3a5f; }
   </style>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
+    body { font-family: 'Segoe UI', sans-serif; background: #fff; min-height: 100vh; }
 
     .admin-header {
-      background: #002855;
+      background: #1e3a5f;
       color: white;
       padding: 12px 26px;
       display: flex;
@@ -36,8 +36,8 @@
 
     #info-empresa-header {
       font-size: 0.76rem;
-      color: #c9a84c;
-      font-weight: 500;
+      color: #1e3a5f;
+      font-weight: 600;
       padding: 0 10px 8px;
     }
 
@@ -47,51 +47,59 @@
     .sidebar {
       width: 184px;
       flex-shrink: 0;
-      background: #002855;
-      color: #fff;
+      background: #fff;
+      color: #1c2733;
       display: flex;
       flex-direction: column;
       padding: 16px 0 0;
       position: sticky;
       top: 0;
       height: 100vh;
+      border-right: 1px solid #e9ecf1;
     }
     .sidebar-brand {
       padding: 0 18px 14px;
       margin-bottom: 8px;
-      border-bottom: 1px solid rgba(255,255,255,0.12);
+      border-bottom: 1px solid #eef0f3;
       font-size: 0.7rem;
       letter-spacing: 0.04em;
-      color: #c9a84c;
-      font-weight: 600;
+      color: #1e3a5f;
+      font-weight: 700;
     }
-    .sidebar-nav { display: flex; flex-direction: column; gap: 1px; padding: 0 8px; }
+    .sidebar-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
     .sidebar-bottom {
       margin-top: auto;
       padding: 8px;
-      border-top: 1px solid rgba(255,255,255,0.12);
+      border-top: 1px solid #eef0f3;
     }
     .nav-item {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 8px;
       width: 100%;
       padding: 9px 10px;
       border-radius: 7px;
-      background: none;
       border: none;
-      color: rgba(255,255,255,0.82);
+      background: none;
+      color: #5a6478;
       font-size: 0.8rem;
       font-weight: 500;
       cursor: pointer;
       text-align: left;
       transition: background 0.15s, color 0.15s;
     }
-    .nav-item .nav-icon { font-size: 0.95rem; flex-shrink: 0; }
-    .nav-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
-    .nav-item.activo { background: #c9a84c; color: #002855; font-weight: 600; }
+    .nav-item .nav-icon { font-size: 0.9rem; flex-shrink: 0; opacity: 0.8; }
+    .nav-item:hover { background: #f3f5f8; color: #1e3a5f; }
+    .nav-item.activo {
+      background: #1e3a5f;
+      color: #fff;
+      font-weight: 600;
+    }
+    .nav-item.activo .nav-icon { opacity: 1; }
 
     .btn-sidebar-toggle { display: none; }
+    .sidebar-overlay { display: none; }
 
     .subtabs-bar {
       background: white;
@@ -115,10 +123,10 @@
       white-space: nowrap;
       transition: color 0.15s, border-color 0.15s;
     }
-    .subtab-btn:hover { color: #002855; }
-    .subtab-btn.activo { color: #002855; border-bottom-color: #002855; font-weight: 600; }
+    .subtab-btn:hover { color: #1e3a5f; }
+    .subtab-btn.activo { color: #1e3a5f; border-bottom-color: #1e3a5f; font-weight: 600; }
 
-    .admin-content { padding: 24px 30px; max-width: 1400px; margin: 0 auto; width: 100%; }
+    .admin-content { padding: 0; width: 100%; }
 
     @media (max-width: 900px) {
       .sidebar {
@@ -140,28 +148,38 @@
       }
     }
 
-    .tab-panel { display: none; }
+    .tab-panel { display: none; width: 100%; }
     .tab-panel.activo { display: block; }
 
     .panel-card {
       background: white;
-      border-radius: 12px;
-      padding: 24px;
+      border-radius: 0;
+      padding: 16px 18px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      margin-bottom: 20px;
+      margin-bottom: 14px;
+      width: 100%;
+      box-sizing: border-box;
     }
     .panel-card h2 {
-      font-size: 1.05rem;
-      color: #002855;
-      margin-bottom: 16px;
-      padding-bottom: 10px;
+      font-size: 1.02rem;
+      color: #1e3a5f;
+      margin-bottom: 12px;
+      padding-bottom: 7px;
       border-bottom: 1px solid #eee;
     }
 
-    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    /* Barra de filtros compacta en una sola fila (neutraliza el width:100% de styles.css) */
+    .filtro-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .filtro-bar input, .filtro-bar select { width: auto; flex: 1 1 200px; }
+    .filtro-bar button { width: auto; flex: 0 0 auto; }
+    @media (max-width: 640px) {
+      .filtro-bar input, .filtro-bar select, .filtro-bar button { flex: 1 1 100%; }
+    }
+
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
     .form-grid input, .form-grid select, .form-grid .field-wrap { width: 100%; }
     .form-grid input, .form-grid select {
-      padding: 10px 12px;
+      padding: 9px 11px;
       border: 1px solid #ddd;
       border-radius: 7px;
       font-size: 0.9rem;
@@ -169,12 +187,12 @@
     }
     .form-grid input:focus, .form-grid select:focus {
       outline: none;
-      border-color: #002855;
+      border-color: #1e3a5f;
     }
-    .field-hint { font-size: 0.75rem; color: #999; margin-top: 4px; }
+    .field-hint { font-size: 0.74rem; color: #999; margin-top: 2px; }
 
     .btn-primary {
-      background: #002855;
+      background: #1e3a5f;
       color: white;
       border: none;
       padding: 10px 22px;
@@ -184,11 +202,11 @@
       font-weight: 500;
       transition: background 0.2s;
     }
-    .btn-primary:hover { background: #003d7a; }
+    .btn-primary:hover { background: #2a4f7c; }
     .btn-secondary {
       background: white;
-      color: #002855;
-      border: 1px solid #002855;
+      color: #1e3a5f;
+      border: 1px solid #1e3a5f;
       padding: 10px 22px;
       border-radius: 7px;
       cursor: pointer;
@@ -197,25 +215,26 @@
     }
 
     .info-box {
-      background: #e8f4fd;
-      border-left: 4px solid #002855;
-      padding: 12px 16px;
+      background: #eef4fb;
+      border-left: 3px solid #1e3a5f;
+      padding: 8px 14px;
       border-radius: 6px;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       color: #333;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
-    .info-box strong { color: #002855; }
+    .info-box.info-box--linea { display: inline-flex; align-items: center; gap: 6px; }
+    .info-box strong { color: #1e3a5f; }
 
     .plantilla-link {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      color: #002855;
+      color: #1e3a5f;
       font-size: 0.85rem;
       text-decoration: none;
       padding: 7px 14px;
-      border: 1px solid #002855;
+      border: 1px solid #1e3a5f;
       border-radius: 6px;
       margin-bottom: 14px;
       transition: background 0.2s;
@@ -240,7 +259,7 @@
       min-width: 600px;
     }
     .preview-table-wrap th {
-      background: #002855;
+      background: #1e3a5f;
       color: white;
       padding: 8px 10px;
       text-align: left;
@@ -253,47 +272,53 @@
     /* Tabla trabajadores */
     .tabla-trabajadores { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
     .tabla-trabajadores th {
-      background: #002855; color: white; padding: 10px 12px; text-align: left;
+      background: #1e3a5f; color: white; padding: 10px 12px; text-align: left;
     }
     .tabla-trabajadores td { padding: 9px 12px; border-bottom: 1px solid #eee; }
     .tabla-trabajadores tr:hover td { background: #f9f9f9; }
-    .badge-activo { background: #d4edda; color: #155724; padding: 3px 8px; border-radius: 12px; font-size: 0.78rem; }
-    .badge-inactivo { background: #f8d7da; color: #721c24; padding: 3px 8px; border-radius: 12px; font-size: 0.78rem; }
+    .badge-activo { background: #e3f6e9; color: #157347; padding: 2px 9px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; }
+    .badge-inactivo { background: #fbe8ea; color: #b02a37; padding: 2px 9px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; }
 
     .btn-editar {
-      padding: 5px 12px; background: #002855; color: white;
+      padding: 5px 12px; background: #1e3a5f; color: white;
       border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem;
     }
     .btn-toggle-on  { padding: 5px 12px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
     .btn-toggle-off { padding: 5px 12px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
 
-    /* Galería de trabajadores / staff */
+    /* Galería de trabajadores / staff — filas compactas, máximo aprovechamiento vertical */
     .galeria-trabajadores, .galeria-staff {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      gap: 14px;
-    }
-    .trab-card {
-      background: #fbfbfc;
-      border: 1px solid #e5e8ec;
-      border-radius: 10px;
-      padding: 14px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 5px;
     }
-    .trab-card-top { display: flex; align-items: flex-start; gap: 10px; }
+    .trab-card {
+      background: #fff;
+      border: 1px solid #e9ecf1;
+      border-radius: 8px;
+      padding: 7px 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 16px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .trab-card:hover { background: #f6f8fb; border-color: #d7dee8; }
+    .trab-card-top { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; min-width: 220px; }
     .trab-avatar {
-      width: 38px; height: 38px; border-radius: 50%; background: #002855; color: white;
+      width: 32px; height: 32px; border-radius: 50%; background: #1e3a5f; color: white;
       display: flex; align-items: center; justify-content: center;
-      font-size: 0.85rem; font-weight: 700; flex-shrink: 0;
+      font-size: 0.74rem; font-weight: 700; flex-shrink: 0; letter-spacing: 0.02em;
     }
-    .trab-info { flex: 1; min-width: 0; }
-    .trab-nombre { font-weight: 600; font-size: 0.92rem; color: #222; }
-    .trab-meta { font-size: 0.78rem; color: #888; margin-top: 2px; }
-    .trab-email { font-size: 0.8rem; color: #555; word-break: break-all; }
-    .trab-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
-    .trab-actions button { flex: 1; min-width: 90px; white-space: nowrap; }
+    .trab-info { min-width: 0; }
+    .trab-nombre { font-weight: 600; font-size: 0.86rem; color: #1c2733; line-height: 1.25; }
+    .trab-meta { font-size: 0.72rem; color: #8a93a3; line-height: 1.25; margin-top: 1px; }
+    .trab-email {
+      flex: 1 1 200px; min-width: 0; font-size: 0.8rem; color: #4a5568;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .trab-actions { flex: 0 0 auto; display: flex; gap: 6px; margin-left: auto; }
+    .trab-actions button { white-space: nowrap; padding: 5px 11px; font-size: 0.76rem; }
 
     /* Reporte */
     .reporte-selects { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
@@ -301,7 +326,7 @@
 
     /* Registros */
     #tabla-registros { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
-    #tabla-registros th { background: #002855; color: white; padding: 10px 12px; text-align: left; }
+    #tabla-registros th { background: #1e3a5f; color: white; padding: 10px 12px; text-align: left; }
     #tabla-registros td { padding: 9px 12px; border-bottom: 1px solid #eee; }
 
     /* Modal */
@@ -314,12 +339,14 @@
       width: 90%; max-width: 480px; box-shadow: 0 8px 30px rgba(0,0,0,0.2);
       max-height: 88vh; overflow-y: auto;
     }
-    .modal-box h3 { color: #002855; margin-bottom: 18px; font-size: 1.05rem; }
-    .modal-box input, .modal-box select {
+    .modal-box h3 { color: #1e3a5f; margin-bottom: 18px; font-size: 1.05rem; }
+    .modal-box input, .modal-box select,
+    #panel-editar-curso input[id^="editar-curso"], #panel-editar-curso select[id^="editar-curso"] {
       width: 100%; padding: 10px 12px; border: 1px solid #ddd;
       border-radius: 7px; font-size: 0.9rem; margin-bottom: 10px;
     }
     .modal-actions { display: flex; gap: 10px; margin-top: 6px; }
+    .modal-actions .btn-primary, .modal-actions .btn-secondary { width: auto; flex: 0 0 auto; }
     .campo-label { display: block; font-size: 0.82rem; font-weight: 600; color: #333; margin-bottom: 4px; }
     .campo-ayuda { font-size: 0.76rem; color: #888; margin: 0 0 6px; }
 
@@ -328,10 +355,10 @@
       border-radius: 10px;
       padding: 16px;
       text-align: center;
-      border-top: 4px solid #002855;
+      border-top: 4px solid #1e3a5f;
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
     }
-    .stat-card .stat-num { font-size: 2rem; font-weight: 700; color: #002855; line-height: 1; }
+    .stat-card .stat-num { font-size: 2rem; font-weight: 700; color: #1e3a5f; line-height: 1; }
     .stat-card .stat-label { font-size: 0.78rem; color: #666; margin-top: 4px; }
     .stat-card.verde { border-top-color: #28a745; }
     .stat-card.verde .stat-num { color: #28a745; }
@@ -356,9 +383,34 @@
 
     .trabajador-item { padding: 7px 0; font-size: 0.83rem; border-bottom: 1px solid #f0f0f0; color: #333; }
 
+    /* Matriz Cursos obligatorios por cargo */
+    .tabla-matriz-wrap { overflow: auto; border: 1px solid #e9ecf1; border-radius: 10px; max-height: 65vh; }
+    .tabla-matriz { border-collapse: collapse; width: auto; table-layout: fixed; font-size: 0.8rem; }
+    .tabla-matriz thead th {
+      background: #1e3a5f; color: #fff; padding: 10px 8px; font-weight: 600;
+      font-size: 0.74rem; line-height: 1.3; text-align: center; width: 110px;
+      border-right: 1px solid rgba(255,255,255,0.12);
+      position: sticky; top: 0; z-index: 1;
+    }
+    .tabla-matriz thead th:first-child {
+      text-align: left; width: 190px; max-width: 220px; left: 0; z-index: 2;
+    }
+    .tabla-matriz tbody td {
+      padding: 7px 8px; text-align: center; border-bottom: 1px solid #eef0f4;
+    }
+    .tabla-matriz tbody td:first-child {
+      text-align: left; font-weight: 600; color: #1c2733; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+      position: sticky; left: 0; background: #fff; border-right: 1px solid #eef0f4;
+    }
+    .tabla-matriz tbody tr:nth-child(even) td { background: #fafbfd; }
+    .tabla-matriz tbody tr:nth-child(even) td:first-child { background: #f5f7fa; }
+    .tabla-matriz tbody tr:hover td { background: #eef2f8; }
+    .tabla-matriz input[type="checkbox"] { width: 16px; height: 16px; accent-color: #1e3a5f; cursor: pointer; }
+
     @media (max-width: 600px) {
       .form-grid { grid-template-columns: 1fr; }
-      .admin-content { padding: 16px; }
+      .admin-content { padding: 0; }
     }
   </style>
 </head>
@@ -372,29 +424,29 @@
     <div class="sidebar-brand">CV GLOBAL S.A.C.</div>
     <nav class="sidebar-nav">
       <button class="nav-item activo" id="seccion-btn-trabajadores" onclick="mostrarSeccion('trabajadores', this)">
-        <span class="nav-icon">👥</span> Trabajadores
+        <span>Trabajadores</span><span class="nav-icon">👥</span>
       </button>
       <button class="nav-item" id="seccion-btn-cursos" onclick="mostrarSeccion('cursos', this)">
-        <span class="nav-icon">📚</span> Cursos
+        <span>Cursos</span><span class="nav-icon">📚</span>
       </button>
       <button class="nav-item" id="seccion-btn-certificados" onclick="mostrarSeccion('certificados', this)">
-        <span class="nav-icon">🎓</span> Certificados
+        <span>Certificados</span><span class="nav-icon">🎓</span>
       </button>
       <button class="nav-item" id="seccion-btn-reporte" onclick="mostrarSeccion('reporte', this)">
-        <span class="nav-icon">📊</span> Registro de Notas
+        <span>Registro de Notas</span><span class="nav-icon">📊</span>
       </button>
       <button class="nav-item" id="seccion-btn-programa-sst" onclick="mostrarSeccion('programa-sst', this)">
-        <span class="nav-icon">🦺</span> Programa SST
+        <span>Programa SST</span><span class="nav-icon">🦺</span>
       </button>
       <button class="nav-item" id="seccion-btn-staff" onclick="mostrarSeccion('staff', this)">
-        <span class="nav-icon">🛡️</span> Administradores
+        <span>Administradores</span><span class="nav-icon">🛡️</span>
       </button>
     </nav>
 
     <div class="sidebar-bottom">
       <div id="info-empresa-header"></div>
       <button class="nav-item" onclick="window.location.href='index.html#cursos'">
-        <span class="nav-icon">←</span> Volver a cursos
+        <span>Volver a cursos</span><span class="nav-icon">←</span>
       </button>
     </div>
   </aside>
@@ -412,7 +464,7 @@
   <!-- ═══ TAB: TRABAJADORES ═══ -->
   <div id="tab-trabajadores" class="tab-panel activo">
     <div class="panel-card">
-      <h2>➕ Crear cuenta de usuario</h2>
+      <h2>➕ Añadir trabajador</h2>
       <div id="info-empresa"></div>
       <div class="form-grid">
         <select id="nuevo-doc-tipo">
@@ -433,16 +485,13 @@
           <div class="field-hint">Si no tiene correo se generará uno automático con su DNI</div>
         </div>
         <input type="text" id="nuevo-telefono" placeholder="Teléfono (opcional)" />
-        <select id="nuevo-cargo">
-          <option value="">-- Selecciona cargo --</option>
-        </select>
         <input type="date" id="nuevo-fecha-ingreso" />
       </div>
       <div id="nuevo-sedes-wrap" style="margin-top:12px;">
-        <label style="font-size:0.85rem; color:#555; display:block; margin-bottom:6px;">Sede(s):</label>
-        <div id="nuevo-sedes-checks"></div>
+        <label style="font-size:0.85rem; color:#555; display:block; margin-bottom:6px;">Selecciona la(s) sede(s) * — y el cargo que tendrá en cada una:</label>
+        <div id="nuevo-sedes-checks" oninput="actualizarEstadoBotonNuevoTrabajador()" onchange="actualizarEstadoBotonNuevoTrabajador()"></div>
       </div>
-      <button onclick="crearUsuario()" class="btn-primary" style="margin-top:16px;">Crear usuario</button>
+      <button id="btn-crear-usuario" onclick="crearUsuario()" class="btn-primary" style="margin-top:16px; display:none;">Añadir trabajador</button>
     </div>
 
   </div>
@@ -451,7 +500,7 @@
   <div id="tab-crear-gestor" class="tab-panel">
     <!-- Panel solo visible para admins/superadmins, oculto para gestores -->
     <div class="panel-card" id="panel-crear-gestor">
-      <h2>🔑 Crear Gestor de Personal</h2>
+      <h2>🔑 Añadir gestor</h2>
       <p style="color:#555; margin-bottom:14px; font-size:0.9rem;">
         El gestor solo puede cargar y actualizar trabajadores. No tiene acceso a reportes, cursos ni otras secciones.
       </p>
@@ -469,37 +518,36 @@
         <input type="text" id="gestor-nombres"   placeholder="Nombres *"   disabled />
         <input type="text" id="gestor-apellidos" placeholder="Apellidos *" disabled />
         <div class="field-wrap">
-          <input type="email" id="gestor-email" placeholder="Correo electrónico (opcional)" />
-          <div class="field-hint">Si no tiene correo se generará uno automático con su DNI</div>
+          <input type="email" id="gestor-email" placeholder="Correo electrónico *" />
+          <div class="field-hint">Obligatorio: con este correo va a ingresar y a recuperar su contraseña.</div>
         </div>
       </div>
-      <button onclick="crearGestor()" class="btn-primary" style="margin-top:16px;">Crear Gestor</button>
+      <button id="btn-crear-gestor" onclick="crearGestor()" class="btn-primary" style="margin-top:16px; display:none;">Añadir gestor</button>
     </div>
   </div>
 
   <!-- ═══ TAB: GALERÍA DE TRABAJADORES ═══ -->
   <div id="tab-galeria-trabajadores" class="tab-panel">
     <div class="panel-card">
-      <h2>👥 Trabajadores</h2>
-      <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+      <div class="filtro-bar">
         <input type="text" id="buscar-apellido" placeholder="Buscar por apellido o DNI..."
                style="flex:1; min-width:200px; padding:9px 12px; border:1px solid #dde3ec; border-radius:7px; font-size:0.9rem;"
-               onkeydown="if(event.key==='Enter') cargarTrabajadores(0)" />
+               oninput="buscarTrabajadoresDebounced()" />
         <select id="filtro-estado-trab" onchange="cargarTrabajadores(0)"
                 style="padding:9px 12px; border:1px solid #dde3ec; border-radius:7px; font-size:0.9rem;">
           <option value="">Todos los estados</option>
           <option value="activo">Solo activos</option>
           <option value="inactivo">Solo inactivos</option>
         </select>
-        <button onclick="cargarTrabajadores(0)" class="btn-primary" style="white-space:nowrap;">🔍 Buscar</button>
         <button onclick="document.getElementById('buscar-apellido').value=''; document.getElementById('filtro-estado-trab').value=''; cargarTrabajadores(0);"
                 style="padding:9px 14px; border:1px solid #dde3ec; border-radius:7px; background:white; cursor:pointer; font-size:0.88rem;">✕ Limpiar</button>
       </div>
       <div id="galeria-trabajadores" class="galeria-trabajadores"></div>
     </div>
 
-    <div id="form-editar-trab" style="display:none; margin-top:16px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; padding:16px;">
-      <h3 style="font-size:1rem; font-weight:600; color:#002855; margin-bottom:12px;">Editando trabajador</h3>
+    <div class="modal-overlay" id="modal-editar-trab">
+     <div class="modal-box" style="max-width:600px;">
+      <h3 style="font-size:1rem; font-weight:600; color:#1e3a5f; margin-bottom:12px;">Editando trabajador</h3>
       <input type="hidden" id="edit-trab-id" />
       <div class="form-grid">
         <div>
@@ -539,37 +587,40 @@
         <label style="font-size:0.8rem;color:#555;display:block;margin-bottom:6px;">Sede(s):</label>
         <div id="edit-trab-sedes-checks"></div>
       </div>
-      <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; align-items:center;">
+      <div class="modal-actions" style="flex-wrap:wrap;">
         <button onclick="guardarActualizacionIndividual()" class="btn-primary" id="btn-guardar-edicion">💾 Guardar cambios</button>
-        <button onclick="document.getElementById('form-editar-trab').style.display='none'"
-                style="padding:9px 18px;background:#f5f5f5;border:1px solid #ccc;border-radius:7px;cursor:pointer;font-size:0.88rem;">Cancelar</button>
-        <button onclick="resetearContrasena(document.getElementById('edit-trab-email').value.trim())"
-                style="padding:9px 18px;background:#e65100;color:white;border:none;border-radius:7px;cursor:pointer;font-size:0.85rem;white-space:nowrap;">
-          🔑 Enviar reset por correo
-        </button>
+        <button onclick="cerrarModalEditarTrab()" class="btn-secondary">Cancelar</button>
         <span id="estado-edicion-trab" style="font-size:0.88rem;"></span>
       </div>
       <p style="color:#888; font-size:0.78rem; margin-top:6px;">
         El trabajador entra con su DNI como contraseña inicial. Usa "Nueva contraseña" arriba para fijarla manualmente,
-        o "Enviar reset por correo" para que la cambie él mismo (requiere que tenga un email registrado).
+        o el botón "🔑 DNI" de la lista para resetearla a su documento en un clic.
       </p>
+     </div>
     </div>
   </div>
 
   <!-- ═══ TAB: IMPORTAR ═══ -->
   <div id="tab-importar" class="tab-panel">
     <div class="panel-card">
-      <h2>📥 Importar trabajadores desde Excel</h2>
-      <div class="info-box">
-        Columnas requeridas en orden:
-        <strong>DNI · Apellidos · Nombres · Email · Cargo · Teléfono · Fecha Ingreso</strong><br>
-        El sistema detecta automáticamente trabajadores nuevos y cambios de cargo. El email es opcional pero recomendado para recuperación de contraseña.
+      <h2>📥 Actualizar cargos desde Excel</h2>
+      <div class="info-box" style="margin-bottom:14px;">
+        Esta herramienta es solo para <strong>trabajadores que ya existen</strong> en el sistema — sirve para cambiarles el cargo
+        en bloque (por ejemplo, tras una reasignación de puestos). No crea trabajadores nuevos: para eso usa "Añadir trabajador"
+        uno por uno (ahí sí eliges sede y cargo por sede).
       </div>
-      <a href="#" class="plantilla-link" onclick="descargarPlantilla(event)">📄 Descargar plantilla</a>
+      <ol style="font-size:0.88rem; color:#333; line-height:1.9; margin:0 0 14px 20px; padding:0;">
+        <li><strong>Descarga la plantilla</strong> con el botón de abajo — ya trae las columnas en el orden correcto.</li>
+        <li><strong>Llena el Excel</strong> con un trabajador por fila, respetando esas columnas: DNI · Apellidos · Nombres · Email · Cargo · Teléfono · Fecha Ingreso. El DNI debe ser de alguien que ya está en el sistema, y el Cargo debe escribirse exactamente igual a como está registrado.</li>
+        <li><strong>Sube ese mismo archivo</strong> con "Seleccionar archivo" y presiona "Vista previa".</li>
+        <li><strong>Revisa la vista previa</strong> — te muestra a quién le cambia el cargo, a quién no le cambia nada, y avisa si algún cargo no coincide con ninguno registrado o si el DNI no existe en el sistema.</li>
+        <li><strong>Aplica los cambios de cargo</strong> con el botón que aparece debajo de la vista previa. Las filas de "nuevo" o "cargo inválido" solo se pueden descargar para revisarlas — no se crean automáticamente.</li>
+      </ol>
+      <a href="#" class="plantilla-link" onclick="descargarPlantilla(event)">📄 1. Descargar plantilla</a>
       <div class="file-input-wrap">
         <input type="file" id="archivo-excel" accept=".xlsx,.xls" />
       </div>
-      <button onclick="previsualizarExcel()" class="btn-primary" id="btn-vista-previa">Vista previa</button>
+      <button onclick="previsualizarExcel()" class="btn-primary" id="btn-vista-previa">3. Ver vista previa</button>
 
       <div id="preview-excel" style="display:none; margin-top:16px;">
         <p id="preview-resumen" style="font-weight:600; margin-bottom:12px; color:#333; font-size:0.95rem; line-height:2;"></p>
@@ -589,58 +640,11 @@
     </div>
   </div>
 
-  <!-- ═══ TAB: ACTUALIZAR ═══ -->
-  <div id="tab-actualizar" class="tab-panel">
 
-    <div class="panel-card">
-      <h2>🔑 Mantenimiento de contraseñas</h2>
-      <div style="background:#fff8e1; border:1px solid #ffe082; border-radius:8px; padding:10px 14px; font-size:0.88rem; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <span>¿Trabajadores con DNI que empieza en 0 no pueden ingresar?</span>
-        <button onclick="corregirPasswordsDNI()" style="padding:7px 14px; background:#e65100; color:white; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem; white-space:nowrap;">
-          Corregir contraseñas con cero inicial
-        </button>
-      </div>
-      <p style="color:#888; font-size:0.78rem; margin-top:8px;">
-        Para editar, resetear contraseña o activar/desactivar a un trabajador puntual, usa la galería en Trabajadores.
-      </p>
-    </div>
-
-    <div class="panel-card">
-      <h2>🔄 Actualización masiva desde Excel</h2>
-      <div class="info-box">
-        Usa el <strong>DNI</strong> para identificar al trabajador. Columnas:
-        <strong>DNI · Apellidos · Nombres · Email · Teléfono · Cargo · Fecha Ingreso</strong><br>
-        Solo se actualizan los campos que tengan valor — los vacíos no se modifican.<br>
-        Al actualizar el email también se actualiza el acceso de ingreso a la plataforma.
-      </div>
-      <a href="#" class="plantilla-link" onclick="descargarPlantillaActualizacion(event)">📄 Descargar plantilla</a>
-      <div class="file-input-wrap">
-        <input type="file" id="archivo-actualizacion" accept=".xlsx,.xls" />
-      </div>
-      <button onclick="previsualizarActualizacion()" class="btn-primary">Vista previa</button>
-
-      <div id="preview-actualizacion" style="display:none; margin-top:16px;">
-        <p id="preview-resumen-act" style="font-weight:600; margin-bottom:10px; color:#333;"></p>
-        <div class="preview-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>DNI</th><th>Apellidos</th><th>Nombres</th><th>Email</th><th>Teléfono</th><th>Cargo</th><th>Fecha Ingreso</th><th>Estado</th>
-              </tr>
-            </thead>
-            <tbody id="tbody-actualizacion"></tbody>
-          </table>
-        </div>
-        <button onclick="ejecutarActualizacion()" class="btn-primary" style="margin-top:14px;">✅ Confirmar actualización</button>
-      </div>
-      <div id="progreso-actualizacion" class="progreso"></div>
-    </div>
-  </div>
-
-  <!-- ═══ TAB: CURSOS ═══ -->
+  <!-- ═══ TAB: CURSOS (subir) ═══ -->
   <div id="tab-cursos" class="tab-panel">
     <div class="panel-card">
-      <h2>📚 Subir nuevo curso</h2>
+      <h2>📚 Subir curso</h2>
       <div class="form-grid">
         <input type="text"   id="titulo-curso"    placeholder="Nombre del curso *" />
         <input type="text"   id="codigo-prefijo"  placeholder="Prefijo del código (ej: IPERC, TEA) *"
@@ -650,50 +654,162 @@
       </div>
       <button onclick="subirCurso()" class="btn-primary" style="margin-top:16px;">Subir curso</button>
       <p style="color:#888; font-size:0.82rem; margin-top:10px;">
-        Después de crear el curso, ábrelo con "✏️ Editar curso" en la lista de abajo para subir el material (PDF) y los videos.
+        Después de crear el curso, ábrelo con "✏️ Editar" en la pestaña "Editar cursos" para subir el material (PDF) y los videos.
       </p>
     </div>
+  </div>
 
+  <!-- ═══ TAB: CURSOS (editar/lista) ═══ -->
+  <div id="tab-cursos-lista" class="tab-panel">
     <div class="panel-card">
-      <h2>📋 Cursos existentes</h2>
-      <button onclick="cargarListaCursos()" class="btn-primary" style="margin-bottom:16px;">🔄 Cargar lista</button>
-      <div id="lista-toggle-cursos"></div>
-    </div>
-
-    <div class="panel-card">
-      <h2>📝 Examen y Evaluación de la eficacia por curso</h2>
-      <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
-        Selecciona un curso para gestionar sus preguntas de examen y evaluación de la eficacia.
+      <p style="color:#555; font-size:0.85rem; margin-bottom:14px;">
+        Selecciona un curso para cambiar título, duración, material (PDF) o videos.
       </p>
-      <div style="display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap;">
-        <select id="select-curso-form"
+      <div class="filtro-bar">
+        <select id="select-curso-editar" onchange="abrirEdicionCurso(this.value)"
                 style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; flex:1; min-width:220px;">
           <option value="">-- Selecciona un curso --</option>
         </select>
-        <button onclick="cargarFormulariosCurso()" class="btn-primary">Ver formularios</button>
+      </div>
+
+      <div id="panel-editar-curso" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid #eee;">
+        <input type="hidden" id="editar-curso-id" />
+
+        <label class="campo-label" for="editar-curso-titulo">Título del curso *</label>
+        <input type="text"   id="editar-curso-titulo"         placeholder="Ej. Trabajo en altura" />
+
+        <label class="campo-label" for="editar-curso-codigo-prefijo">Prefijo de código *</label>
+        <p class="campo-ayuda">Siglas cortas que identifican al curso (ej. "TRAB"). Se usa para generar el código automático.</p>
+        <input type="text"   id="editar-curso-codigo-prefijo" placeholder="Ej. TRAB" />
+
+        <label class="campo-label" for="editar-curso-codigo">Código completo del curso</label>
+        <p class="campo-ayuda">Formato PREFIJO-AÑO-CORRELATIVO. Se genera solo al crear el curso; normalmente no hace falta tocarlo.</p>
+        <input type="text"   id="editar-curso-codigo"         placeholder="Ej. TRAB-2026-0001" />
+
+        <label class="campo-label" for="editar-curso-duracion">Duración *</label>
+        <p class="campo-ayuda">Duración del curso en horas.</p>
+        <input type="number" id="editar-curso-duracion"       placeholder="Ej. 2" />
+
+        <label class="campo-label" for="editar-curso-vigencia">Vigencia del certificado</label>
+        <p class="campo-ayuda">Meses que dura vigente el certificado antes de que el trabajador deba retomar el curso.</p>
+        <input type="number" id="editar-curso-vigencia"       placeholder="Ej. 12" />
+
+        <label class="campo-label" for="editar-curso-url-material">Material del curso (PDF)</label>
+        <p class="campo-ayuda">Enlace público al PDF que verá el trabajador. Súbelo con el botón de abajo o pega la URL manualmente.</p>
+        <input type="text"   id="editar-curso-url-material"   placeholder="https://.../materiales/archivo.pdf" />
+        <div style="display:flex;gap:6px;align-items:center;margin:-8px 0 12px;">
+          <input type="file" id="editar-curso-pdf-file" accept="application/pdf" style="flex:1;font-size:0.82rem;" />
+          <button onclick="subirPdfCurso()" class="btn-secondary" style="white-space:nowrap;">📤 Subir PDF</button>
+        </div>
+
+        <div class="modal-actions">
+          <button onclick="guardarEdicionCurso()" class="btn-primary">Guardar cambios</button>
+          <button onclick="cerrarPanelEditarCurso()" class="btn-secondary">Cancelar</button>
+        </div>
+
+        <hr style="margin:16px 0;border:none;border-top:1px solid #eee;" />
+        <p style="font-weight:600;margin:0 0 4px;color:#1e3a5f;">🎬 Videos del curso</p>
+        <p class="campo-ayuda" style="margin-top:0;">Videos que el trabajador debe ver, en orden. Sube el video a YouTube (puede ser "oculto") y pega aquí el link que te da el botón "Compartir" — cualquier formato funciona.</p>
+        <div id="lista-videos-curso" style="margin-bottom:10px;"></div>
+        <div class="filtro-bar" style="margin-bottom:0;">
+          <input type="text" id="nuevo-video-url" placeholder="https://youtu.be/ID" />
+          <button onclick="agregarVideoCurso()" class="btn-primary" style="white-space:nowrap;">+ Agregar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: CURSOS (examen y evaluación) ═══ -->
+  <div id="tab-cursos-examen" class="tab-panel">
+    <div class="panel-card">
+      <h2>📝 Examen y evaluación</h2>
+      <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
+        Selecciona un curso para gestionar sus preguntas de examen y evaluación de la eficacia.
+      </p>
+      <div class="filtro-bar" style="margin-bottom:16px;">
+        <select id="select-curso-form" onchange="cargarFormulariosCurso()"
+                style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; flex:1; min-width:220px;">
+          <option value="">-- Selecciona un curso --</option>
+        </select>
       </div>
       <div id="contenedor-formularios"></div>
     </div>
+  </div>
 
+  <!-- Modal: nueva pregunta de examen/eficacia (pregunta + opciones a la vez) -->
+  <div class="modal-overlay" id="modal-nueva-pregunta">
+    <div class="modal-box" style="max-width:520px;">
+      <h3>➕ Nueva pregunta</h3>
+      <input type="hidden" id="mnp-formulario-id" />
+      <input type="hidden" id="mnp-tipo" />
+
+      <label class="campo-label" for="mnp-texto">Texto de la pregunta *</label>
+      <input type="text" id="mnp-texto" placeholder="Ej. ¿Cuál es el EPP obligatorio para trabajos en altura?" />
+
+      <label class="campo-label" for="mnp-puntaje">Puntaje</label>
+      <input type="number" id="mnp-puntaje" value="1" min="1" style="max-width:110px;" />
+
+      <label class="campo-label" style="margin-top:10px;">Opciones de respuesta</label>
+      <p class="campo-ayuda">Completa al menos 2 y marca cuál es la correcta. Deja vacías las que no uses.</p>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <input type="radio" name="mnp-correcta-radio" id="mnp-correcta-1" style="flex:0 0 auto; width:auto;" />
+        <input type="text" id="mnp-op-1" placeholder="Opción 1" style="flex:1; margin-bottom:0;" />
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <input type="radio" name="mnp-correcta-radio" id="mnp-correcta-2" style="flex:0 0 auto; width:auto;" />
+        <input type="text" id="mnp-op-2" placeholder="Opción 2" style="flex:1; margin-bottom:0;" />
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <input type="radio" name="mnp-correcta-radio" id="mnp-correcta-3" style="flex:0 0 auto; width:auto;" />
+        <input type="text" id="mnp-op-3" placeholder="Opción 3" style="flex:1; margin-bottom:0;" />
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <input type="radio" name="mnp-correcta-radio" id="mnp-correcta-4" style="flex:0 0 auto; width:auto;" />
+        <input type="text" id="mnp-op-4" placeholder="Opción 4" style="flex:1; margin-bottom:0;" />
+      </div>
+
+      <div class="modal-actions">
+        <button onclick="guardarNuevaPreguntaCompleta()" class="btn-primary">Guardar pregunta</button>
+        <button onclick="cerrarModalNuevaPregunta()" class="btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: nueva pregunta de encuesta de satisfacción (Likert, sin opciones que elegir) -->
+  <div class="modal-overlay" id="modal-nueva-pregunta-encuesta">
+    <div class="modal-box" style="max-width:460px;">
+      <h3>➕ Nueva pregunta de encuesta</h3>
+      <input type="hidden" id="mpe-formulario-id" />
+      <label class="campo-label" for="mpe-texto">Texto de la pregunta *</label>
+      <input type="text" id="mpe-texto" placeholder="Ej. ¿El contenido fue claro y relevante?" />
+      <p class="campo-ayuda">Se le generan automáticamente las 5 opciones Likert (Muy en desacuerdo → Muy de acuerdo).</p>
+      <div class="modal-actions">
+        <button onclick="guardarPreguntaEncuesta()" class="btn-primary">Guardar pregunta</button>
+        <button onclick="cerrarModalPreguntaEncuesta()" class="btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: CURSOS (encuesta) ═══ -->
+  <div id="tab-cursos-encuesta" class="tab-panel">
     <div class="panel-card">
-      <h2>📋 Encuesta de satisfacción (global)</h2>
+      <h2>📋 Encuesta de satisfacción</h2>
       <p style="color:#555; font-size:0.88rem; margin-bottom:12px;">
-        La encuesta aplica a todos los cursos. Cada pregunta genera automáticamente las 5 opciones Likert.
+        La encuesta aplica a todos los cursos (global). Cada pregunta genera automáticamente las 5 opciones Likert.
       </p>
-      <button onclick="cargarEncuestaGlobal()" class="btn-primary" style="margin-bottom:16px;">Cargar encuesta</button>
-      <div id="contenedor-encuesta-global"></div>
+      <div id="contenedor-encuesta-global"><p style="color:#888;">Cargando...</p></div>
     </div>
   </div>
 
   <!-- ═══ TAB: CURSOS OBLIGATORIOS POR CARGO ═══ -->
   <div id="tab-cursos-obligatorios" class="tab-panel">
     <div class="panel-card">
-      <h2>✅ Cursos obligatorios por cargo</h2>
-      <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
-        Marca qué cursos debe tener cada cargo. Los trabajadores solo verán los cursos que les correspondan según su cargo
-        (sede actual: <strong id="obl-sede-actual"></strong>). Si un cargo no tiene ningún curso marcado, sus trabajadores
-        siguen viendo todos los cursos por ahora (para no dejarlos sin nada mientras terminas de configurar).
-      </p>
+      <h2 style="display:flex; align-items:center; gap:8px;">
+        ✅ Cursos obligatorios por cargo
+        <span title="Marca qué cursos debe tener cada cargo. Los trabajadores solo verán los cursos que les correspondan según su cargo. Si un cargo no tiene ningún curso marcado, sus trabajadores siguen viendo todos los cursos por ahora (para no dejarlos sin nada mientras terminas de configurar)."
+              style="cursor:help; font-size:0.8rem; color:#8a93a3; border:1px solid #c9ced6; border-radius:50%; width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; font-weight:600; font-style:normal;">i</span>
+      </h2>
+      <p style="color:#888; font-size:0.78rem; margin-bottom:10px;">Sede actual: <strong id="obl-sede-actual"></strong></p>
       <div id="matriz-obligatorios"><p style="color:#888;">Cargando...</p></div>
     </div>
 
@@ -702,11 +818,9 @@
       <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
         Para el caso puntual de una persona que necesita un curso extra que no le corresponde por su cargo.
       </p>
-      <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+      <div class="filtro-bar">
         <input type="text" id="buscar-excepcion-input" placeholder="Buscar por DNI o apellido..."
-               style="flex:1; min-width:200px; padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"
-               onkeydown="if(event.key==='Enter') buscarTrabajadorExcepcion()" />
-        <button onclick="buscarTrabajadorExcepcion()" class="btn-primary">🔍 Buscar</button>
+               oninput="buscarExcepcionDebounced()" />
       </div>
       <div id="resultado-excepcion"></div>
       <div id="panel-excepciones" style="display:none; margin-top:14px; background:#f8f9fa; border:1px solid #ddd; border-radius:8px; padding:16px;"></div>
@@ -731,7 +845,7 @@
           <label style="display:block; font-size:0.82rem; color:#555; margin-bottom:5px;">Mes / Año (opcional)</label>
           <input type="month" id="cert-bulk-mes" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;" />
         </div>
-        <button onclick="descargarCertificadosMasivo()" class="btn-primary" style="height:38px;">
+        <button onclick="descargarCertificadosMasivo()" class="btn-primary" style="height:38px; width:auto; flex:0 0 auto;">
           📦 Generar ZIP
         </button>
       </div>
@@ -845,7 +959,7 @@
     </div>
   </div>
 
-  <!-- ═══ TAB: PROGRAMA SST ═══ -->
+  <!-- ═══ TAB: PROGRAMA SST (subir) ═══ -->
   <div id="tab-programa-sst" class="tab-panel">
     <div class="panel-card">
       <h2>🦺 Subir Programa Anual SST</h2>
@@ -854,9 +968,9 @@
       </p>
 
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
-        <select id="sst-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
+        <select id="sst-anio" style="padding:9px 30px 9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; width:auto; min-width:100px; flex:0 0 auto;"></select>
         <label style="font-size:0.88rem; color:#555;">Año del programa</label>
-        <a href="#" onclick="descargarPlantillaSST(event)" class="btn-primary" style="text-decoration:none;">⬇️ Descargar plantilla</a>
+        <a href="#" onclick="descargarPlantillaSST(event)" class="btn-primary" style="text-decoration:none; width:auto; flex:0 0 auto;">⬇️ Descargar plantilla</a>
       </div>
 
       <div style="margin-bottom:12px;">
@@ -870,7 +984,7 @@
         <div style="overflow-x:auto; margin-bottom:12px;">
           <table style="border-collapse:collapse; width:100%; font-size:0.8rem; min-width:900px;">
             <thead>
-              <tr style="background:#002855; color:white;">
+              <tr style="background:#1e3a5f; color:white;">
                 <th style="padding:8px 10px; text-align:left;">Requisito</th>
                 <th style="padding:8px 10px; text-align:left;">N°</th>
                 <th style="padding:8px 10px; text-align:left;">Curso</th>
@@ -892,38 +1006,41 @@
         <span id="progreso-sst" style="margin-left:12px; font-size:0.88rem; color:#555;"></span>
       </div>
     </div>
+  </div>
 
+  <!-- ═══ TAB: PROGRAMA SST (ver guardado) ═══ -->
+  <div id="tab-programa-sst-ver" class="tab-panel">
     <div class="panel-card">
       <h2>📋 Ver programa guardado</h2>
-      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
-        <select id="ver-sst-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
-        <select id="ver-sst-tipo" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+      <div class="filtro-bar">
+        <select id="ver-sst-anio" onchange="verProgramaSST()" style="padding:9px 30px 9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; min-width:100px;"></select>
+        <select id="ver-sst-tipo" onchange="verProgramaSST()" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
           <option value="">-- Todos los tipos --</option>
           <option value="Seguridad">Seguridad</option>
           <option value="Salud">Salud</option>
           <option value="Medio ambiente">Medio ambiente</option>
         </select>
-        <button onclick="verProgramaSST()" class="btn-primary">Ver programa</button>
         <button onclick="eliminarProgramaSST()" class="btn-secondary" style="background:#dc3545; color:white; border:none;">🗑️ Eliminar año</button>
       </div>
       <div id="lista-programa-sst"></div>
     </div>
+  </div>
 
-    <!-- Seguimiento mensual -->
+  <!-- ═══ TAB: PROGRAMA SST (seguimiento) ═══ -->
+  <div id="tab-programa-sst-seguimiento" class="tab-panel">
     <div class="panel-card">
       <h2>✏️ Seguimiento mensual</h2>
       <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
         Registra el estado de ejecución de cada curso programado para el mes.
       </p>
-      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
-        <select id="seg-anio" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;"></select>
-        <select id="seg-mes" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
+      <div class="filtro-bar">
+        <select id="seg-anio" onchange="cargarSeguimientoMes()" style="padding:9px 30px 9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem; min-width:100px;"></select>
+        <select id="seg-mes" onchange="cargarSeguimientoMes()" style="padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:0.9rem;">
           <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
           <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
           <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
           <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
         </select>
-        <button onclick="cargarSeguimientoMes()" class="btn-primary">Cargar cursos del mes</button>
       </div>
       <div id="tabla-seguimiento"></div>
       <div id="btn-guardar-seguimiento" style="display:none; margin-top:14px;">
@@ -937,76 +1054,25 @@
   <!-- ═══ TAB: ADMINISTRADORES / GESTORES ═══ -->
   <div id="tab-staff" class="tab-panel">
     <div class="panel-card">
-      <h2>🛡️ Administradores y Gestores</h2>
-      <p style="color:#555; font-size:0.88rem; margin-bottom:14px;">
+      <p style="color:#555; font-size:0.82rem; margin-bottom:12px;">
         Cuentas con acceso al panel de tu empresa. Todas ingresan con su <strong>DNI</strong> (igual que un trabajador) —
         el correo es solo un dato de contacto, no la contraseña.
       </p>
-      <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+      <div class="filtro-bar">
         <input type="text" id="buscar-staff" placeholder="Buscar por nombre o DNI..."
                style="flex:1; min-width:200px; padding:9px 12px; border:1px solid #dde3ec; border-radius:7px; font-size:0.9rem;"
-               onkeydown="if(event.key==='Enter') cargarStaff()" />
+               oninput="buscarStaffDebounced()" />
         <select id="filtro-rol-staff" onchange="cargarStaff()"
                 style="padding:9px 12px; border:1px solid #dde3ec; border-radius:7px; font-size:0.9rem;">
           <option value="">Todos los roles</option>
           <option value="admin">Solo administradores</option>
           <option value="gestor">Solo gestores</option>
         </select>
-        <button onclick="cargarStaff()" class="btn-primary" style="white-space:nowrap;">🔍 Buscar</button>
       </div>
       <div id="galeria-staff" class="galeria-staff"></div>
     </div>
   </div>
 
-    </div>
-  </div>
-</div>
-
-<!-- Modal editar curso -->
-<div id="modal-editar-curso" class="modal-overlay">
-  <div class="modal-box">
-    <h3>✏️ Editar curso</h3>
-    <input type="hidden" id="editar-curso-id" />
-
-    <label class="campo-label" for="editar-curso-titulo">Título del curso *</label>
-    <input type="text"   id="editar-curso-titulo"         placeholder="Ej. Trabajo en altura" />
-
-    <label class="campo-label" for="editar-curso-codigo-prefijo">Prefijo de código *</label>
-    <p class="campo-ayuda">Siglas cortas que identifican al curso (ej. "TRAB"). Se usa para generar el código automático.</p>
-    <input type="text"   id="editar-curso-codigo-prefijo" placeholder="Ej. TRAB" />
-
-    <label class="campo-label" for="editar-curso-codigo">Código completo del curso</label>
-    <p class="campo-ayuda">Formato PREFIJO-AÑO-CORRELATIVO. Se genera solo al crear el curso; normalmente no hace falta tocarlo.</p>
-    <input type="text"   id="editar-curso-codigo"         placeholder="Ej. TRAB-2026-0001" />
-
-    <label class="campo-label" for="editar-curso-duracion">Duración *</label>
-    <p class="campo-ayuda">Duración del curso en horas.</p>
-    <input type="number" id="editar-curso-duracion"       placeholder="Ej. 2" />
-
-    <label class="campo-label" for="editar-curso-vigencia">Vigencia del certificado</label>
-    <p class="campo-ayuda">Meses que dura vigente el certificado antes de que el trabajador deba retomar el curso.</p>
-    <input type="number" id="editar-curso-vigencia"       placeholder="Ej. 12" />
-
-    <label class="campo-label" for="editar-curso-url-material">Material del curso (PDF)</label>
-    <p class="campo-ayuda">Enlace público al PDF que verá el trabajador. Súbelo con el botón de abajo o pega la URL manualmente.</p>
-    <input type="text"   id="editar-curso-url-material"   placeholder="https://.../materiales/archivo.pdf" />
-    <div style="display:flex;gap:6px;align-items:center;margin:-8px 0 12px;">
-      <input type="file" id="editar-curso-pdf-file" accept="application/pdf" style="flex:1;font-size:0.82rem;" />
-      <button onclick="subirPdfCurso()" class="btn-secondary" style="white-space:nowrap;">📤 Subir PDF</button>
-    </div>
-
-    <div class="modal-actions">
-      <button onclick="guardarEdicionCurso()" class="btn-primary">Guardar cambios</button>
-      <button onclick="cerrarModalCurso()" class="btn-secondary">Cancelar</button>
-    </div>
-
-    <hr style="margin:16px 0;border:none;border-top:1px solid #eee;" />
-    <p style="font-weight:600;margin:0 0 4px;color:#002855;">🎬 Videos del curso</p>
-    <p class="campo-ayuda" style="margin-top:0;">Videos que el trabajador debe ver, en orden. Sube el video a YouTube (puede ser "oculto") y pega aquí el link que te da el botón "Compartir" — cualquier formato funciona.</p>
-    <div id="lista-videos-curso" style="margin-bottom:10px;"></div>
-    <div style="display:flex;gap:6px;">
-      <input type="text" id="nuevo-video-url" placeholder="https://youtu.be/ID" style="flex:1;" />
-      <button onclick="agregarVideoCurso()" class="btn-primary" style="white-space:nowrap;">+ Agregar</button>
     </div>
   </div>
 </div>
@@ -1021,19 +1087,25 @@
 <script>
   const SECCIONES = {
     'trabajadores': [
-      { tab: 'trabajadores',           label: 'Crear cuenta' },
-      { tab: 'crear-gestor',           label: 'Crear gestor' },
-      { tab: 'galeria-trabajadores',   label: 'Trabajadores' },
-      { tab: 'importar',               label: 'Importar Excel' },
-      { tab: 'actualizar',             label: 'Actualizar' },
+      { tab: 'trabajadores',           label: 'Añadir trabajador' },
+      { tab: 'crear-gestor',           label: 'Añadir gestor' },
+      { tab: 'galeria-trabajadores',   label: 'Lista de trabajadores' },
+      { tab: 'importar',               label: 'Actualizar cargos (Excel)' },
     ],
     'cursos': [
-      { tab: 'cursos',              label: 'Cursos' },
+      { tab: 'cursos',              label: 'Subir curso' },
+      { tab: 'cursos-lista',        label: 'Editar cursos' },
+      { tab: 'cursos-examen',       label: 'Examen y evaluación' },
+      { tab: 'cursos-encuesta',     label: 'Encuesta de satisfacción' },
       { tab: 'cursos-obligatorios', label: 'Obligatorios por cargo' },
     ],
     'certificados':   [{ tab: 'certificados',   label: 'Certificados' }],
     'reporte':        [{ tab: 'reporte',        label: 'Registro de Notas' }],
-    'programa-sst':   [{ tab: 'programa-sst',   label: 'Programa SST' }],
+    'programa-sst': [
+      { tab: 'programa-sst',              label: 'Subir programa' },
+      { tab: 'programa-sst-ver',          label: 'Ver programa guardado' },
+      { tab: 'programa-sst-seguimiento',  label: 'Seguimiento mensual' },
+    ],
     'staff':          [{ tab: 'staff',          label: 'Administradores' }],
   };
 
@@ -1072,24 +1144,34 @@
 
     const seccion = tabASeccion(tab);
     if (seccion) _ultimoTabPorSeccion[seccion] = tab;
+    sessionStorage.setItem('adminTabActual', tab);
 
+    // admin.js es un módulo (carga diferida) — al restaurar la última pantalla justo al abrir
+    // la página, puede que todavía no esté listo. Se protege con "?." y admin.js vuelve a
+    // llamar a mostrarTab() una vez que ya cargó todo (ver el final de admin.js).
     if (tab === 'galeria-trabajadores') {
-      cargarTrabajadores(0);
+      window.cargarTrabajadores?.(0);
     }
     if (tab === 'staff') {
-      cargarStaff();
+      window.cargarStaff?.();
     }
-    if (tab === 'cursos') {
-      initSelectCursoForm();
+    if (tab === 'cursos-lista') {
+      window.cargarListaCursos?.();
+    }
+    if (tab === 'cursos-examen') {
+      window.initSelectCursoForm?.();
+    }
+    if (tab === 'cursos-encuesta') {
+      window.cargarEncuestaGlobal?.();
     }
     if (tab === 'cursos-obligatorios') {
-      initCursosObligatorios();
+      window.initCursosObligatorios?.();
     }
-    if (tab === 'programa-sst') {
-      initSelectorAnioSST();
+    if (tab === 'programa-sst' || tab === 'programa-sst-ver' || tab === 'programa-sst-seguimiento') {
+      window.initSelectorAnioSST?.();
     }
     if (tab === 'reporte') {
-      initReporteNotas();
+      window.initReporteNotas?.();
     }
   }
 
@@ -1103,9 +1185,28 @@
     document.getElementById('sidebar-overlay').classList.remove('activo');
   }
 
-  // Estado inicial: sección Trabajadores con su barra de subtabs
-  mostrarSeccion('trabajadores', document.getElementById('seccion-btn-trabajadores'));
+  // Cerrar cualquier modal al hacer clic fuera de su contenido (en el fondo oscuro).
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) {
+      e.target.style.display = 'none';
+    }
+  });
+
+  // Estado inicial: si venimos de un cambio de sede (o refresh), volver a la misma pantalla en la que estaba.
+  (function iniciarEnUltimaPantalla() {
+    const tabGuardado = sessionStorage.getItem('adminTabActual');
+    const seccionGuardada = tabGuardado && tabASeccion(tabGuardado);
+    if (seccionGuardada) {
+      const btn = document.getElementById('seccion-btn-' + seccionGuardada);
+      if (btn) {
+        _ultimoTabPorSeccion[seccionGuardada] = tabGuardado;
+        mostrarSeccion(seccionGuardada, btn);
+        return;
+      }
+    }
+    mostrarSeccion('trabajadores', document.getElementById('seccion-btn-trabajadores'));
+  })();
 </script>
-<script type="module" src="admin.js?v=19"></script>
+<script type="module" src="admin.js?v=21"></script>
 </body>
 </html>

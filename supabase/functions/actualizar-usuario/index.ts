@@ -59,9 +59,25 @@ Deno.serve(async (req) => {
       if (profileError) throw new Error(profileError.message)
     }
 
-    // Actualizar en Auth: solo password (el email en Auth es siempre DNI@cvglobal.pe)
-    const authUpdates: Record<string, string> = {}
+    // Actualizar en Auth: password siempre; el email de Auth solo se sincroniza para
+    // admin/gestor/superadmin (ellos ingresan con correo real). Los trabajadores ingresan
+    // siempre con DNI@cvglobal.pe — nunca se les toca el email de Auth aunque cambien su
+    // "correo de contacto" en profiles.
+    const authUpdates: Record<string, string | boolean> = {}
     if (password) authUpdates.password = password
+
+    if (updates?.email) {
+      const { data: perfilObjetivo } = await supabaseAdmin
+        .from('profiles')
+        .select('rol')
+        .eq('id', usuario_id)
+        .single()
+
+      if (['admin', 'gestor', 'superadmin'].includes(perfilObjetivo?.rol)) {
+        authUpdates.email = updates.email
+        authUpdates.email_confirm = true
+      }
+    }
 
     if (Object.keys(authUpdates).length > 0) {
       const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(

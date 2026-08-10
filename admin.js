@@ -39,23 +39,54 @@ function initSelectBuscable(id) {
   new window.TomSelect(el, { allowEmptyOption: true, maxOptions: 300 });
 }
 
+let _debounceTrab = null;
+window.buscarTrabajadoresDebounced = function () {
+  clearTimeout(_debounceTrab);
+  _debounceTrab = setTimeout(() => cargarTrabajadores(0), 350);
+};
+
+let _debounceStaff = null;
+window.buscarStaffDebounced = function () {
+  clearTimeout(_debounceStaff);
+  _debounceStaff = setTimeout(() => cargarStaff(), 350);
+};
+
 let empresaAdminId = null;
 let empresaAdminNombre = null;
 let empresaAdminRuc = null;
 let sedeAdminActiva = null;
 let sedesAdminDisponibles = [];
 let currentUserId = null;
+let cargosGlobalesCache = [];
 
+// Fila por sede: checkbox + su propio selector de cargo (el puesto puede cambiar entre sedes).
+// Ninguna sede queda marcada por defecto — se elige explícitamente.
 function pintarCheckboxesSedes() {
   const cont = document.getElementById('nuevo-sedes-checks');
   if (!cont) return;
   const lista = sedesAdminDisponibles.length ? sedesAdminDisponibles : ['ANTAMINA'];
+  const opcionesCargo = cargosGlobalesCache.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
   cont.innerHTML = lista.map(s => `
-    <label style="margin-right:16px; font-size:0.9rem;">
-      <input type="checkbox" class="chk-nuevo-sede" value="${s}" ${s === sedeAdminActiva ? 'checked' : ''} />
-      ${s}
-    </label>`).join('');
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap;">
+      <label style="display:flex; align-items:center; gap:6px; font-size:0.88rem; min-width:120px;">
+        <input type="checkbox" class="chk-nuevo-sede" value="${s}" onchange="toggleCargoPorSede(this)" />
+        ${s}
+      </label>
+      <select class="sel-cargo-por-sede" data-sede="${s}" disabled
+              style="padding:7px 10px; border:1px solid #ddd; border-radius:6px; font-size:0.85rem; flex:1; min-width:180px; opacity:0.5;">
+        <option value="">-- Cargo en ${s} --</option>
+        ${opcionesCargo}
+      </select>
+    </div>`).join('');
 }
+
+window.toggleCargoPorSede = function (chk) {
+  const sel = chk.closest('div').querySelector('.sel-cargo-por-sede');
+  sel.disabled = !chk.checked;
+  sel.style.opacity = chk.checked ? '1' : '0.5';
+  if (!chk.checked) sel.value = '';
+  actualizarEstadoBotonNuevoTrabajador();
+};
 
 // ═══════════════════════════════
 // 🏢 Resolver sede activa del admin (una o varias)
@@ -93,15 +124,20 @@ async function resolverSedeAdmin(userId) {
     if (cont && !document.getElementById('selector-sede-admin')) {
       const sel = document.createElement('select');
       sel.id = 'selector-sede-admin';
+      sel.title = 'Clic para cambiar de sede';
       sel.style.display = 'block';
       sel.style.width = '100%';
       sel.style.marginTop = '6px';
-      sel.style.padding = '6px 8px';
+      sel.style.padding = '6px 26px 6px 8px';
       sel.style.borderRadius = '6px';
-      sel.style.border = '1px solid rgba(255,255,255,0.25)';
-      sel.style.background = 'rgba(255,255,255,0.08)';
-      sel.style.color = '#fff';
+      sel.style.border = '1px solid #dde3ec';
+      sel.style.background = "#f3f5f8 url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231e3a5f' d='M6 8L1 3h10z'/%3E%3C/svg%3E\") no-repeat right 8px center";
+      sel.style.appearance = 'none';
+      sel.style.webkitAppearance = 'none';
+      sel.style.cursor = 'pointer';
+      sel.style.color = '#1e3a5f';
       sel.style.fontSize = '0.76rem';
+      sel.style.fontWeight = '600';
       sedes.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.sede;
@@ -153,6 +189,12 @@ async function resolverSedeAdmin(userId) {
 
   await cargarDatosAdmin();
 
+  // Si al restaurar la última pantalla (justo al abrir la página) se necesitaba una función
+  // de este archivo antes de que terminara de cargar, se saltó — la disparamos de nuevo ahora
+  // que ya está todo listo.
+  const tabActivoAlCargar = document.querySelector('.tab-panel.activo')?.id.replace('tab-', '');
+  if (tabActivoAlCargar) window.mostrarTab?.(tabActivoAlCargar);
+
   // Gestor de Personal: solo ve la sección Trabajadores, sin "Crear gestor"
   if (perfil?.rol === "gestor") {
     document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn => {
@@ -175,6 +217,15 @@ async function cargarDatosAdmin() {
     .eq('id', user.id)
     .single();
 
+  // Cargar cargos primero — pintarCheckboxesSedes() (dentro de resolverSedeAdmin) los necesita
+  // para armar el selector de cargo por sede.
+  const { data: cargos } = await supabase
+    .from('cargos')
+    .select('*')
+    .eq('activo', true)
+    .order('nombre');
+  cargosGlobalesCache = cargos || [];
+
   if (perfil?.empresa_id) {
     empresaAdminId = perfil.empresa_id;
     empresaAdminNombre = perfil.empresas?.nombre;
@@ -183,7 +234,7 @@ async function cargarDatosAdmin() {
     document.getElementById('info-empresa-header').textContent = `🏢 ${empresaAdminNombre}`;
     await resolverSedeAdmin(user.id);
     document.getElementById('info-empresa').innerHTML = `
-      <div class="info-box" style="margin-bottom:16px;">
+      <div class="info-box info-box--linea" style="margin-bottom:14px;">
         🏢 <strong>${empresaAdminNombre}</strong> — RUC: ${empresaAdminRuc}
       </div>
     `;
@@ -196,21 +247,11 @@ async function cargarDatosAdmin() {
     `;
   }
 
-  // Cargar cargos
-  const { data: cargos } = await supabase
-    .from('cargos')
-    .select('*')
-    .eq('activo', true)
-    .order('nombre');
-
-  const selCargo = document.getElementById('nuevo-cargo');
-  selCargo.innerHTML = '<option value="">-- Selecciona cargo --</option>';
-  cargos?.forEach(c => {
-    selCargo.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
-  });
-
-  configurarRENIEC('nuevo-dni', 'nuevo-doc-tipo', 'nuevo-nombres', 'nuevo-apellidos');
-  configurarRENIEC('gestor-dni', 'gestor-doc-tipo', 'gestor-nombres', 'gestor-apellidos');
+  configurarRENIEC('nuevo-dni', 'nuevo-doc-tipo', 'nuevo-nombres', 'nuevo-apellidos', actualizarEstadoBotonNuevoTrabajador);
+  configurarRENIEC('gestor-dni', 'gestor-doc-tipo', 'gestor-nombres', 'gestor-apellidos', actualizarEstadoBotonNuevoGestor);
+  document.getElementById('gestor-email')?.addEventListener('input', actualizarEstadoBotonNuevoGestor);
+  actualizarEstadoBotonNuevoTrabajador();
+  actualizarEstadoBotonNuevoGestor();
 
   // Cargar cursos en los selects que los necesitan (bulk cert)
   const { data: cursosForSelect } = await supabase
@@ -225,15 +266,18 @@ async function cargarDatosAdmin() {
 }
 
 // 🪪 RENIEC autocomplete
-function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
+function configurarRENIEC(idDni, idTipo, idNombres, idApellidos, onUpdate) {
   const inputDni = document.getElementById(idDni);
   if (!inputDni) return;
+
+  const nombresEl = document.getElementById(idNombres);
+  const apellidosEl = document.getElementById(idApellidos);
+  nombresEl?.addEventListener('input', () => onUpdate?.());
+  apellidosEl?.addEventListener('input', () => onUpdate?.());
 
   // Desbloquear al cambiar a CE o Pasaporte
   document.getElementById(idTipo)?.addEventListener('change', () => {
     const tipo = document.getElementById(idTipo).value;
-    const nombresEl = document.getElementById(idNombres);
-    const apellidosEl = document.getElementById(idApellidos);
     const msgEl = document.getElementById(idDni + '-reniec-msg');
     if (tipo !== 'DNI') {
       nombresEl.disabled = false;
@@ -245,16 +289,16 @@ function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
       nombresEl.value = '';
       apellidosEl.value = '';
     }
+    onUpdate?.();
   });
 
   inputDni.addEventListener('input', async () => {
+    onUpdate?.();
     const dni = inputDni.value.trim();
     const tipo = document.getElementById(idTipo)?.value;
     if (tipo !== 'DNI' || dni.length !== 8) return;
 
     const msgEl = document.getElementById(idDni + '-reniec-msg');
-    const nombresEl = document.getElementById(idNombres);
-    const apellidosEl = document.getElementById(idApellidos);
 
     if (msgEl) msgEl.textContent = '🔍 Buscando...';
 
@@ -284,27 +328,55 @@ function configurarRENIEC(idDni, idTipo, idNombres, idApellidos) {
       apellidosEl.disabled = false;
       if (msgEl) msgEl.textContent = '⚠️ Error — ingresa manualmente.';
     }
+    onUpdate?.();
   });
 }
+
+// Muestra el botón de guardar solo cuando los campos obligatorios están completos —
+// evita que el usuario intente guardar un formulario a medio llenar.
+window.actualizarEstadoBotonNuevoTrabajador = function () {
+  const dni = document.getElementById('nuevo-dni')?.value.trim();
+  const nombres = document.getElementById('nuevo-nombres')?.value.trim();
+  const apellidos = document.getElementById('nuevo-apellidos')?.value.trim();
+  const sedesOk = Array.from(document.querySelectorAll('.chk-nuevo-sede:checked')).every(chk =>
+    chk.closest('div').querySelector('.sel-cargo-por-sede')?.value
+  );
+  const haySedes = document.querySelectorAll('.chk-nuevo-sede:checked').length > 0;
+  const completo = !!dni && !!nombres && !!apellidos && haySedes && sedesOk;
+  const btn = document.getElementById('btn-crear-usuario');
+  if (btn) btn.style.display = completo ? 'block' : 'none';
+};
+
+window.actualizarEstadoBotonNuevoGestor = function () {
+  const dni = document.getElementById('gestor-dni')?.value.trim();
+  const nombres = document.getElementById('gestor-nombres')?.value.trim();
+  const apellidos = document.getElementById('gestor-apellidos')?.value.trim();
+  const email = document.getElementById('gestor-email')?.value.trim();
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '');
+  const completo = !!dni && !!nombres && !!apellidos && emailOk;
+  const btn = document.getElementById('btn-crear-gestor');
+  if (btn) btn.style.display = completo ? 'block' : 'none';
+};
 
 // ═══════════════════════════════
 // 👥 Crear nuevo usuario
 // ═══════════════════════════════
 window.crearUsuario = async function () {
   const email         = document.getElementById("nuevo-email").value.trim();
-  const dni           = document.getElementById("nuevo-dni").value.trim();
+  const dniInput      = document.getElementById("nuevo-dni").value.trim();
   const nombres       = document.getElementById("nuevo-nombres").value.trim();
   const apellidos     = document.getElementById("nuevo-apellidos").value.trim();
   const doc_tipo      = document.getElementById("nuevo-doc-tipo").value;
   const telefono      = document.getElementById("nuevo-telefono").value.trim();
-  const cargo_id      = document.getElementById("nuevo-cargo").value;
   const fecha_ingreso = document.getElementById("nuevo-fecha-ingreso").value;
 
-  if (!dni || !nombres || !apellidos) {
+  if (!dniInput || !nombres || !apellidos) {
     alert("❌ Completa los campos obligatorios: nombres, apellidos y documento.");
     return;
   }
 
+  // Normaliza a 8 dígitos con cero inicial — así la contraseña queda bien desde la creación.
+  const dni = normalizarDNI(dniInput);
   const emailFinal = email || null;
 
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -317,9 +389,17 @@ window.crearUsuario = async function () {
     return;
   }
 
-  const sedesElegidas = Array.from(document.querySelectorAll('.chk-nuevo-sede:checked')).map(c => c.value);
+  const sedesElegidas = Array.from(document.querySelectorAll('.chk-nuevo-sede:checked')).map(chk => ({
+    sede: chk.value,
+    cargo_id: chk.closest('div').querySelector('.sel-cargo-por-sede')?.value || null,
+  }));
   if (sedesElegidas.length === 0) {
     alert("❌ Selecciona al menos una sede.");
+    return;
+  }
+  const sedesSinCargo = sedesElegidas.filter(s => !s.cargo_id);
+  if (sedesSinCargo.length > 0) {
+    alert(`❌ Selecciona el cargo para: ${sedesSinCargo.map(s => s.sede).join(', ')}.`);
     return;
   }
 
@@ -349,7 +429,6 @@ window.crearUsuario = async function () {
       documento_numero: dni,
       telefono:         telefono || null,
       empresa_id:       empresaAdminId,
-      cargo_id:         cargo_id || null,
       fecha_ingreso:    fecha_ingreso || null,
       rol:              'trabajador',
       sedes:            sedesElegidas
@@ -369,27 +448,30 @@ window.crearUsuario = async function () {
    "nuevo-telefono", "nuevo-fecha-ingreso"].forEach(id => {
     document.getElementById(id).value = '';
   });
-  document.getElementById('nuevo-cargo').value = '';
+  pintarCheckboxesSedes();
+  actualizarEstadoBotonNuevoTrabajador();
 };
 
 window.crearGestor = async function () {
   const email         = document.getElementById("gestor-email").value.trim();
-  const dni           = document.getElementById("gestor-dni").value.trim();
+  const dniInput      = document.getElementById("gestor-dni").value.trim();
   const nombres       = document.getElementById("gestor-nombres").value.trim();
   const apellidos     = document.getElementById("gestor-apellidos").value.trim();
   const doc_tipo      = document.getElementById("gestor-doc-tipo").value;
 
-  if (!dni || !nombres || !apellidos) {
-    alert("❌ Completa los campos obligatorios: nombres, apellidos y documento.");
+  if (!dniInput || !nombres || !apellidos || !email) {
+    alert("❌ Completa los campos obligatorios: nombres, apellidos, documento y correo.");
     return;
   }
 
-  const emailFinal = email || null;
-
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     alert("❌ Ingresa un correo electrónico válido.");
     return;
   }
+
+  // Normaliza a 8 dígitos con cero inicial — así la contraseña queda bien desde la creación.
+  const dni = normalizarDNI(dniInput);
+  const emailFinal = email;
 
   if (!empresaAdminId) {
     alert("❌ Tu usuario no tiene empresa asignada. Contacta al superadmin.");
@@ -432,6 +514,7 @@ window.crearGestor = async function () {
   document.getElementById('gestor-doc-tipo').value = 'DNI';
   document.getElementById('gestor-nombres').disabled = true;
   document.getElementById('gestor-apellidos').disabled = true;
+  actualizarEstadoBotonNuevoGestor();
 };
 
 // ═══════════════════════════════
@@ -481,36 +564,6 @@ window.subirCurso = async function () {
 // ═══════════════════════════════
 // 🔐 Resetear contraseña
 // ═══════════════════════════════
-window.resetearContrasena = async function (emailDirecto) {
-  const emailIngresado = (emailDirecto || document.getElementById("email-reset")?.value || "").trim();
-
-  if (!emailIngresado) {
-    alert("Ingresa el correo.");
-    return;
-  }
-
-  // Buscar el perfil por email personal para obtener el email de Auth (DNI@cvglobal.pe)
-  const { data: perfil } = await supabase
-    .from('profiles')
-    .select('documento_numero')
-    .eq('email', emailIngresado)
-    .maybeSingle();
-
-  const authEmail = perfil?.documento_numero
-    ? `${perfil.documento_numero}@cvglobal.pe`
-    : emailIngresado;
-
-  const { error } = await supabase.auth.resetPasswordForEmail(authEmail, {
-    redirectTo: "https://cursossstcvglobal.netlify.app/cambiar-clave.html"
-  });
-
-  if (error) {
-    alert("❌ Error: " + error.message);
-  } else {
-    alert("✅ Enlace enviado. Revisa el correo.");
-  }
-};
-
 // ═══════════════════════════════
 // 🔍 Verificar DNI en tiempo real
 // ═══════════════════════════════
@@ -1189,11 +1242,30 @@ window.cargarTrabajadores = async function (page = 0) {
   const busqueda = document.getElementById('buscar-apellido')?.value.trim() || '';
   const filtroEstado = document.getElementById('filtro-estado-trab')?.value || '';
 
+  // Solo trabajadores asignados a la sede activa (perfil_sede) — si está en varias sedes,
+  // aparece igual en cualquiera de ellas.
+  const { data: sedeRows, error: errSede } = await supabase
+    .from('perfil_sede')
+    .select('profile_id')
+    .eq('empresa_id', empresaAdminId)
+    .eq('sede', sedeAdminActiva)
+    .eq('activo', true);
+  if (errSede) { alert('❌ ' + errSede.message); return; }
+
+  const idsEnSede = (sedeRows || []).map(r => r.profile_id);
+  if (!idsEnSede.length) {
+    document.getElementById('galeria-trabajadores').innerHTML =
+      `<p style="color:#888;padding:12px;">No hay trabajadores asignados a la sede ${sedeAdminActiva}.</p>`;
+    document.getElementById('paginacion-trabajadores')?.remove();
+    return;
+  }
+
   let query = supabase
     .from('profiles')
     .select('id, nombres, apellidos, email, documento_numero, telefono, cargo_id, cargo, fecha_ingreso, activo', { count: 'exact' })
     .eq('empresa_id', empresaAdminId)
     .eq('rol', 'trabajador')
+    .in('id', idsEnSede)
     .order('apellidos')
     .range(desde, desde + PAGE_SIZE - 1);
 
@@ -1238,9 +1310,9 @@ window.cargarTrabajadores = async function (page = 0) {
         <button class="${u.activo ? 'btn-toggle-on' : 'btn-toggle-off'}" onclick="toggleActivo('${u.id}', ${u.activo})">
           ${u.activo ? 'Desactivar' : 'Activar'}
         </button>
-        <button onclick="resetearPasswordADni(${idx})"
+        <button onclick="resetearPasswordADni(${idx})" title="Deja su contraseña igual a su DNI"
                 style="padding:5px 12px;background:#e65100;color:white;border:none;border-radius:5px;cursor:pointer;font-size:0.8rem;">
-          🔑 DNI
+          🔑 Resetear contraseña
         </button>
       </div>
     </div>
@@ -1264,231 +1336,6 @@ window.cargarTrabajadores = async function (page = 0) {
   `;
 };
 
-// ═══════════════════════════════
-// 🔄 Actualización masiva desde Excel
-// ═══════════════════════════════
-let filasActualizacion = [];
-
-window.descargarPlantillaActualizacion = async function (e) {
-  e.preventDefault();
-  const XLSX = window.XLSX;
-
-  const { data: cargos } = await supabase.from('cargos').select('nombre').eq('activo', true).order('nombre');
-  const listaCargos = cargos?.map(c => c.nombre) || [];
-
-  const ws = XLSX.utils.aoa_to_sheet([
-    ['DNI', 'Apellidos', 'Nombres', 'Email', 'Telefono', 'Cargo', 'Fecha Ingreso'],
-  ]);
-
-  // Forzar columna DNI como texto en 200 filas para que Excel preserve ceros iniciales
-  for (let row = 2; row <= 201; row++) {
-    ws[`A${row}`] = { t: 's', v: '' };
-  }
-  ws['!ref'] = 'A1:G201';
-
-  const wsCargos = XLSX.utils.aoa_to_sheet(listaCargos.map(c => [c]));
-
-  ws['!cols'] = [12, 22, 22, 28, 14, 22, 14].map(w => ({ wch: w }));
-
-  ws['!dataValidations'] = ws['!dataValidations'] || [];
-  if (listaCargos.length > 0) {
-    ws['!dataValidations'].push({
-      type: 'list',
-      sqref: 'F2:F200',
-      formula1: listaCargos.map(c => `"${c}"`).join(',').length <= 255
-        ? '"' + listaCargos.join(',') + '"'
-        : 'Cargos!$A$1:$A$' + listaCargos.length
-    });
-  }
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Actualizar');
-  XLSX.utils.book_append_sheet(wb, wsCargos, 'Cargos');
-  XLSX.writeFile(wb, 'plantilla_actualizacion.xlsx');
-};
-
-window.previsualizarActualizacion = function () {
-  const archivo = document.getElementById('archivo-actualizacion').files[0];
-  if (!archivo) { alert('Selecciona un archivo Excel.'); return; }
-
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    const XLSX = window.XLSX;
-    const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-    const hoja = workbook.Sheets[workbook.SheetNames[0]];
-    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
-
-    // Auto-eliminar duplicados (se queda con la primera aparición de cada DNI)
-    const vistosAct = new Set();
-    const todasFilas = filas.slice(1).filter(f => f[0]);
-    filasActualizacion = todasFilas.filter(f => {
-      const dni = normalizarDNI(f[0]);
-      if (vistosAct.has(dni)) return false;
-      vistosAct.add(dni);
-      return true;
-    });
-    const elimAct = todasFilas.length - filasActualizacion.length;
-    const dupsAct = [];
-
-    const tbody = document.getElementById('tbody-actualizacion');
-    tbody.innerHTML = '';
-    filasActualizacion.forEach(f => {
-      const fechaRaw = f[6];
-      let fecha = '';
-      if (fechaRaw instanceof Date) {
-        const y = fechaRaw.getFullYear();
-        const m = String(fechaRaw.getMonth() + 1).padStart(2, '0');
-        const d = String(fechaRaw.getDate()).padStart(2, '0');
-        fecha = `${y}-${m}-${d}`;
-      } else if (fechaRaw) {
-        fecha = String(fechaRaw).trim();
-      }
-      const dni = normalizarDNI(f[0]);
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td style="padding:5px;">${f[0]}</td>
-        <td style="padding:5px;">${f[1]}</td>
-        <td style="padding:5px;">${f[2]}</td>
-        <td style="padding:5px;">${String(f[3]).trim().toLowerCase()}</td>
-        <td style="padding:5px;">${f[4]}</td>
-        <td style="padding:5px;">${f[5]}</td>
-        <td style="padding:5px;">${fecha}</td>
-        <td style="padding:5px; color:#888;">Pendiente</td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    let resumen = `${filasActualizacion.length} trabajadores a actualizar.`;
-    if (elimAct > 0) resumen += ` ℹ️ ${elimAct} fila(s) duplicada(s) eliminadas automáticamente.`;
-    document.getElementById('preview-resumen-act').textContent = resumen;
-    document.getElementById('preview-actualizacion').style.display = 'block';
-  };
-  reader.readAsArrayBuffer(archivo);
-};
-
-window.ejecutarActualizacion = async function () {
-  if (!filasActualizacion.length) return;
-
-  const btnActualizar = document.querySelector('#preview-actualizacion .btn-primary');
-  btnActualizar.disabled = true;
-  btnActualizar.textContent = '⏳ Actualizando...';
-
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
-  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
-
-  const { data: cargos } = await supabase.from('cargos').select('id, nombre').eq('activo', true);
-
-  // Cargar todos los perfiles de la empresa de una sola vez para detectar no encontrados
-  const { data: perfilesEmpresa } = await supabase
-    .from('profiles')
-    .select('id, documento_numero')
-    .eq('empresa_id', empresaAdminId);
-  const perfilPorDni = {};
-  // Normalizar DNI del lado de la base de datos también para evitar mismatch de formato
-  perfilesEmpresa?.forEach(p => { perfilPorDni[normalizarDNI(p.documento_numero)] = p.id; });
-
-  const filas = document.querySelectorAll('#tbody-actualizacion tr');
-  const progreso = document.getElementById('progreso-actualizacion');
-  let ok = 0, errores = 0, noEncontrados = 0;
-  const filasError = [['DNI', 'Apellidos', 'Nombres', 'Email', 'Cargo', 'Error']];
-
-  for (let i = 0; i < filasActualizacion.length; i++) {
-    const f           = filasActualizacion[i];
-    const dni         = normalizarDNI(f[0]);
-    const apellidos   = String(f[1]).trim();
-    const nombres     = String(f[2]).trim();
-    const emailRaw    = String(f[3]).trim().toLowerCase();
-    const telefono    = String(f[4]).trim();
-    const cargoNombre = String(f[5]).trim();
-    const fechaRaw    = f[6];
-
-    let fechaIngreso = '';
-    if (fechaRaw instanceof Date) {
-      const y = fechaRaw.getFullYear();
-      const m = String(fechaRaw.getMonth() + 1).padStart(2, '0');
-      const d = String(fechaRaw.getDate()).padStart(2, '0');
-      fechaIngreso = `${y}-${m}-${d}`;
-    } else if (fechaRaw) {
-      fechaIngreso = String(fechaRaw).trim();
-    }
-
-    const tdEstado = filas[i].querySelectorAll('td')[7];
-    tdEstado.textContent = '⏳ Actualizando...';
-    tdEstado.style.color = '#888';
-
-    const usuarioId = perfilPorDni[dni];
-    if (!usuarioId) {
-      tdEstado.textContent = '⚠️ DNI no encontrado';
-      tdEstado.style.color = 'orange';
-      filasError.push([dni, apellidos, nombres, emailRaw, cargoNombre, 'DNI no encontrado en esta empresa']);
-      noEncontrados++;
-      progreso.textContent = `Progreso: ${i + 1}/${filasActualizacion.length} — ✅ ${ok}, ❌ ${errores}, ⚠️ ${noEncontrados} no encontrados`;
-      continue;
-    }
-
-    const email = emailRaw.includes('@') ? emailRaw : null;
-    const cargo = cargos?.find(c => c.nombre.toLowerCase() === cargoNombre.toLowerCase());
-
-    const updates = {};
-    if (apellidos) updates.apellidos = apellidos;
-    if (nombres)   updates.nombres   = nombres;
-    if (email)     updates.email     = email;
-    if (telefono)  updates.telefono  = telefono;
-    if (cargo)   { updates.cargo_id  = cargo.id; updates.cargo = cargo.nombre; }
-    if (fechaIngreso) updates.fecha_ingreso = fechaIngreso;
-
-    if (Object.keys(updates).length === 0) {
-      tdEstado.textContent = '⚠️ Sin cambios';
-      tdEstado.style.color = '#888';
-      ok++;
-      progreso.textContent = `Progreso: ${i + 1}/${filasActualizacion.length} — ✅ ${ok}, ❌ ${errores}, ⚠️ ${noEncontrados} no encontrados`;
-      continue;
-    }
-
-    // Usar edge function para actualizar profiles (auth.users.email nunca cambia)
-    const { data: sessionDataAct } = await supabase.auth.getSession();
-    const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sessionDataAct.session?.access_token}`,
-        'apikey': ANON_KEY,
-      },
-      body: JSON.stringify({ usuario_id: usuarioId, updates }),
-    });
-
-    let data = {};
-    try { data = await res.json(); } catch (_) {}
-    if (!res.ok || data?.error) {
-      const msgError = data?.error || data?.message || `HTTP ${res.status}`;
-      tdEstado.textContent = '❌ ' + msgError;
-      tdEstado.style.color = 'red';
-      filasError.push([dni, apellidos, nombres, emailRaw, cargoNombre, msgError]);
-      errores++;
-    } else {
-      tdEstado.textContent = '✅ Actualizado';
-      tdEstado.style.color = 'green';
-      ok++;
-    }
-
-    progreso.textContent = `Progreso: ${i + 1}/${filasActualizacion.length} — ✅ ${ok}, ❌ ${errores}, ⚠️ ${noEncontrados} no encontrados`;
-  }
-
-  progreso.textContent += ' — ¡Completado!';
-  btnActualizar.disabled = false;
-  btnActualizar.textContent = '✅ Confirmar actualización';
-
-  if (errores > 0 || noEncontrados > 0) {
-    const XLSX = window.XLSX;
-    const ws = XLSX.utils.aoa_to_sheet(filasError);
-    ws['!cols'] = [12, 22, 22, 30, 22, 40].map(w => ({ wch: w }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Errores');
-    XLSX.writeFile(wb, 'errores_actualizacion.xlsx');
-    alert(`⚠️ Proceso completado con observaciones:\n✅ ${ok} actualizados\n❌ ${errores} con error\n⚠️ ${noEncontrados} DNI no encontrado\n\nSe descargó "errores_actualizacion.xlsx".`);
-  }
-};
 
 // ═══════════════════════════════
 // ✏️ ACTUALIZACIÓN INDIVIDUAL DE TRABAJADOR
@@ -1539,11 +1386,27 @@ window.cargarStaff = async function () {
   const busqueda = document.getElementById('buscar-staff')?.value.trim() || '';
   const filtroRol = document.getElementById('filtro-rol-staff')?.value || '';
 
+  const { data: sedeRows, error: errSede } = await supabase
+    .from('perfil_sede')
+    .select('profile_id')
+    .eq('empresa_id', empresaAdminId)
+    .eq('sede', sedeAdminActiva)
+    .eq('activo', true);
+  if (errSede) { alert('❌ ' + errSede.message); return; }
+
+  const idsEnSede = (sedeRows || []).map(r => r.profile_id);
+  if (!idsEnSede.length) {
+    document.getElementById('galeria-staff').innerHTML =
+      `<p style="color:#888;padding:12px;">No hay administradores ni gestores asignados a la sede ${sedeAdminActiva}.</p>`;
+    return;
+  }
+
   let query = supabase
     .from('profiles')
     .select('id, nombres, apellidos, email, documento_numero, rol, activo')
     .eq('empresa_id', empresaAdminId)
     .in('rol', filtroRol ? [filtroRol] : ['admin', 'gestor'])
+    .in('id', idsEnSede)
     .order('apellidos');
 
   if (busqueda) {
@@ -1572,79 +1435,11 @@ window.cargarStaff = async function () {
         <span class="${u.activo ? 'badge-activo' : 'badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span>
       </div>
       <div class="trab-email">${u.email || '<em style="color:#aaa;">Sin correo</em>'}</div>
-      <div class="trab-actions">
-        <button onclick="cambiarEmailStaff(${idx})"
-                style="padding:5px 12px;background:#0d6efd;color:white;border:none;border-radius:5px;cursor:pointer;font-size:0.8rem;">
-          ✉️ Cambiar correo
-        </button>
-        <button class="${u.activo ? 'btn-toggle-on' : 'btn-toggle-off'}"
-                onclick="toggleActivoStaff('${u.id}', ${u.activo})" ${u.id === currentUserId ? 'disabled title="No puedes desactivar tu propia cuenta"' : ''}>
-          ${u.activo ? 'Desactivar' : 'Activar'}
-        </button>
-        <button onclick="resetearPasswordStaffADni(${idx})"
-                style="padding:5px 12px;background:#e65100;color:white;border:none;border-radius:5px;cursor:pointer;font-size:0.8rem;">
-          🔑 Resetear a DNI
-        </button>
-      </div>
+      <p style="font-size:0.72rem;color:#aaa;margin:2px 0 0;">Solo el superadmin puede modificar esta cuenta (correo, contraseña, activar/desactivar).</p>
     </div>
   `).join('');
 };
 
-window.toggleActivoStaff = async function (id, activo) {
-  if (id === currentUserId) { alert('❌ No puedes desactivar tu propia cuenta.'); return; }
-  const { error } = await supabase.from('profiles').update({ activo: !activo }).eq('id', id);
-  if (error) { alert('❌ ' + error.message); return; }
-  cargarStaff();
-};
-
-window.cambiarEmailStaff = async function (idx) {
-  const u = _staffEncontrados[idx];
-  if (!u) return;
-  const nuevoEmail = prompt(`Nuevo correo de contacto para ${u.apellidos}, ${u.nombres}:`, u.email || '');
-  if (nuevoEmail === null) return;
-  if (nuevoEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nuevoEmail)) {
-    alert('❌ Correo inválido.');
-    return;
-  }
-  const { error } = await supabase.from('profiles').update({ email: nuevoEmail || null }).eq('id', u.id);
-  if (error) { alert('❌ ' + error.message); return; }
-  alert('✅ Correo actualizado. Recuerda: esto no cambia cómo ingresa a la plataforma (sigue siendo su DNI).');
-  cargarStaff();
-};
-
-// Reseteo de un clic: deja la contraseña de la cuenta admin/gestor igual a su DNI completo.
-window.resetearPasswordStaffADni = async function (idx) {
-  const u = _staffEncontrados[idx];
-  if (!u) return;
-  if (!await showConfirm(
-    `¿Resetear la contraseña de ${u.apellidos}, ${u.nombres} a su DNI (${u.documento_numero})?`,
-    { confirmText: 'Sí, resetear' }
-  )) return;
-
-  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
-  const { data: sessionData } = await supabase.auth.getSession();
-
-  const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${sessionData.session?.access_token}`,
-      'apikey': ANON_KEY,
-    },
-    body: JSON.stringify({
-      usuario_id: u.id,
-      updates: {},
-      password: u.documento_numero,
-    }),
-  });
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok || data?.error) {
-    alert('❌ ' + (data?.error || 'Error al resetear la contraseña.'));
-    return;
-  }
-  alert(`✅ Contraseña reseteada. Ya puede ingresar con DNI: ${u.documento_numero}`);
-};
 
 window.abrirFormEdicion = async function (idx) {
   const t = _trabEncontrados[idx];
@@ -1683,8 +1478,11 @@ window.abrirFormEdicion = async function (idx) {
       ${s}
     </label>`).join('');
 
-  document.getElementById('form-editar-trab').style.display = 'block';
-  document.getElementById('form-editar-trab').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('modal-editar-trab').style.display = 'flex';
+};
+
+window.cerrarModalEditarTrab = function () {
+  document.getElementById('modal-editar-trab').style.display = 'none';
 };
 
 window.guardarActualizacionIndividual = async function () {
@@ -1753,56 +1551,6 @@ window.guardarActualizacionIndividual = async function () {
 
   btn.disabled    = false;
   btn.textContent = '💾 Guardar cambios';
-};
-
-// ═══════════════════════════════
-// 🔑 CORREGIR CONTRASEÑAS DNI CON CERO INICIAL
-// ═══════════════════════════════
-window.corregirPasswordsDNI = async function () {
-  if (!empresaAdminId) { alert('❌ Sin empresa asignada.'); return; }
-
-  const { data: afectados } = await supabase
-    .from('profiles')
-    .select('id, documento_numero, nombres, apellidos')
-    .eq('empresa_id', empresaAdminId)
-    .eq('rol', 'trabajador')
-    .like('documento_numero', '0%');
-
-  if (!afectados || afectados.length === 0) {
-    alert('✅ No hay trabajadores con DNI que empiece en 0 en tu empresa.');
-    return;
-  }
-
-  const confirmado = await showConfirm(
-    `Se encontraron ${afectados.length} trabajador(es) con DNI que empieza en 0.\n\nSe les actualizará la contraseña para que sea su DNI completo (con el cero).\n\n¿Continuar?`,
-    { confirmText: 'Sí, corregir' }
-  );
-  if (!confirmado) return;
-
-  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyYWhqbHN0YXV0d2lueHlxY2Z4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMTMyNjYsImV4cCI6MjA4ODY4OTI2Nn0.iAbYatXkr5BAplYDhs7vMca2ROjb11uFM0e4619sD4s';
-
-  const { data: sessionDataAct3 } = await supabase.auth.getSession();
-  let ok = 0, errores = 0;
-  for (const u of afectados) {
-    const res = await fetch('https://wrahjlstautwinxyqcfx.supabase.co/functions/v1/actualizar-usuario', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sessionDataAct3.session?.access_token}`,
-        'apikey': ANON_KEY,
-      },
-      body: JSON.stringify({
-        usuario_id: u.id,
-        updates: {},
-        password: u.documento_numero,  // DNI con el cero completo
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data?.error) errores++;
-    else ok++;
-  }
-
-  alert(`✅ Proceso completado.\n${ok} contraseña(s) corregida(s).\n${errores > 0 ? `❌ ${errores} con error.` : ''}`);
 };
 
 window.toggleActivo = async function (id, activo) {
@@ -2022,8 +1770,9 @@ window.descargarCertificadosMasivo = async function () {
 };
 
 window.cargarListaCursos = async function () {
-  const contenedor = document.getElementById('lista-toggle-cursos');
-  contenedor.innerHTML = '<p style="color:#888;font-size:0.88rem;">Cargando...</p>';
+  const sel = document.getElementById('select-curso-editar');
+  const idSeleccionado = sel.value;
+  sel.innerHTML = '<option value="">-- Selecciona un curso --</option>';
 
   const { data: cursos, error: errCursos } = await supabase
     .from('cursos')
@@ -2031,47 +1780,22 @@ window.cargarListaCursos = async function () {
     .eq('sede', sedeAdminActiva)
     .order('titulo');
 
-  if (errCursos) {
-    contenedor.innerHTML = `<p style="color:red;">❌ Error: ${errCursos.message}</p>`;
-    return;
-  }
+  if (errCursos) { alert('❌ ' + errCursos.message); return; }
   if (!cursos?.length) {
-    contenedor.innerHTML = '<p style="color:#888;">No hay cursos registrados.</p>';
+    sel.innerHTML = '<option value="">-- No hay cursos registrados --</option>';
     return;
   }
 
   window.cursosCache = {};
-  cursos.forEach(c => { window.cursosCache[c.id] = c; });
-
-  const renderFila = c => `
-    <tr>
-      <td style="padding:10px 12px; font-weight:500;">${c.titulo}</td>
-      <td style="padding:10px 12px; color:#888; font-size:0.82rem;">${c.duracion ? c.duracion + 'h' : '—'}</td>
-      <td style="padding:10px 12px; white-space:nowrap;">
-        <button onclick="abrirEdicionCurso('${c.id}')"
-                style="padding:6px 14px; border:none; border-radius:6px; cursor:pointer; font-size:0.82rem;
-                       background:#0d6efd; color:white;">
-          ✏️ Editar
-        </button>
-      </td>
-    </tr>`;
-
-  contenedor.innerHTML = `
-    <table style="width:100%; border-collapse:collapse;">
-      <thead>
-        <tr style="background:#f8f9fa; font-size:0.82rem; color:#555; text-transform:uppercase; letter-spacing:0.5px;">
-          <th style="padding:8px 12px; text-align:left;">Curso</th>
-          <th style="padding:8px 12px; text-align:left;">Duración</th>
-          <th style="padding:8px 12px; text-align:left;">Acción</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${cursos.map(renderFila).join('')}
-      </tbody>
-    </table>`;
+  cursos.forEach(c => {
+    window.cursosCache[c.id] = c;
+    sel.innerHTML += `<option value="${c.id}">${c.titulo}${c.duracion ? ' (' + c.duracion + 'h)' : ''}</option>`;
+  });
+  if (idSeleccionado && window.cursosCache[idSeleccionado]) sel.value = idSeleccionado;
 };
 
 window.abrirEdicionCurso = function (id) {
+  if (!id) { cerrarPanelEditarCurso(); return; }
   const c = window.cursosCache?.[id];
   if (!c) { alert('❌ No se encontró el curso.'); return; }
 
@@ -2084,12 +1808,14 @@ window.abrirEdicionCurso = function (id) {
   document.getElementById('editar-curso-url-material').value  = c.url_material || '';
   document.getElementById('editar-curso-pdf-file').value      = '';
 
-  document.getElementById('modal-editar-curso').style.display = 'flex';
+  document.getElementById('panel-editar-curso').style.display = 'block';
   cargarVideosCurso(c.id);
 };
 
-window.cerrarModalCurso = function () {
-  document.getElementById('modal-editar-curso').style.display = 'none';
+window.cerrarPanelEditarCurso = function () {
+  document.getElementById('panel-editar-curso').style.display = 'none';
+  const sel = document.getElementById('select-curso-editar');
+  if (sel) sel.value = '';
 };
 
 window.subirPdfCurso = async function () {
@@ -2148,7 +1874,8 @@ window.guardarEdicionCurso = async function () {
 
   if (error) { alert('❌ Error al guardar: ' + error.message); return; }
 
-  cerrarModalCurso();
+  alert('✅ Curso actualizado.');
+  cerrarPanelEditarCurso();
   cargarListaCursos();
 };
 
@@ -2223,65 +1950,68 @@ window.initSelectCursoForm = async function initSelectCursoForm() {
   initSelectBuscable('select-curso-form');
 }
 
+let _cursoFormularioActivo = null;
+let _tipoFormularioActivo = 'examen';
+
 window.cargarFormulariosCurso = async function () {
   await initSelectCursoForm();
   const sel = document.getElementById('select-curso-form');
   const cursoId = sel.value;
-  if (!cursoId) { alert('Selecciona un curso.'); return; }
+  if (!cursoId) { document.getElementById('contenedor-formularios').innerHTML = ''; return; }
+  _cursoFormularioActivo = cursoId;
 
   const { data: forms } = await supabase
     .from('formularios').select('*')
     .eq('id_curso', cursoId).in('tipo', ['examen', 'eficacia']);
 
   const cont = document.getElementById('contenedor-formularios');
-  cont.innerHTML = '';
+  const tabBtn = (tipo, texto) => `
+    <button onclick="cambiarTipoFormulario('${tipo}')"
+      style="padding:9px 16px; border:none; border-bottom:2px solid ${_tipoFormularioActivo === tipo ? '#1e3a5f' : 'transparent'};
+             background:none; cursor:pointer; font-size:0.88rem; font-weight:${_tipoFormularioActivo === tipo ? '600' : '500'};
+             color:${_tipoFormularioActivo === tipo ? '#1e3a5f' : '#667'};">
+      ${texto}
+    </button>`;
 
-  for (const tipo of ['examen', 'eficacia']) {
-    const form  = forms?.find(f => f.tipo === tipo);
-    const label = tipo === 'examen' ? '📝 Examen' : '✅ Evaluación de la eficacia';
-    const color = tipo === 'examen' ? '#002855' : '#28a745';
-    const bloque = document.createElement('div');
-    bloque.style.cssText = 'border:1px solid #e0e0e0;border-radius:10px;padding:16px;margin-bottom:16px;';
+  cont.innerHTML = `
+    <div style="display:flex; gap:4px; border-bottom:1px solid #e5e8ec; margin-bottom:14px;">
+      ${tabBtn('examen', '📝 Examen')}
+      ${tabBtn('eficacia', '✅ Evaluación de la eficacia')}
+    </div>
+    <div id="bloque-formulario-actual"></div>`;
 
-    if (!form) {
-      bloque.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <h3 style="margin:0;color:${color};">${label}</h3>
-          <button onclick="crearFormulario('${cursoId}','${tipo}')" class="btn-primary" style="font-size:0.85rem;">+ Crear ${tipo}</button>
-        </div>
-        <p style="color:#888;font-size:0.85rem;margin-top:8px;">No existe aún para este curso.</p>`;
-    } else {
-      bloque.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-          <h3 style="margin:0;color:${color};">${label}</h3>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-            <a href="#" onclick="descargarPlantillaPreguntas(event)" style="font-size:0.8rem;color:#666;text-decoration:underline;">⬇️ Plantilla Excel</a>
-            <input type="file" id="import-preg-${form.id}" accept=".xlsx,.xls" style="display:none;"
-              onchange="importarPreguntasExcel(${form.id},'${tipo}', this)" />
-            <button onclick="document.getElementById('import-preg-${form.id}').click()" class="btn-secondary" style="font-size:0.85rem;">📥 Importar Excel</button>
-            <button onclick="mostrarFormPregunta(${form.id},'${tipo}')" class="btn-primary" style="font-size:0.85rem;">+ Nueva pregunta</button>
-          </div>
-        </div>
-        <div id="progreso-import-preg-${form.id}" style="font-size:0.82rem;color:#666;margin-bottom:8px;"></div>
-        <div id="lista-preguntas-${form.id}"><em style="color:#888;font-size:0.85rem;">Cargando...</em></div>
-        <div id="form-nueva-pregunta-${form.id}" style="display:none;background:#f8f9fa;border-radius:8px;padding:14px;margin-top:12px;">
-          <p style="font-weight:600;margin:0 0 10px;">Nueva pregunta</p>
-          <input id="txt-pregunta-${form.id}" type="text" placeholder="Texto de la pregunta *"
-            style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.88rem;margin-bottom:8px;box-sizing:border-box;" />
-          <div style="display:flex;gap:8px;align-items:center;">
-            <label style="font-size:0.85rem;">Puntaje:</label>
-            <input id="pts-pregunta-${form.id}" type="number" value="1" min="1"
-              style="width:70px;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:0.88rem;" />
-            <button onclick="guardarNuevaPregunta(${form.id},'${tipo}')" class="btn-primary" style="font-size:0.85rem;">Guardar</button>
-            <button onclick="document.getElementById('form-nueva-pregunta-${form.id}').style.display='none'"
-              style="background:#e0e0e0;border:none;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:0.85rem;">Cancelar</button>
-          </div>
-        </div>`;
-      cargarPreguntas(form.id, tipo);
-    }
-    cont.appendChild(bloque);
-  }
+  renderBloqueFormulario(cursoId, _tipoFormularioActivo, forms?.find(f => f.tipo === _tipoFormularioActivo));
 };
+
+window.cambiarTipoFormulario = function (tipo) {
+  _tipoFormularioActivo = tipo;
+  cargarFormulariosCurso();
+};
+
+async function renderBloqueFormulario(cursoId, tipo, form) {
+  const bloque = document.getElementById('bloque-formulario-actual');
+  if (!bloque) return;
+
+  if (!form) {
+    bloque.innerHTML = `<p style="color:#888;font-size:0.85rem;">
+      No existe aún para este curso.
+      <button onclick="crearFormulario('${cursoId}','${tipo}')" class="btn-primary" style="font-size:0.85rem; margin-left:8px;">+ Crear</button>
+    </p>`;
+    return;
+  }
+
+  bloque.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      <a href="#" onclick="descargarPlantillaPreguntas(event)" style="font-size:0.8rem;color:#666;text-decoration:underline;">⬇️ Plantilla Excel</a>
+      <input type="file" id="import-preg-${form.id}" accept=".xlsx,.xls" style="display:none;"
+        onchange="importarPreguntasExcel(${form.id},'${tipo}', this)" />
+      <button onclick="document.getElementById('import-preg-${form.id}').click()" class="btn-secondary" style="font-size:0.85rem;">📥 Importar Excel</button>
+      <button onclick="abrirModalNuevaPregunta(${form.id},'${tipo}')" class="btn-primary" style="font-size:0.85rem;">+ Nueva pregunta</button>
+    </div>
+    <div id="progreso-import-preg-${form.id}" style="font-size:0.82rem;color:#666;margin-bottom:8px;"></div>
+    <div id="lista-preguntas-${form.id}"><em style="color:#888;font-size:0.85rem;">Cargando...</em></div>`;
+  cargarPreguntas(form.id, tipo);
+}
 
 window.crearFormulario = async function (cursoId, tipo) {
   const label = tipo === 'examen' ? 'Examen' : 'Evaluación de la eficacia';
@@ -2290,9 +2020,59 @@ window.crearFormulario = async function (cursoId, tipo) {
   cargarFormulariosCurso();
 };
 
-window.mostrarFormPregunta = function (formularioId, tipo) {
-  const div = document.getElementById(`form-nueva-pregunta-${formularioId}`);
-  if (div) { div.style.display = 'block'; document.getElementById(`txt-pregunta-${formularioId}`).focus(); }
+// ── Nueva pregunta: modal con la pregunta y hasta 4 opciones (marcando la correcta) a la vez ──
+window.abrirModalNuevaPregunta = function (formularioId, tipo) {
+  document.getElementById('mnp-formulario-id').value = formularioId;
+  document.getElementById('mnp-tipo').value = tipo;
+  document.getElementById('mnp-texto').value = '';
+  document.getElementById('mnp-puntaje').value = 1;
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById(`mnp-op-${i}`).value = '';
+    document.getElementById(`mnp-correcta-${i}`).checked = false;
+  }
+  document.getElementById('modal-nueva-pregunta').style.display = 'flex';
+  document.getElementById('mnp-texto').focus();
+};
+
+window.cerrarModalNuevaPregunta = function () {
+  document.getElementById('modal-nueva-pregunta').style.display = 'none';
+};
+
+window.guardarNuevaPreguntaCompleta = async function () {
+  const formularioId = document.getElementById('mnp-formulario-id').value;
+  const tipo = document.getElementById('mnp-tipo').value;
+  const texto = document.getElementById('mnp-texto').value.trim();
+  const pts = parseFloat(document.getElementById('mnp-puntaje').value) || 1;
+  if (!texto) { alert('❌ Escribe el texto de la pregunta.'); return; }
+
+  const opciones = [];
+  for (let i = 1; i <= 4; i++) {
+    const val = document.getElementById(`mnp-op-${i}`).value.trim();
+    if (val) opciones.push({ texto: val, correcta: document.getElementById(`mnp-correcta-${i}`).checked, orden: i });
+  }
+  if (opciones.length && !opciones.some(o => o.correcta)) {
+    alert('❌ Marca cuál opción es la correcta.');
+    return;
+  }
+
+  const { data: ult } = await supabase.from('preguntas').select('orden')
+    .eq('id_formulario', formularioId).order('orden', { ascending: false }).limit(1);
+  const orden = (ult?.[0]?.orden || 0) + 1;
+
+  const { data: nuevaPregunta, error } = await supabase.from('preguntas')
+    .insert([{ id_formulario: formularioId, pregunta: texto, orden, puntaje: pts }])
+    .select().single();
+  if (error || !nuevaPregunta) { alert('❌ ' + (error?.message || 'No se pudo crear la pregunta.')); return; }
+
+  if (opciones.length) {
+    const { error: errOp } = await supabase.from('opciones_pregunta').insert(
+      opciones.map(o => ({ id_pregunta: nuevaPregunta.id, opcion: o.texto, orden: o.orden, es_correcta: o.correcta }))
+    );
+    if (errOp) { alert('⚠️ La pregunta se creó, pero hubo un error al guardar las opciones: ' + errOp.message); }
+  }
+
+  cerrarModalNuevaPregunta();
+  cargarPreguntas(formularioId, tipo);
 };
 
 window.descargarPlantillaPreguntas = function (e) {
@@ -2411,10 +2191,10 @@ async function cargarPreguntas(formularioId, tipo) {
       </div>`).join('');
 
     return `
-      <div style="border-left:3px solid #002855;padding:10px 14px;margin-bottom:12px;background:#fafafa;border-radius:0 8px 8px 0;">
+      <div style="border-left:3px solid #1e3a5f;padding:10px 14px;margin-bottom:12px;background:#fafafa;border-radius:0 8px 8px 0;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
           <div>
-            <span style="font-weight:600;color:#002855;font-size:0.85rem;">${i + 1}.</span>
+            <span style="font-weight:600;color:#1e3a5f;font-size:0.85rem;">${i + 1}.</span>
             <span style="font-size:0.9rem;margin-left:6px;">${p.pregunta}</span>
             <span style="color:#888;font-size:0.78rem;margin-left:8px;">(${p.puntaje} pt${p.puntaje !== 1 ? 's' : ''})</span>
           </div>
@@ -2508,7 +2288,7 @@ window.cargarEncuestaGlobal = async function () {
     <div style="border:1px solid #e0e0e0;border-radius:10px;padding:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
         <span style="font-size:0.85rem;color:#555;">${preguntas?.length || 0} preguntas · Opciones Likert auto-generadas</span>
-        <button onclick="mostrarFormPreguntaEncuesta(${form.id})" class="btn-primary" style="font-size:0.85rem;">+ Nueva pregunta</button>
+        <button onclick="abrirModalPreguntaEncuesta(${form.id})" class="btn-primary" style="font-size:0.85rem;">+ Nueva pregunta</button>
       </div>
       <div id="lista-preguntas-encuesta">
         ${preguntas?.length
@@ -2520,26 +2300,24 @@ window.cargarEncuestaGlobal = async function () {
             </div>`).join('')
           : '<p style="color:#888;font-size:0.85rem;">Sin preguntas aún.</p>'}
       </div>
-      <div id="form-preg-encuesta-${form.id}" style="display:none;background:#f8f9fa;border-radius:8px;padding:12px;margin-top:12px;">
-        <input id="txt-preg-encuesta-${form.id}" type="text" placeholder="Ej: ¿El contenido fue claro y relevante? *"
-          style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.88rem;margin-bottom:8px;box-sizing:border-box;" />
-        <div style="display:flex;gap:8px;">
-          <button onclick="guardarPreguntaEncuesta(${form.id})" class="btn-primary" style="font-size:0.85rem;">Guardar</button>
-          <button onclick="document.getElementById('form-preg-encuesta-${form.id}').style.display='none'"
-            style="background:#e0e0e0;border:none;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:0.85rem;">Cancelar</button>
-        </div>
-      </div>
     </div>`;
 };
 
-window.mostrarFormPreguntaEncuesta = function (formId) {
-  const div = document.getElementById(`form-preg-encuesta-${formId}`);
-  if (div) { div.style.display = 'block'; document.getElementById(`txt-preg-encuesta-${formId}`).focus(); }
+window.abrirModalPreguntaEncuesta = function (formId) {
+  document.getElementById('mpe-formulario-id').value = formId;
+  document.getElementById('mpe-texto').value = '';
+  document.getElementById('modal-nueva-pregunta-encuesta').style.display = 'flex';
+  document.getElementById('mpe-texto').focus();
 };
 
-window.guardarPreguntaEncuesta = async function (formularioId) {
-  const texto = document.getElementById(`txt-preg-encuesta-${formularioId}`).value.trim();
-  if (!texto) { alert('Escribe el texto de la pregunta.'); return; }
+window.cerrarModalPreguntaEncuesta = function () {
+  document.getElementById('modal-nueva-pregunta-encuesta').style.display = 'none';
+};
+
+window.guardarPreguntaEncuesta = async function () {
+  const formularioId = document.getElementById('mpe-formulario-id').value;
+  const texto = document.getElementById('mpe-texto').value.trim();
+  if (!texto) { alert('❌ Escribe el texto de la pregunta.'); return; }
 
   const { data: ult } = await supabase.from('preguntas').select('orden')
     .eq('id_formulario', formularioId).order('orden', { ascending: false }).limit(1);
@@ -2552,6 +2330,7 @@ window.guardarPreguntaEncuesta = async function (formularioId) {
   await supabase.from('opciones_pregunta').insert(
     OPCIONES_LIKERT.map(o => ({ id_pregunta: nueva.id, ...o, es_correcta: false }))
   );
+  cerrarModalPreguntaEncuesta();
   cargarEncuestaGlobal();
 };
 
@@ -2588,6 +2367,14 @@ window.initSelectorAnioSST = function initSelectorAnioSST() {
   });
   const selMes = document.getElementById('seg-mes');
   if (selMes) selMes.value = mesCurrent;
+
+  // Mostrar en automático según la pestaña activa — sin necesidad de tocar nada más.
+  if (document.getElementById('tab-programa-sst-ver')?.classList.contains('activo')) {
+    window.verProgramaSST?.();
+  }
+  if (document.getElementById('tab-programa-sst-seguimiento')?.classList.contains('activo')) {
+    window.cargarSeguimientoMes?.();
+  }
 }
 
 window.previsualizarProgramaSST = function () {
@@ -2717,7 +2504,7 @@ window.importarProgramaSST = async function () {
   filasProgramaSST = [];
 };
 
-const TIPO_COLOR_SST = { 'Seguridad': '#002855', 'Salud': '#198754', 'Medio ambiente': '#8a6d3b' };
+const TIPO_COLOR_SST = { 'Seguridad': '#1e3a5f', 'Salud': '#198754', 'Medio ambiente': '#8a6d3b' };
 
 window.verProgramaSST = async function () {
   const anio = parseInt(document.getElementById('ver-sst-anio').value);
@@ -2744,28 +2531,34 @@ window.verProgramaSST = async function () {
   const mesesKey = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const colorTipo = c => TIPO_COLOR_SST[c] || '#666';
 
-  const tarjetas = data.map(f => `
-    <div class="trab-card">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-        <div>
-          <div class="trab-nombre">${f.curso}</div>
-          <div class="trab-meta">${f.requisito || ''}${f.encargado ? ' · ' + f.encargado : ''}${f.duracion_hr ? ' · ' + f.duracion_hr + 'h' : ''}</div>
-        </div>
-        ${f.tipo_curso ? `<span style="background:${colorTipo(f.tipo_curso)};color:white;padding:3px 9px;border-radius:12px;font-size:0.72rem;white-space:nowrap;">${f.tipo_curso}</span>` : ''}
-      </div>
-      <div style="display:flex; gap:4px; margin-top:6px;">
-        ${mesesKey.map((m, i) => `
-          <span title="${MESES_NOM[i]}" style="flex:1; text-align:center; padding:4px 0; border-radius:5px; font-size:0.72rem; font-weight:600;
-            background:${f[m] ? '#d4edda' : '#f0f0f0'}; color:${f[m] ? '#155724' : '#bbb'};">
-            ${mesesNom[i]}
-          </span>`).join('')}
-      </div>
-    </div>
-  `).join('');
+  const filas = data.map(f => `
+    <tr>
+      <td>${f.requisito || '—'}</td>
+      <td>${f.numero ?? '—'}</td>
+      <td style="font-weight:600;">${f.curso}</td>
+      <td>${f.tipo_curso ? `<span style="background:${colorTipo(f.tipo_curso)};color:white;padding:2px 9px;border-radius:10px;font-size:0.72rem;white-space:nowrap;">${f.tipo_curso}</span>` : '—'}</td>
+      <td>${f.encargado || '—'}</td>
+      <td>${f.duracion_hr ? f.duracion_hr + 'h' : '—'}</td>
+      ${mesesKey.map((m, i) => `
+        <td title="${MESES_NOM[i]}" style="text-align:center; font-weight:600;
+          background:${f[m] ? '#d4edda' : ''}; color:${f[m] ? '#155724' : '#ccc'};">
+          ${f[m] ? '✓' : '—'}
+        </td>`).join('')}
+    </tr>`).join('');
 
   cont.innerHTML = `
     <p style="font-size:0.85rem;color:#555;margin-bottom:12px;">${data.length} cursos — Año ${anio} · ${sedeAdminActiva}</p>
-    <div class="galeria-trabajadores">${tarjetas}</div>`;
+    <div class="preview-table-wrap">
+      <table style="min-width:900px;">
+        <thead>
+          <tr>
+            <th>Requisito</th><th>N°</th><th>Curso</th><th>Tipo</th><th>Encargado</th><th>Duración</th>
+            ${mesesNom.map(m => `<th style="text-align:center;">${m}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>`;
 };
 
 window.eliminarProgramaSST = async function () {
@@ -2908,7 +2701,7 @@ window.cargarSeguimientoMes = async function () {
   cont.innerHTML = `
     <div style="overflow-x:auto;">
       <table style="border-collapse:collapse;width:100%;font-size:0.82rem;min-width:750px;">
-        <thead><tr style="background:#002855;color:white;">
+        <thead><tr style="background:#1e3a5f;color:white;">
           <th style="padding:8px 10px;text-align:left;">Curso</th>
           <th style="padding:8px 10px;">Tipo</th>
           <th style="padding:8px 10px;">Encargado</th>
@@ -2960,7 +2753,7 @@ window.cargarEstadisticasSST = async function () {
 
   const [{ data: programa }, { data: seguimientos }] = await Promise.all([
     supabase.from('programa_capacitaciones').select('id,tipo_curso,encargado,ene,feb,mar,abr,may,jun,jul,ago,sep,oct,nov,dic')
-      .eq('empresa_id', empresaAdminId).eq('anio', anio).eq('sede', 'ANTAMINA'),
+      .eq('empresa_id', empresaAdminId).eq('anio', anio).eq('sede', sedeAdminActiva),
     supabase.from('seguimiento_sst').select('*')
       .eq('empresa_id', empresaAdminId).eq('anio', anio),
   ]);
@@ -2997,8 +2790,8 @@ window.cargarEstadisticasSST = async function () {
   document.getElementById('sst-kpis').innerHTML = [
     ['Cumplimiento Anual', `${pctAnual}%`, kpiColor(pctAnual)],
     [`Cumplimiento ${MESES_NOM[mesActual]}`, `${pctMesActual}%`, kpiColor(pctMesActual)],
-    ['Cursos programados (año)', totalProg, '#002855'],
-    ['Cursos ejecutados (año)', totalEjec, '#002855'],
+    ['Cursos programados (año)', totalProg, '#1e3a5f'],
+    ['Cursos ejecutados (año)', totalEjec, '#1e3a5f'],
     ['Pendientes', totalProg - totalEjec, '#6c757d'],
   ].map(([label, val, color]) => `
     <div style="background:#f8f9fa;border-radius:10px;padding:14px 20px;min-width:140px;text-align:center;border-top:4px solid ${color};">
@@ -3014,7 +2807,7 @@ window.cargarEstadisticasSST = async function () {
     data: {
       labels: MESES_NOM.map(m => m.substring(0,3)),
       datasets: [
-        { label: 'Programados', data: mesData.map(m => m.programados), backgroundColor: '#002855aa' },
+        { label: 'Programados', data: mesData.map(m => m.programados), backgroundColor: '#1e3a5faa' },
         { label: 'Ejecutados',  data: mesData.map(m => m.ejecutados),  backgroundColor: '#198754aa' },
       ]
     },
@@ -3038,7 +2831,7 @@ window.cargarEstadisticasSST = async function () {
     type: 'doughnut',
     data: {
       labels: tipos,
-      datasets: [{ data: tipoData.map(t => t.prog), backgroundColor: ['#002855','#198754','#0d6efd'] }]
+      datasets: [{ data: tipoData.map(t => t.prog), backgroundColor: ['#1e3a5f','#198754','#0d6efd'] }]
     },
     options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
   });
@@ -3056,7 +2849,7 @@ window.cargarEstadisticasSST = async function () {
     type: 'doughnut',
     data: {
       labels: encargados,
-      datasets: [{ data: encData, backgroundColor: ['#002855','#198754','#0d6efd','#fd7e14','#6f42c1'] }]
+      datasets: [{ data: encData, backgroundColor: ['#1e3a5f','#198754','#0d6efd','#fd7e14','#6f42c1'] }]
     },
     options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
   });
@@ -3109,27 +2902,21 @@ function renderMatrizObligatorios() {
     return;
   }
 
-  const header = cursos.map(c => `<th style="padding:8px 6px;font-size:0.76rem;max-width:110px;">${c.titulo}</th>`).join('');
+  const header = cursos.map(c => `<th title="${c.titulo}">${c.titulo}</th>`).join('');
   const filas = cargos.map(cg => {
     const marcados = window._cursosPorCargo[cg.id] || new Set();
     const celdas = cursos.map(c => `
-      <td style="text-align:center;padding:6px;">
+      <td>
         <input type="checkbox" ${marcados.has(c.id) ? 'checked' : ''}
           onchange="toggleCargoCurso('${cg.id}','${c.id}', this.checked)" />
       </td>`).join('');
-    return `<tr style="border-bottom:1px solid #eee;">
-      <td style="padding:7px 10px;font-weight:500;white-space:nowrap;">${cg.nombre}</td>
-      ${celdas}
-    </tr>`;
+    return `<tr><td title="${cg.nombre}">${cg.nombre}</td>${celdas}</tr>`;
   }).join('');
 
   cont.innerHTML = `
-    <div style="overflow-x:auto;">
-      <table style="border-collapse:collapse;width:100%;font-size:0.85rem;">
-        <thead><tr style="background:#002855;color:white;">
-          <th style="padding:8px 10px;text-align:left;">Cargo</th>
-          ${header}
-        </tr></thead>
+    <div class="tabla-matriz-wrap">
+      <table class="tabla-matriz">
+        <thead><tr><th>Cargo</th>${header}</tr></thead>
         <tbody>${filas}</tbody>
       </table>
     </div>`;
@@ -3163,9 +2950,16 @@ window.toggleCargoCurso = async function (cargoId, cursoId, marcado) {
   }
 };
 
+let _debounceExcepcion = null;
+window.buscarExcepcionDebounced = function () {
+  clearTimeout(_debounceExcepcion);
+  _debounceExcepcion = setTimeout(() => buscarTrabajadorExcepcion(), 350);
+};
+
 window.buscarTrabajadorExcepcion = async function () {
   const q = document.getElementById('buscar-excepcion-input').value.trim();
-  if (!q) { alert('Ingresa un DNI o apellido.'); return; }
+  const cont0 = document.getElementById('resultado-excepcion');
+  if (!q) { cont0.innerHTML = ''; document.getElementById('panel-excepciones').style.display = 'none'; return; }
 
   let query = supabase.from('profiles')
     .select('id, nombres, apellidos, documento_numero, cargo_id')
@@ -3182,7 +2976,7 @@ window.buscarTrabajadorExcepcion = async function () {
   cont.innerHTML = data.map((t, idx) => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:white;border:1px solid #ddd;border-radius:7px;margin-bottom:6px;">
       <span>${t.apellidos}, ${t.nombres} · DNI ${t.documento_numero}</span>
-      <button onclick="abrirExcepcionesTrabajador(${idx})" style="padding:6px 12px;background:#002855;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.82rem;">Ver cursos</button>
+      <button onclick="abrirExcepcionesTrabajador(${idx})" style="padding:6px 12px;background:#1e3a5f;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.82rem;">Ver cursos</button>
     </div>`).join('');
 };
 
@@ -3197,7 +2991,7 @@ window.abrirExcepcionesTrabajador = async function (idx) {
   const cont = document.getElementById('panel-excepciones');
   cont.style.display = 'block';
   cont.innerHTML = `
-    <h3 style="font-size:0.95rem;font-weight:600;color:#002855;margin-bottom:10px;">
+    <h3 style="font-size:0.95rem;font-weight:600;color:#1e3a5f;margin-bottom:10px;">
       Cursos extra para ${t.apellidos}, ${t.nombres}
     </h3>
     <p style="color:#888;font-size:0.8rem;margin-bottom:10px;">
@@ -3252,6 +3046,11 @@ document.addEventListener('DOMContentLoaded', () => {
       id: 'nuevo-email',
       validate: v => v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
                   ? 'Correo no válido.' : null,
+    },
+    {
+      id: 'gestor-email',
+      validate: v => !v ? 'El correo es obligatorio para gestores.'
+                  : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? 'Correo no válido.' : null,
     },
   ]);
 

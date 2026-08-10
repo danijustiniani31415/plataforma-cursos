@@ -49,7 +49,20 @@ Deno.serve(async (req) => {
       empresa_id, cargo_id, fecha_ingreso, rol, sedes
     } = await req.json()
 
-    const sedesFinal = Array.isArray(sedes) && sedes.length > 0 ? sedes : ['ANTAMINA']
+    // `sedes` puede venir como array de strings (formato antiguo) o de {sede, cargo_id} (un cargo por sede)
+    const sedesFinal = Array.isArray(sedes) && sedes.length > 0
+      ? sedes.map((s: any) => typeof s === 'string' ? { sede: s, cargo_id: cargo_id || null } : { sede: s.sede, cargo_id: s.cargo_id || null })
+      : [{ sede: 'ANTAMINA', cargo_id: cargo_id || null }]
+
+    const cargoIdPrincipal = sedesFinal[0]?.cargo_id || cargo_id || null
+
+    // Administradores y gestores ingresan con su correo real (y por ahí recuperan su contraseña).
+    // Los trabajadores siempre ingresan con su DNI — no requieren correo.
+    if (['admin', 'gestor'].includes(rol) && !email) {
+      return new Response(JSON.stringify({ error: 'El correo electrónico es obligatorio para administradores y gestores.' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     const { data: existe } = await supabaseAdmin
       .from('profiles')
@@ -63,8 +76,9 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Auth siempre usa DNI@cvglobal.pe; el email personal solo va al perfil
-    const authEmail = `${documento_numero}@cvglobal.pe`
+    // Trabajadores: Auth usa DNI@cvglobal.pe (ingresan con DNI).
+    // Admin/gestor: Auth usa su correo real (ingresan con correo y pueden recuperar clave por ahí).
+    const authEmail = ['admin', 'gestor'].includes(rol) ? email : `${documento_numero}@cvglobal.pe`
 
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: authEmail,
@@ -91,11 +105,11 @@ Deno.serve(async (req) => {
     }
 
     let cargoNombre = null
-    if (cargo_id) {
+    if (cargoIdPrincipal) {
       const { data: carg } = await supabaseAdmin
         .from('cargos')
         .select('nombre')
-        .eq('id', cargo_id)
+        .eq('id', cargoIdPrincipal)
         .single()
       cargoNombre = carg?.nombre || null
     }
@@ -113,7 +127,7 @@ Deno.serve(async (req) => {
         empresa_id,
         empresa:               empresaNombre,
         empresa_ruc:           empresaRuc,
-        cargo_id:              cargo_id || null,
+        cargo_id:              cargoIdPrincipal,
         cargo:                 cargoNombre,
         fecha_ingreso:         fecha_ingreso || null,
         rol:                   rol || 'trabajador',
@@ -130,11 +144,11 @@ Deno.serve(async (req) => {
     if (empresa_id) {
       const { error: sedeError } = await supabaseAdmin
         .from('perfil_sede')
-        .insert(sedesFinal.map((sede: string) => ({
+        .insert(sedesFinal.map((s: { sede: string; cargo_id: string | null }) => ({
           profile_id: authData.user.id,
           empresa_id,
-          sede,
-          cargo_id: cargo_id || null,
+          sede: s.sede,
+          cargo_id: s.cargo_id,
           fecha_ingreso: fecha_ingreso || null,
           activo: true,
         })))

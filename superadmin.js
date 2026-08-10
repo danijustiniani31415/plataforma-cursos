@@ -2,6 +2,11 @@ import { supabase } from './src/supabaseClient.js';
 import { alertToToast, withLoading, showConfirm, fieldValidation } from './toast.js';
 const alert = alertToToast;
 
+// Normaliza DNI: elimina espacios/saltos y padea a 8 dígitos con 0 a la izquierda
+function normalizarDNI(raw) {
+  return String(raw).trim().replace(/[\n\r]/g, '').padStart(8, '0');
+}
+
 // ✅ Verificar que sea superadmin
 (async () => {
   const { data: { user } } = await supabase.auth.getUser();
@@ -210,6 +215,8 @@ window.toggleCargo = async function (id, activo) {
 // ═══════════════════════════════
 // 👤 ADMINS
 // ═══════════════════════════════
+let _adminsCache = [];
+
 async function cargarAdmins() {
   const { data } = await supabase
     .from('profiles')
@@ -217,34 +224,164 @@ async function cargarAdmins() {
     .in('rol', ['admin', 'gestor'])
     .order('apellidos');
 
-  const tbody = document.querySelector('#tabla-admins tbody');
-  tbody.innerHTML = '';
-  data?.forEach(u => {
-    const rolBadge = u.rol === 'gestor'
-      ? `<span style="background:#6f42c1;color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem;">Gestor</span>`
-      : `<span style="background:#002855;color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem;">Admin</span>`;
-    tbody.innerHTML += `
-      <tr>
-        <td>${u.apellidos || ''} ${u.nombres || ''}</td>
-        <td>${u.email}</td>
-        <td>${u.empresas?.nombre || '—'}</td>
-        <td>${u.documento_tipo}: ${u.documento_numero || '—'}</td>
-        <td>${rolBadge}</td>
-        <td>${u.activo ? '✅ Activo' : '❌ Inactivo'}</td>
-        <td style="display:flex; gap:6px;">
-          <button onclick="toggleUsuario('${u.id}', ${u.activo})"
-            style="padding:5px 10px; background:${u.activo ? '#dc3545' : '#28a745'};
-                   color:white; border:none; border-radius:4px; cursor:pointer;">
-            ${u.activo ? 'Desactivar' : 'Activar'}
-          </button>
-          <button onclick="eliminarAdmin('${u.id}', '${u.apellidos} ${u.nombres}')"
-            style="padding:5px 10px; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer;">
-            🗑️ Eliminar
-          </button>
-        </td>
-      </tr>`;
-  });
+  _adminsCache = data || [];
+  const cont = document.getElementById('lista-admins');
+  cont.innerHTML = '';
+
+  if (!_adminsCache.length) {
+    cont.innerHTML = '<p style="color:#888;padding:12px;">No hay administradores ni gestores registrados.</p>';
+    return;
+  }
+
+  cont.innerHTML = _adminsCache.map((u, idx) => `
+    <div class="admin-row">
+      <div class="admin-row-info">
+        <div class="admin-avatar">${(u.apellidos || '?').trim().charAt(0)}${(u.nombres || '').trim().charAt(0)}</div>
+        <div>
+          <div class="admin-nombre">${u.apellidos || ''} ${u.nombres || ''}
+            <span class="${u.rol === 'gestor' ? 'badge-gestor' : 'badge-admin2'}">${u.rol === 'gestor' ? 'Gestor' : 'Admin'}</span>
+          </div>
+          <div class="admin-meta">${u.empresas?.nombre || '—'} · ${u.documento_tipo}: ${u.documento_numero || '—'} · ${u.email || 'sin correo'}</div>
+        </div>
+      </div>
+      <span class="${u.activo ? 'badge-activo' : 'badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span>
+      <div class="admin-row-actions">
+        <button class="btn-fila" onclick="abrirGestionSedes(${idx})" title="Elegir qué sedes puede ver">🌐 Sedes</button>
+        <button class="btn-fila" style="background:#0d6efd;color:#fff;" onclick="cambiarEmailAdmin(${idx})" title="Cambiar correo de acceso">✉️ Cambiar correo</button>
+        <button class="btn-fila" style="background:#e65100;color:#fff;" onclick="enviarResetPasswordAdmin(${idx})" title="Envía un correo para que fije su propia contraseña">📧 Cambiar contraseña</button>
+        <button class="btn-fila" style="background:#6f42c1;color:#fff;" onclick="hacerSuperadmin(${idx})" title="Dar acceso total de superadmin">⭐ Hacer superadmin</button>
+        <button class="btn-fila" style="background:${u.activo ? '#dc3545' : '#28a745'};color:#fff;" onclick="toggleUsuario('${u.id}', ${u.activo})">
+          ${u.activo ? 'Desactivar' : 'Activar'}
+        </button>
+        <button class="btn-fila" style="background:#6c757d;color:#fff;" onclick="eliminarAdmin('${u.id}', '${u.apellidos} ${u.nombres}')">🗑️ Eliminar</button>
+      </div>
+    </div>`).join('');
 }
+
+// Cambiar el correo de acceso de un admin/gestor — sincroniza el email de Auth vía la Edge Function.
+window.cambiarEmailAdmin = async function (idx) {
+  const u = _adminsCache[idx];
+  if (!u) return;
+  const nuevoEmail = prompt(`Correo de ${u.apellidos}, ${u.nombres} (con este ingresa y recupera su contraseña):`, u.email || '');
+  if (nuevoEmail === null) return;
+  if (!nuevoEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nuevoEmail)) {
+    alert('❌ Correo inválido. El correo es obligatorio para administradores y gestores.');
+    return;
+  }
+
+  const { data, error } = await supabase.functions.invoke('actualizar-usuario', {
+    body: { usuario_id: u.id, updates: { email: nuevoEmail } },
+  });
+  if (error || data?.error) { alert('❌ ' + (data?.error || error.message)); return; }
+  alert('✅ Correo actualizado. Ya puede ingresar y recuperar su contraseña con ese correo.');
+  await cargarAdmins();
+};
+
+// Envía un correo para que el propio admin/gestor fije su contraseña — nunca se resetea a DNI (inseguro).
+window.enviarResetPasswordAdmin = async function (idx) {
+  const u = _adminsCache[idx];
+  if (!u) return;
+  if (!u.email) {
+    alert('❌ Esta cuenta no tiene correo registrado. Usa "✉️ Cambiar correo" primero.');
+    return;
+  }
+  if (!await showConfirm(
+    `¿Enviar un correo a ${u.email} para que ${u.apellidos}, ${u.nombres} cambie su contraseña?`,
+    { confirmText: 'Sí, enviar' }
+  )) return;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(u.email, {
+    redirectTo: window.location.origin + '/cambiar-clave.html',
+  });
+  if (error) { alert('❌ ' + error.message); return; }
+  alert(`✅ Correo enviado a ${u.email}.`);
+};
+
+// Dar rol de superadmin — acceso total al sistema, acción sensible.
+window.hacerSuperadmin = async function (idx) {
+  const u = _adminsCache[idx];
+  if (!u) return;
+  if (!await showConfirm(
+    `¿Dar acceso de SUPERADMIN a ${u.apellidos}, ${u.nombres}?\n` +
+    `Esta persona podrá ver y administrar TODAS las empresas del sistema, no solo "${u.empresas?.nombre || 'su empresa'}".`,
+    { confirmText: 'Sí, dar superadmin' }
+  )) return;
+
+  const { data, error } = await supabase.functions.invoke('actualizar-usuario', {
+    body: { usuario_id: u.id, updates: { rol: 'superadmin' } },
+  });
+  if (error || data?.error) { alert('❌ ' + (data?.error || error.message)); return; }
+  alert(`✅ ${u.apellidos}, ${u.nombres} ahora es superadmin.`);
+  await cargarAdmins();
+  await cargarTodosUsuarios();
+};
+
+// ── Gestión de sedes por admin ──────────────────────────────────────────────
+window.abrirGestionSedes = async function (idx) {
+  const u = _adminsCache[idx];
+  if (!u) return;
+
+  const modal = document.getElementById('modal-sedes');
+  const cont = document.getElementById('modal-sedes-lista');
+  document.getElementById('modal-sedes-nombre').textContent = `${u.apellidos}, ${u.nombres}`;
+  cont.innerHTML = '<p style="color:#888;">Cargando sedes...</p>';
+  modal.style.display = 'flex';
+  modal.dataset.usuarioIdx = idx;
+
+  const [{ data: sedesEmpresa }, { data: sedesCursos }, { data: sedesActuales }] = await Promise.all([
+    supabase.from('perfil_sede').select('sede').eq('empresa_id', u.empresa_id),
+    supabase.from('cursos').select('sede').eq('empresa_id', u.empresa_id),
+    supabase.from('perfil_sede').select('sede, activo').eq('profile_id', u.id),
+  ]);
+
+  const todasSedes = Array.from(new Set([
+    ...(sedesEmpresa || []).map(s => s.sede),
+    ...(sedesCursos  || []).map(s => s.sede),
+  ].filter(Boolean))).sort();
+
+  const activasSet = new Set((sedesActuales || []).filter(s => s.activo).map(s => s.sede));
+
+  if (!todasSedes.length) {
+    cont.innerHTML = '<p style="color:#888;">Esta empresa todavía no tiene sedes registradas (sin cursos ni asignaciones).</p>';
+    return;
+  }
+
+  cont.innerHTML = todasSedes.map(s => `
+    <label style="display:flex; align-items:center; gap:8px; padding:7px 0; font-size:0.92rem;">
+      <input type="checkbox" class="chk-modal-sede" value="${s}" ${activasSet.has(s) ? 'checked' : ''} style="width:16px;height:16px;" />
+      ${s}
+    </label>`).join('');
+};
+
+window.cerrarModalSedes = function () {
+  document.getElementById('modal-sedes').style.display = 'none';
+};
+
+window.guardarSedesAdmin = async function () {
+  const modal = document.getElementById('modal-sedes');
+  const u = _adminsCache[modal.dataset.usuarioIdx];
+  if (!u) return;
+
+  const { data: sedesActuales } = await supabase.from('perfil_sede').select('sede, activo').eq('profile_id', u.id);
+  const activasAntes = new Set((sedesActuales || []).filter(s => s.activo).map(s => s.sede));
+
+  const marcadasAhora = new Set(
+    Array.from(document.querySelectorAll('.chk-modal-sede:checked')).map(c => c.value)
+  );
+
+  const agregarSedes = Array.from(marcadasAhora).filter(s => !activasAntes.has(s));
+  const quitarSedes   = Array.from(activasAntes).filter(s => !marcadasAhora.has(s));
+
+  if (!agregarSedes.length && !quitarSedes.length) { cerrarModalSedes(); return; }
+
+  const { data, error } = await supabase.functions.invoke('actualizar-usuario', {
+    body: { usuario_id: u.id, updates: {}, agregarSedes, quitarSedes },
+  });
+  if (error || data?.error) { alert('❌ ' + (data?.error || error.message)); return; }
+
+  alert(`✅ Sedes actualizadas para ${u.apellidos}, ${u.nombres}.`);
+  cerrarModalSedes();
+};
 
 window.eliminarAdmin = async function (id, nombre) {
   if (!await showConfirm(`¿Eliminar al administrador "${nombre}"?\nEsta acción no se puede deshacer.`, { confirmText: 'Eliminar' })) return;
@@ -261,16 +398,19 @@ window.crearAdmin = async function () {
   const nombres      = document.getElementById('admin-nombres').value.trim();
   const apellidos    = document.getElementById('admin-apellidos').value.trim();
   const doc_tipo     = document.getElementById('admin-doc-tipo').value;
-  const dni          = document.getElementById('admin-dni').value.trim();
+  const dniInput     = document.getElementById('admin-dni').value.trim();
   const email        = document.getElementById('admin-email').value.trim();
   const telefono     = document.getElementById('admin-telefono').value.trim();
   const empresa_id   = document.getElementById('admin-empresa').value;
   const cargo_id     = document.getElementById('admin-cargo').value;
   const fecha_ingreso = document.getElementById('admin-fecha-ingreso').value;
 
-  if (!nombres || !apellidos || !dni || !email || !empresa_id) {
+  if (!nombres || !apellidos || !dniInput || !email || !empresa_id) {
     alert('❌ Completa los campos obligatorios.'); return;
   }
+
+  // Normaliza a 8 dígitos con cero inicial — así la contraseña queda bien desde la creación.
+  const dni = normalizarDNI(dniInput);
 
   // Verificar DNI único
   const { data: existe } = await supabase
@@ -484,6 +624,13 @@ window.guardarBranding = async function () {
   msg.textContent = error ? '❌ ' + error.message : '✅ Branding guardado correctamente.';
   msg.style.color = error ? '#dc3545' : '#198754';
 };
+
+// Cerrar cualquier modal al hacer clic fuera de su contenido (en el fondo oscuro).
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal-overlay')) {
+    e.target.style.display = 'none';
+  }
+});
 
 // ═══════════════════════════════════════════════
 // ⏳ SPINNERS EN BOTONES

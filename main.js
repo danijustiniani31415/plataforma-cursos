@@ -454,7 +454,7 @@ async function mostrarPasoActual() {
   const paso    = pasosCurso[pasoActual];
   const tipoPaso = typeof paso === 'object' ? paso.tipo : paso;
   let contenidoHTML      = '';
-  let tituloPaso         = typeof paso === 'object' ? paso.titulo : obtenerTituloPaso(paso);
+  let tituloPaso         = typeof paso === 'object' ? (paso.titulo || obtenerTituloPaso(paso.tipo)) : obtenerTituloPaso(paso);
   let siguienteHabilitado = true;
 
   switch (tipoPaso) {

@@ -2813,7 +2813,15 @@ async function cargarPreguntas(formularioId, tipo) {
     const opciones = (p.opciones_pregunta || []).sort((a, b) => a.orden - b.orden).map(o => `
       <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:4px;
         background:${o.es_correcta ? '#d4edda' : '#f8f9fa'};border-radius:6px;font-size:0.85rem;">
-        <span style="flex:1;">${o.opcion}</span>
+        <span id="opcion-view-${o.id}" style="flex:1;">${o.opcion}</span>
+        <input id="opcion-edit-${o.id}" type="text" value="${o.opcion.replace(/"/g, '&quot;')}"
+          style="display:none;flex:1;padding:4px 7px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;" />
+        <button id="opcion-btn-editar-${o.id}" onclick="editarOpcion(${o.id})"
+          style="background:transparent;border:1px solid #ccc;border-radius:4px;padding:3px 7px;cursor:pointer;font-size:0.78rem;">✏️</button>
+        <button id="opcion-btn-guardar-${o.id}" onclick="guardarEdicionOpcion(${o.id},${p.id},${formularioId},'${tipo}')"
+          style="display:none;background:#1e3a5f;color:white;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:0.78rem;">Guardar</button>
+        <button id="opcion-btn-cancelar-${o.id}" onclick="cancelarEdicionOpcion(${o.id})"
+          style="display:none;background:#e0e0e0;border:none;border-radius:4px;padding:3px 7px;cursor:pointer;font-size:0.78rem;">✕</button>
         <button onclick="toggleCorrecta(${o.id},${p.id},${formularioId},'${tipo}')"
           style="background:${o.es_correcta ? '#28a745' : '#e0e0e0'};color:${o.es_correcta ? 'white' : '#555'};
           border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:0.78rem;">
@@ -2825,14 +2833,28 @@ async function cargarPreguntas(formularioId, tipo) {
     return `
       <div style="border-left:3px solid #1e3a5f;padding:10px 14px;margin-bottom:12px;background:#fafafa;border-radius:0 8px 8px 0;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-          <div>
+          <div id="pregunta-view-${p.id}" style="flex:1;">
             <span style="font-weight:600;color:#1e3a5f;font-size:0.85rem;">${i + 1}.</span>
             <span style="font-size:0.9rem;margin-left:6px;">${p.pregunta}</span>
             <span style="color:#888;font-size:0.78rem;margin-left:8px;">(${p.puntaje} pt${p.puntaje !== 1 ? 's' : ''})</span>
           </div>
-          <button onclick="eliminarPregunta(${p.id},${formularioId},'${tipo}')"
-            style="background:#dc3545;color:white;border:none;border-radius:5px;padding:4px 9px;cursor:pointer;font-size:0.8rem;white-space:nowrap;margin-left:8px;">
-            🗑️ Eliminar</button>
+          <div id="pregunta-edit-${p.id}" style="display:none;flex:1;gap:6px;align-items:center;flex-wrap:wrap;">
+            <input id="txt-editar-pregunta-${p.id}" type="text" value="${p.pregunta.replace(/"/g, '&quot;')}"
+              style="flex:1;min-width:200px;padding:6px 9px;border:1px solid #ddd;border-radius:5px;font-size:0.85rem;" />
+            <input id="pts-editar-pregunta-${p.id}" type="number" min="1" value="${p.puntaje}"
+              style="width:70px;padding:6px 9px;border:1px solid #ddd;border-radius:5px;font-size:0.85rem;" />
+          </div>
+          <div style="display:flex;gap:6px;margin-left:8px;white-space:nowrap;">
+            <button id="pregunta-btn-editar-${p.id}" onclick="editarPregunta(${p.id})"
+              style="background:transparent;border:1px solid #ccc;border-radius:5px;padding:4px 9px;cursor:pointer;font-size:0.8rem;">✏️ Editar</button>
+            <button id="pregunta-btn-guardar-${p.id}" onclick="guardarEdicionPregunta(${p.id},${formularioId},'${tipo}')"
+              style="display:none;background:#1e3a5f;color:white;border:none;border-radius:5px;padding:4px 9px;cursor:pointer;font-size:0.8rem;">Guardar</button>
+            <button id="pregunta-btn-cancelar-${p.id}" onclick="cancelarEdicionPregunta(${p.id})"
+              style="display:none;background:#e0e0e0;border:none;border-radius:5px;padding:4px 9px;cursor:pointer;font-size:0.8rem;">Cancelar</button>
+            <button onclick="eliminarPregunta(${p.id},${formularioId},'${tipo}')"
+              style="background:#dc3545;color:white;border:none;border-radius:5px;padding:4px 9px;cursor:pointer;font-size:0.8rem;">
+              🗑️ Eliminar</button>
+          </div>
         </div>
         <div>${opciones || '<em style="color:#aaa;font-size:0.82rem;">Sin opciones</em>'}</div>
         <div id="form-opcion-${p.id}" style="display:none;margin-top:8px;">
@@ -2850,6 +2872,59 @@ async function cargarPreguntas(formularioId, tipo) {
       </div>`;
   }).join('');
 }
+
+window.editarPregunta = function (preguntaId) {
+  document.getElementById(`pregunta-view-${preguntaId}`).style.display = 'none';
+  document.getElementById(`pregunta-edit-${preguntaId}`).style.display = 'flex';
+  document.getElementById(`pregunta-btn-editar-${preguntaId}`).style.display = 'none';
+  document.getElementById(`pregunta-btn-guardar-${preguntaId}`).style.display = 'inline-block';
+  document.getElementById(`pregunta-btn-cancelar-${preguntaId}`).style.display = 'inline-block';
+  document.getElementById(`txt-editar-pregunta-${preguntaId}`).focus();
+};
+
+window.cancelarEdicionPregunta = function (preguntaId) {
+  document.getElementById(`pregunta-view-${preguntaId}`).style.display = 'block';
+  document.getElementById(`pregunta-edit-${preguntaId}`).style.display = 'none';
+  document.getElementById(`pregunta-btn-editar-${preguntaId}`).style.display = 'inline-block';
+  document.getElementById(`pregunta-btn-guardar-${preguntaId}`).style.display = 'none';
+  document.getElementById(`pregunta-btn-cancelar-${preguntaId}`).style.display = 'none';
+};
+
+window.guardarEdicionPregunta = async function (preguntaId, formularioId, tipo) {
+  const texto = document.getElementById(`txt-editar-pregunta-${preguntaId}`).value.trim();
+  const pts   = parseFloat(document.getElementById(`pts-editar-pregunta-${preguntaId}`).value) || 1;
+  if (!texto) { alert('❌ Escribe el texto de la pregunta.'); return; }
+
+  const { error } = await supabase.from('preguntas').update({ pregunta: texto, puntaje: pts }).eq('id', preguntaId);
+  if (error) { alert('❌ ' + error.message); return; }
+  cargarPreguntas(formularioId, tipo);
+};
+
+window.editarOpcion = function (opcionId) {
+  document.getElementById(`opcion-view-${opcionId}`).style.display = 'none';
+  document.getElementById(`opcion-edit-${opcionId}`).style.display = 'block';
+  document.getElementById(`opcion-btn-editar-${opcionId}`).style.display = 'none';
+  document.getElementById(`opcion-btn-guardar-${opcionId}`).style.display = 'inline-block';
+  document.getElementById(`opcion-btn-cancelar-${opcionId}`).style.display = 'inline-block';
+  document.getElementById(`opcion-edit-${opcionId}`).focus();
+};
+
+window.cancelarEdicionOpcion = function (opcionId) {
+  document.getElementById(`opcion-view-${opcionId}`).style.display = 'block';
+  document.getElementById(`opcion-edit-${opcionId}`).style.display = 'none';
+  document.getElementById(`opcion-btn-editar-${opcionId}`).style.display = 'inline-block';
+  document.getElementById(`opcion-btn-guardar-${opcionId}`).style.display = 'none';
+  document.getElementById(`opcion-btn-cancelar-${opcionId}`).style.display = 'none';
+};
+
+window.guardarEdicionOpcion = async function (opcionId, preguntaId, formularioId, tipo) {
+  const texto = document.getElementById(`opcion-edit-${opcionId}`).value.trim();
+  if (!texto) { alert('❌ Escribe el texto de la opción.'); return; }
+
+  const { error } = await supabase.from('opciones_pregunta').update({ opcion: texto }).eq('id', opcionId);
+  if (error) { alert('❌ ' + error.message); return; }
+  cargarPreguntas(formularioId, tipo);
+};
 
 window.eliminarPregunta = async function (preguntaId, formularioId, tipo) {
   if (!await showConfirm('¿Eliminar esta pregunta y todas sus opciones?', { confirmText: 'Eliminar' })) return;

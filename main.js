@@ -1277,23 +1277,14 @@ window.consultarEstado = async function () {
       </table>`;
   }
 
-  // Si el trabajador pertenece a más de una sede, se separan los cursos por sede
-  let cuerpoHTML;
-  if (sedesTrabajador.length > 1) {
-    cuerpoHTML = sedesTrabajador.map(sede => {
-      const cursosSede = (cursos || []).filter(c => c.sede === sede);
-      if (!cursosSede.length) return '';
-      return `
-        <div style="margin-top:16px;">
-          <div style="font-weight:600; color:#002855; font-size:0.9rem; padding:4px 0; border-bottom:2px solid #002855; margin-bottom:2px;">
-            🏢 ${sede}
-          </div>
-          ${tablaCursos(cursosSede)}
-        </div>`;
-    }).join('');
-  } else {
-    cuerpoHTML = tablaCursos(cursos || []);
-  }
+  // Si el trabajador pertenece a más de una sede, se elige con un dropdown cuál ver
+  const selectorSedeHTML = sedesTrabajador.length > 1 ? `
+    <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
+      <label for="consulta-sede-select" style="font-size:0.85rem; color:#666; font-weight:500;">🏢 Sede:</label>
+      <select id="consulta-sede-select" style="flex:1; padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:0.88rem;">
+        ${sedesTrabajador.map(sede => `<option value="${sede}">${sede}</option>`).join('')}
+      </select>
+    </div>` : '';
 
   resultado.innerHTML = `
     <div class="consulta-card">
@@ -1301,6 +1292,22 @@ window.consultarEstado = async function () {
         <strong>👤 ${nombreCompleto}</strong>
         <span style="color:#666; font-size:0.85rem;">🏢 ${empresa}</span>
       </div>
-      ${cuerpoHTML}
+      ${selectorSedeHTML}
+      <div id="consulta-tabla-sede"></div>
     </div>`;
+
+  const contTabla = document.getElementById('consulta-tabla-sede');
+  const selectSede = document.getElementById('consulta-sede-select');
+
+  function renderSede(sede) {
+    const cursosSede = sede ? (cursos || []).filter(c => c.sede === sede) : (cursos || []);
+    contTabla.innerHTML = tablaCursos(cursosSede);
+  }
+
+  if (selectSede) {
+    selectSede.addEventListener('change', () => renderSede(selectSede.value));
+    renderSede(sedesTrabajador[0]);
+  } else {
+    renderSede(null);
+  }
 };

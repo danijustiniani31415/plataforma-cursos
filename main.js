@@ -1178,12 +1178,19 @@ window.consultarEstado = async function () {
     return;
   }
 
-  // Traer todos los cursos activos
-  const { data: cursos, error: errorCursos } = await supabase
-    .from('cursos')
-    .select('id, titulo')
-    .eq('activo', true)
-    .order('titulo');
+  // Sedes a las que pertenece el trabajador (puede tener más de una)
+  const { data: sedesPerfil } = await supabase
+    .from('perfil_sede')
+    .select('sede')
+    .eq('profile_id', perfil.id)
+    .eq('activo', true);
+
+  const sedesTrabajador = [...new Set((sedesPerfil || []).map(s => s.sede))];
+
+  // Traer los cursos activos de esas sedes (o todos, si el perfil no tiene sede asignada)
+  let queryCursos = supabase.from('cursos').select('id, titulo, sede').eq('activo', true).order('titulo');
+  if (sedesTrabajador.length) queryCursos = queryCursos.in('sede', sedesTrabajador);
+  const { data: cursos, error: errorCursos } = await queryCursos;
 
   if (errorCursos) {
     resultado.innerHTML = `<div class="consulta-error">❌ Error al cargar cursos: ${errorCursos.message}</div>`;
@@ -1228,8 +1235,7 @@ window.consultarEstado = async function () {
     return new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
-  let filasHTML = '';
-  for (const curso of (cursos || [])) {
+  function filaCurso(curso) {
     // Fecha de realización: preferir certificado si existe, sino envío
     const fechaRaw = certMap[curso.id] || envioMap[curso.id];
     let estadoHTML = '';
@@ -1251,11 +1257,42 @@ window.consultarEstado = async function () {
       estadoHTML = `<span class="estado-pendiente">⏳ Pendiente</span>`;
     }
 
-    filasHTML += `
+    return `
       <tr>
         <td style="padding:10px 12px; border-bottom:1px solid #eee; font-weight:500;">${curso.titulo}</td>
         <td style="padding:10px 12px; border-bottom:1px solid #eee;">${estadoHTML}</td>
       </tr>`;
+  }
+
+  function tablaCursos(listaCursos) {
+    return `
+      <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:0.88rem;">
+        <thead>
+          <tr style="background:#f5f7fa;">
+            <th style="padding:8px 12px; text-align:left; color:#002855;">Curso</th>
+            <th style="padding:8px 12px; text-align:left; color:#002855;">Estado · Fechas</th>
+          </tr>
+        </thead>
+        <tbody>${listaCursos.map(filaCurso).join('')}</tbody>
+      </table>`;
+  }
+
+  // Si el trabajador pertenece a más de una sede, se separan los cursos por sede
+  let cuerpoHTML;
+  if (sedesTrabajador.length > 1) {
+    cuerpoHTML = sedesTrabajador.map(sede => {
+      const cursosSede = (cursos || []).filter(c => c.sede === sede);
+      if (!cursosSede.length) return '';
+      return `
+        <div style="margin-top:16px;">
+          <div style="font-weight:600; color:#002855; font-size:0.9rem; padding:4px 0; border-bottom:2px solid #002855; margin-bottom:2px;">
+            🏢 ${sede}
+          </div>
+          ${tablaCursos(cursosSede)}
+        </div>`;
+    }).join('');
+  } else {
+    cuerpoHTML = tablaCursos(cursos || []);
   }
 
   resultado.innerHTML = `
@@ -1264,14 +1301,6 @@ window.consultarEstado = async function () {
         <strong>👤 ${nombreCompleto}</strong>
         <span style="color:#666; font-size:0.85rem;">🏢 ${empresa}</span>
       </div>
-      <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:0.88rem;">
-        <thead>
-          <tr style="background:#f5f7fa;">
-            <th style="padding:8px 12px; text-align:left; color:#002855;">Curso</th>
-            <th style="padding:8px 12px; text-align:left; color:#002855;">Estado · Fechas</th>
-          </tr>
-        </thead>
-        <tbody>${filasHTML}</tbody>
-      </table>
+      ${cuerpoHTML}
     </div>`;
 };

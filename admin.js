@@ -2652,13 +2652,13 @@ window.crearFormulario = async function (cursoId, tipo) {
   cargarFormulariosCurso();
 };
 
-// ── Nueva pregunta: modal con la pregunta y hasta 4 opciones (marcando la correcta) a la vez ──
+// ── Nueva pregunta: modal con la pregunta y hasta 5 opciones (marcando la correcta) a la vez ──
 window.abrirModalNuevaPregunta = function (formularioId, tipo) {
   document.getElementById('mnp-formulario-id').value = formularioId;
   document.getElementById('mnp-tipo').value = tipo;
   document.getElementById('mnp-texto').value = '';
   document.getElementById('mnp-puntaje').value = 1;
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 5; i++) {
     document.getElementById(`mnp-op-${i}`).value = '';
     document.getElementById(`mnp-correcta-${i}`).checked = false;
   }
@@ -2678,7 +2678,7 @@ window.guardarNuevaPreguntaCompleta = async function () {
   if (!texto) { alert('❌ Escribe el texto de la pregunta.'); return; }
 
   const opciones = [];
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 5; i++) {
     const val = document.getElementById(`mnp-op-${i}`).value.trim();
     if (val) opciones.push({ texto: val, correcta: document.getElementById(`mnp-correcta-${i}`).checked, orden: i });
   }
@@ -2711,18 +2711,18 @@ window.descargarPlantillaPreguntas = function (e) {
   e?.preventDefault();
   const XLSX = window.XLSX;
   const datos = [
-    ['Pregunta', 'Puntaje', 'Opción 1', 'Opción 2', 'Opción 3', 'Opción 4', 'Correcta (1-4)'],
-    ['¿Cuál es el equipo de protección obligatorio para trabajos en altura?', 1, 'Arnés', 'Guantes', 'Botas', 'Casco', 1],
+    ['Pregunta', 'Puntaje', 'Opción 1', 'Opción 2', 'Opción 3', 'Opción 4', 'Opción 5', 'Correcta (1-5)'],
+    ['¿Cuál es el equipo de protección obligatorio para trabajos en altura?', 1, 'Arnés', 'Guantes', 'Botas', 'Casco', '', 1],
   ];
   const ws = XLSX.utils.aoa_to_sheet(datos);
-  ws['!cols'] = [{ wch: 45 }, { wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 14 }];
+  ws['!cols'] = [{ wch: 45 }, { wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 14 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Preguntas');
   XLSX.writeFile(wb, 'plantilla_preguntas.xlsx');
 };
 
 // Importa preguntas de opción múltiple en bloque desde Excel.
-// Columnas: Pregunta, Puntaje, Opción 1-4 (deja vacías las que no uses), Correcta (1-4).
+// Columnas: Pregunta, Puntaje, Opción 1-5 (deja vacías las que no uses), Correcta (1-5).
 window.importarPreguntasExcel = async function (formularioId, tipo, inputEl) {
   const file = inputEl.files[0];
   if (!file) return;
@@ -2749,7 +2749,7 @@ window.importarPreguntasExcel = async function (formularioId, tipo, inputEl) {
   let ok = 0, errores = 0;
   for (let i = 0; i < filas.length; i++) {
     if (progreso) progreso.textContent = `⏳ Importando ${i + 1} de ${filas.length}...`;
-    const [pregunta, puntaje, op1, op2, op3, op4, correcta] = filas[i];
+    const [pregunta, puntaje, op1, op2, op3, op4, op5, correcta] = filas[i];
     if (!pregunta) continue;
     orden++;
 
@@ -2759,7 +2759,7 @@ window.importarPreguntasExcel = async function (formularioId, tipo, inputEl) {
 
     if (error || !nuevaPregunta) { errores++; continue; }
 
-    const opciones = [op1, op2, op3, op4]
+    const opciones = [op1, op2, op3, op4, op5]
       .map((texto, idx) => texto ? {
         id_pregunta: nuevaPregunta.id,
         opcion: String(texto).trim(),

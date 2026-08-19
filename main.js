@@ -33,10 +33,12 @@ let pasosCurso        = [];
 let formularios       = {};
 let materialVisto     = false;
 let cursosAprobados   = {}; // { [curso_id]: true }
-let sedeActiva        = null;
+let sedeActiva        = null; // sede de la pestaña actualmente visible en "Mis Cursos"
+let sedesTrabajador   = []; // todas las sedes activas del perfil (para las pestañas)
 
 // ═══════════════════════════════
-// 🏢 SEDE — detectar y, si hace falta, pedir que elija
+// 🏢 SEDE — detectar todas las sedes del perfil (ya no bloquea con selector;
+// si tiene más de una, se muestran como pestañas dentro de "Mis Cursos")
 // ═══════════════════════════════
 const sedeSection = document.getElementById('sede-section');
 
@@ -51,45 +53,18 @@ async function resolverSedeYContinuar(user) {
 
   if (error || !sedes || sedes.length === 0) {
     // Sin filas en perfil_sede (perfil antiguo no migrado, o error) — seguir sin bloquear
+    sedesTrabajador = [];
     sedeActiva = sedeGuardada || null;
     await continuarLuegoDeSede(user);
     return;
   }
 
-  if (sedes.length === 1) {
-    sedeActiva = sedes[0].sede;
-    sessionStorage.setItem('sedeActiva', sedeActiva);
-    await continuarLuegoDeSede(user);
-    return;
-  }
-
-  // Más de una sede: si ya había una elegida en esta sesión y sigue siendo válida, úsala
-  if (sedeGuardada && sedes.some(s => s.sede === sedeGuardada)) {
-    sedeActiva = sedeGuardada;
-    await continuarLuegoDeSede(user);
-    return;
-  }
-
-  // Mostrar selector
-  loginSection.style.display = 'none';
-  consultaSection.style.display = 'none';
-  sedeSection.style.display = 'block';
-
-  const lista = document.getElementById('lista-sedes');
-  lista.innerHTML = '';
-  sedes.forEach(s => {
-    const btn = document.createElement('button');
-    btn.className = 'btn-primary';
-    btn.style.marginBottom = '10px';
-    btn.textContent = s.sede;
-    btn.onclick = async () => {
-      sedeActiva = s.sede;
-      sessionStorage.setItem('sedeActiva', sedeActiva);
-      sedeSection.style.display = 'none';
-      await continuarLuegoDeSede(user);
-    };
-    lista.appendChild(btn);
-  });
+  sedesTrabajador = [...new Set(sedes.map(s => s.sede))];
+  sedeActiva = (sedeGuardada && sedesTrabajador.includes(sedeGuardada))
+    ? sedeGuardada
+    : sedesTrabajador[0];
+  sessionStorage.setItem('sedeActiva', sedeActiva);
+  await continuarLuegoDeSede(user);
 }
 
 async function continuarLuegoDeSede(user) {
@@ -250,12 +225,16 @@ async function verificarAdmin(userId) {
 // ═══════════════════════════════
 // 📚 CARGAR CURSOS
 // ═══════════════════════════════
+let cursosTodasSedes = []; // cursos ya filtrados por ruta/individual, de todas las sedes del trabajador
+
 async function cargarCursos() {
+  const sedesConsulta = sedesTrabajador.length ? sedesTrabajador : [sedeActiva || 'ANTAMINA'];
+
   let { data: cursos, error } = await supabase
     .from('cursos')
     .select('*')
     .eq('activo', true)
-    .eq('sede', sedeActiva || 'ANTAMINA')
+    .in('sede', sedesConsulta)
     .order('titulo');
 
   if (error) { alert("❌ Error al cargar cursos: " + error.message); return; }
@@ -277,13 +256,14 @@ async function cargarCursos() {
   // Si el cargo del trabajador tiene cursos obligatorios configurados, filtrar
   // la lista a solo esos (+ excepciones individuales). Si el cargo no tiene
   // nada configurado todavía, se sigue mostrando todo (comportamiento anterior).
+  // La configuración de rutas es por sede, así que se evalúa sede por sede.
   if (perfil?.cargo_id) {
     const [{ data: rutas }, { data: individuales }] = await Promise.all([
       supabase
         .from('rutas_aprendizaje')
-        .select('ruta_cursos(curso_id)')
+        .select('sede, ruta_cursos(curso_id)')
         .eq('empresa_id', perfil.empresa_id)
-        .eq('sede', sedeActiva || 'ANTAMINA')
+        .in('sede', sedesConsulta)
         .eq('cargo_id', perfil.cargo_id),
       supabase
         .from('curso_asignacion_individual')
@@ -291,13 +271,30 @@ async function cargarCursos() {
         .eq('profile_id', usuarioActual.id),
     ]);
 
-    const tieneConfiguracion = (rutas || []).some(r => (r.ruta_cursos || []).length > 0);
-    if (tieneConfiguracion) {
-      const idsRequeridos = new Set();
-      (rutas || []).forEach(r => (r.ruta_cursos || []).forEach(rc => idsRequeridos.add(rc.curso_id)));
-      (individuales || []).forEach(i => idsRequeridos.add(i.curso_id));
-      cursos = cursos.filter(c => idsRequeridos.has(c.id));
-    }
+    const idsIndividuales = new Set((individuales || []).map(i => i.curso_id));
+    const idsRequeridosPorSede = {}; // { [sede]: Set(curso_id) } — solo sedes con configuración
+    (rutas || []).forEach(r => {
+      const ids = (r.ruta_cursos || []).map(rc => rc.curso_id);
+      if (!ids.length) return;
+      if (!idsRequeridosPorSede[r.sede]) idsRequeridosPorSede[r.sede] = new Set();
+      ids.forEach(id => idsRequeridosPorSede[r.sede].add(id));
+    });
+
+    cursos = cursos.filter(c => {
+      const requeridos = idsRequeridosPorSede[c.sede];
+      if (!requeridos) return true; // esa sede no tiene ruta configurada para el cargo: se muestra todo
+      return requeridos.has(c.id) || idsIndividuales.has(c.id);
+    });
+  }
+
+  cursosTodasSedes = cursos;
+
+  // Si la sede activa no tiene cursos cargados (p.ej. quedó guardada de una sesión
+  // anterior sin cursos en esta empresa), cae a la primera sede con cursos.
+  const sedesConCursos = [...new Set(cursosTodasSedes.map(c => c.sede))];
+  if (sedesConCursos.length && !sedesConCursos.includes(sedeActiva)) {
+    sedeActiva = sedesConCursos[0];
+    sessionStorage.setItem('sedeActiva', sedeActiva);
   }
 
   const empresa = perfil?.empresas;
@@ -328,8 +325,53 @@ async function cargarCursos() {
   });
   cursosAprobados = estadoCurso;
 
-  const now   = new Date();
-  const in30  = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  renderTabsSede();
+  renderCursos();
+
+  await cargarGamificacion(perfil);
+}
+
+// ═══════════════════════════════
+// 🏢 PESTAÑAS DE SEDE (solo si el trabajador pertenece a más de una)
+// ═══════════════════════════════
+function renderTabsSede() {
+  const tabsSection = document.getElementById('sede-tabs');
+  if (!tabsSection) return;
+
+  const sedesConCursos = [...new Set(cursosTodasSedes.map(c => c.sede))];
+
+  if (sedesConCursos.length < 2) {
+    tabsSection.style.display = 'none';
+    tabsSection.innerHTML = '';
+    return;
+  }
+
+  tabsSection.style.display = 'flex';
+  tabsSection.innerHTML = '';
+  sedesConCursos.forEach(sede => {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'sede-tab' + (sede === sedeActiva ? ' sede-tab-activo' : '');
+    tab.textContent = sede;
+    tab.onclick = () => {
+      sedeActiva = sede;
+      sessionStorage.setItem('sedeActiva', sedeActiva);
+      renderTabsSede();
+      renderCursos();
+    };
+    tabsSection.appendChild(tab);
+  });
+}
+
+// ═══════════════════════════════
+// 📚 RENDERIZAR LISTA DE CURSOS (de la sede/pestaña activa)
+// ═══════════════════════════════
+function renderCursos() {
+  const cursos = cursosTodasSedes.filter(c => c.sede === sedeActiva);
+  const estadoCurso = cursosAprobados;
+
+  const now  = new Date();
+  const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
   const listaCursos = document.getElementById('lista-cursos');
   listaCursos.innerHTML = '';
@@ -374,8 +416,6 @@ async function cargarCursos() {
     btn.onclick = () => mostrarCurso(curso);
     listaCursos.appendChild(btn);
   });
-
-  await cargarGamificacion(perfil);
 }
 
 // ═══════════════════════════════
@@ -546,7 +586,7 @@ async function mostrarPasoActual() {
             email:      usuarioActual.email,
             usuario_id: usuarioActual.id,
             curso_id:   cursoSeleccionado.id,
-            sede:       sedeActiva || 'ANTAMINA'
+            sede:       cursoSeleccionado.sede || sedeActiva || 'ANTAMINA'
           }]);
         }
       }
@@ -813,7 +853,7 @@ window.enviarFormulario = async function (tipoPaso) {
       usuario_email: usuarioActual.email,
       id_curso:      cursoSeleccionado.id,
       estado:        'completado',
-      sede:          sedeActiva || 'ANTAMINA'
+      sede:          cursoSeleccionado.sede || sedeActiva || 'ANTAMINA'
     }])
     .select()
     .single();

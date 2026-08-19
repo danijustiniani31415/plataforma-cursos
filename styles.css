@@ -1258,6 +1258,30 @@ a:hover { text-decoration: underline; }
 .estado-vencido     { background: #fee2e2; color: #991b1b; }
 .estado-por-vencer  { background: #fef3c7; color: #92400e; }
 
+/* Pestañas de sede (Antamina / Engie) en "Mis Cursos" */
+.sede-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.sede-tab {
+  padding: 10px 18px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.sede-tab:hover { color: var(--navy); }
+.sede-tab-activo {
+  color: var(--navy);
+  border-bottom-color: var(--navy);
+}
+
 /* ═══════════════════════════════════════════
    NAVEGACIÓN DE PASOS — STICKY MÓVIL
 ═══════════════════════════════════════════ */

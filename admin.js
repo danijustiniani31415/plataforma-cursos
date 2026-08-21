@@ -557,7 +557,7 @@ window.subirCurso = async function () {
   const correlativo = String((count || 0) + 1).padStart(4, '0');
   const codigo = `${prefijo}-${anio}-${correlativo}`;
 
-  const { error } = await supabase.from("cursos").insert([{
+  const { data: nuevoCurso, error } = await supabase.from("cursos").insert([{
     titulo,
     codigo_prefijo: prefijo,
     codigo,
@@ -565,11 +565,26 @@ window.subirCurso = async function () {
     vigencia_meses,
     activo:       true,
     sede:         sedeAdminActiva
-  }]);
+  }]).select().single();
 
   if (error) {
     alert("❌ Error al subir curso: " + error.message);
   } else {
+    // Todo curso nuevo es obligatorio por defecto: se agrega a las rutas de
+    // aprendizaje ya configuradas para cualquier cargo en esta sede/empresa.
+    // Los cargos sin ruta configurada ya ven todos los cursos automáticamente.
+    const { data: rutas } = await supabase
+      .from('rutas_aprendizaje')
+      .select('id')
+      .eq('empresa_id', empresaAdminId)
+      .eq('sede', sedeAdminActiva);
+
+    if (rutas?.length) {
+      await supabase.from('ruta_cursos').insert(
+        rutas.map(r => ({ ruta_id: r.id, curso_id: nuevoCurso.id, obligatorio: true }))
+      );
+    }
+
     alert(`✅ Curso subido correctamente.\nCódigo: ${codigo}\n\nAhora ábrelo con "✏️ Editar" en la lista de cursos para subir el material y los videos.`);
     ["titulo-curso", "codigo-prefijo", "duracion-curso", "vigencia-curso"].forEach(id => {
       document.getElementById(id).value = '';
@@ -3611,7 +3626,12 @@ function renderMatrizObligatorios() {
 
   const header = cursos.map(c => `<th title="${c.titulo}">${c.titulo}</th>`).join('');
   const filas = cargos.map(cg => {
-    const marcados = window._cursosPorCargo[cg.id] || new Set();
+    // Si el cargo no tiene ruta configurada, ve TODOS los cursos por defecto
+    // (ver cargarCursos en main.js): se muestran todas las casillas marcadas
+    // para reflejar ese comportamiento real.
+    const marcados = window._rutaPorCargo[cg.id]
+      ? window._cursosPorCargo[cg.id]
+      : new Set(cursos.map(c => c.id));
     const celdas = cursos.map(c => `
       <td>
         <input type="checkbox" ${marcados.has(c.id) ? 'checked' : ''}
@@ -3633,7 +3653,9 @@ window.toggleCargoCurso = async function (cargoId, cursoId, marcado) {
   let rutaId = window._rutaPorCargo[cargoId];
 
   if (!rutaId) {
-    if (!marcado) return;
+    // El cargo no tenía ruta: veía TODOS los cursos por defecto. Al tocar una
+    // casilla se crea la ruta explícita, preservando ese mismo conjunto
+    // (todos los cursos) salvo el que se acaba de desmarcar.
     const cargo = window._cargosObl.find(c => c.id === cargoId);
     const { data, error } = await supabase.from('rutas_aprendizaje').insert({
       empresa_id: empresaAdminId,
@@ -3644,7 +3666,18 @@ window.toggleCargoCurso = async function (cargoId, cursoId, marcado) {
     if (error) { alert('❌ ' + error.message); return; }
     rutaId = data.id;
     window._rutaPorCargo[cargoId] = rutaId;
-    window._cursosPorCargo[cargoId] = new Set();
+
+    const idsIniciales = new Set(window._cursosObl.map(c => c.id));
+    if (!marcado) idsIniciales.delete(cursoId);
+    window._cursosPorCargo[cargoId] = idsIniciales;
+
+    if (idsIniciales.size) {
+      const { error: errIns } = await supabase.from('ruta_cursos').insert(
+        [...idsIniciales].map(id => ({ ruta_id: rutaId, curso_id: id, obligatorio: true }))
+      );
+      if (errIns) { alert('❌ ' + errIns.message); return; }
+    }
+    return;
   }
 
   if (marcado) {

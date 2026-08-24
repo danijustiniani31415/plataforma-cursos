@@ -249,8 +249,11 @@ async function cargarCursos() {
     supabase
       .from('envios_formulario')
       .select('id_curso, aprobado, created_at, formularios(tipo)')
-      .eq('usuario_email', usuarioActual.email)
-      .eq('estado', 'completado'),
+      .eq('estado', 'completado')
+      // Se busca por usuario_id (estable) o por email: si el correo del perfil
+      // cambió después de rendir el examen, o el envío quedó sin usuario_id,
+      // el curso aparecía como "Pendiente" pese a estar aprobado.
+      .or(`usuario_id.eq.${usuarioActual.id},usuario_email.eq.${usuarioActual.email}`),
   ]);
 
   // Si el cargo del trabajador tiene cursos obligatorios configurados, filtrar

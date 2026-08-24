@@ -1040,12 +1040,14 @@ window.generarReporteNotas = async function () {
     : new Date(Date.UTC(anio + 1, 0, 1, 5, 0, 0)).toISOString();
 
   try {
-    // Paso 1: IDs de formularios tipo 'examen' (filtrado opcional por curso)
+    // Paso 1: IDs de formularios tipo 'examen'/'eficacia' (filtrado opcional por curso)
+    // — deben ser los mismos tipos que dan por aprobado un curso (ver main.js, esEvaluacion),
+    // si no, los cursos evaluados con 'eficacia' quedaban totalmente fuera del reporte.
     const examFormIds = [];
     {
       let pg = 0;
       while (true) {
-        let qf = supabase.from('formularios').select('id').eq('tipo', 'examen')
+        let qf = supabase.from('formularios').select('id').in('tipo', ['examen', 'eficacia'])
           .range(pg * 1000, (pg + 1) * 1000 - 1);
         if (cursoId) qf = qf.eq('id_curso', cursoId);
         const { data: fd, error: fe } = await qf;
@@ -1201,14 +1203,17 @@ window.generarReporteNotas = async function () {
     const mapCursos = {};
     (cursos || []).forEach(c => { mapCursos[c.id] = c.titulo; });
 
+    // Si no hay envio_formulario que cruce (sede/usuario distinto, o formulario no
+    // encontrado), no se descarta el certificado: se usa su propia fecha de creación
+    // como fecha efectiva, para no perder certificados que sí muestran las cards.
     _rn_datos = allCerts
       .map(r => {
         const kId    = `${r.usuario_id}|${r.curso_id}`;
         const kEmail = `${r.usuario_email}|${r.curso_id}`;
-        const fecha_examen = enviosMapById[kId] || enviosMapByEmail[kEmail] || null;
+        const fecha_examen = enviosMapById[kId] || enviosMapByEmail[kEmail] || r.fecha || null;
         return { ...r, fecha_examen, curso_nombre: mapCursos[r.curso_id] || '—' };
       })
-      .filter(r => r.fecha_examen !== null)
+      .filter(r => r.fecha_examen !== null && r.fecha_examen >= desde && r.fecha_examen < hasta)
       .sort((a, b) => b.fecha_examen.localeCompare(a.fecha_examen));
 
     console.log('[RN] resultado final:', _rn_datos.length,
@@ -1776,6 +1781,7 @@ window.descargarCertificadosMasivo = async function () {
           usuario_id: perfil.id,
           usuario_email: perfil.email || e.usuario_email || '',
           curso_id: cursoId,
+          sede: sedeAdminActiva,
           codigo: `${prefijo}-${anio}-${String(correlativoActual).padStart(4, '0')}`,
           nota: Number(e.puntaje || 0),
           nombres: perfil.nombres || '',
@@ -1783,6 +1789,7 @@ window.descargarCertificadosMasivo = async function () {
           dni: perfil.documento_numero || '',
           cargo: perfil.cargos?.nombre || '',
           empresa: perfil.empresas?.nombre || '',
+          fecha: e.created_at,
         });
       }
 
